@@ -3509,15 +3509,45 @@ function netoptParseRateCSV(mode, input) {
         // Parse parcel CSV: header is weight,zone2,zone3,...zone8
         var rates = [];
         var weights = [];
+        var parseErrors = [];
+        var expectedCols = lines[0].split(',').length;
         for (var i = 1; i < lines.length; i++) {
           var cols = lines[i].split(',').map(function(c) { return parseFloat(c.trim()); });
+          if (cols.length < expectedCols) {
+            parseErrors.push('Row ' + i + ': expected ' + expectedCols + ' columns, got ' + cols.length);
+            continue;
+          }
+          if (isNaN(cols[0]) || cols[0] <= 0) {
+            parseErrors.push('Row ' + i + ': invalid weight "' + lines[i].split(',')[0].trim() + '"');
+            continue;
+          }
+          var rowRates = cols.slice(1);
+          var hasNaN = rowRates.some(function(v) { return isNaN(v) || v < 0; });
+          if (hasNaN) {
+            parseErrors.push('Row ' + i + ': contains non-numeric or negative rate values');
+            continue;
+          }
           weights.push(cols[0]);
-          rates.push(cols.slice(1));
+          rates.push(rowRates);
+        }
+        if (weights.length === 0) {
+          status.textContent = 'No valid rows found' + (parseErrors.length ? ': ' + parseErrors[0] : '');
+          status.style.color = '#dc2626';
+          return;
+        }
+        // Verify weights are ascending
+        for (var w = 1; w < weights.length; w++) {
+          if (weights[w] <= weights[w-1]) {
+            parseErrors.push('Warning: weights not ascending at row ' + (w+1));
+            break;
+          }
         }
         NETOPT_PARCEL_RATES.custom = { weights: weights, zones: [2,3,4,5,6,7,8], rates: rates };
         document.getElementById('netopt-parcel-carrier').value = 'custom';
-        status.textContent = lines.length - 1 + ' rows loaded';
-        status.style.color = '#059669';
+        var msg = weights.length + ' rows loaded';
+        if (parseErrors.length) msg += ' (' + parseErrors.length + ' skipped)';
+        status.textContent = msg;
+        status.style.color = parseErrors.length ? '#d97706' : '#059669';
       } else if (mode === 'tl' && lines.length > 1) {
         // Simple avg: take mean of rate column
         var total = 0, count = 0;
@@ -3816,62 +3846,8 @@ function netoptNewScenario() {
   netoptShowTool();
 }
 
-// ── FLEET MODELER LANDING ──
-async function fmShowLanding() {
-  var landing = document.getElementById('fm-landing');
-  var tool = document.getElementById('fm-tool');
-  if (landing) landing.style.display = 'block';
-  if (tool) tool.style.display = 'none';
-  await fmLoadScenariosList();
-}
-
-async function fmShowTool() {
-  var landing = document.getElementById('fm-landing');
-  var tool = document.getElementById('fm-tool');
-  if (landing) landing.style.display = 'none';
-  if (tool) tool.style.display = 'block';
-}
-
-async function fmLoadScenariosList() {
-  try {
-    var scenarios = await cmFetchTable('fleet_scenarios', 'order=created_at.desc');
-    var grid = document.getElementById('fm-landing-grid');
-
-    if (!grid) return;
-
-    if (scenarios.length === 0) {
-      grid.innerHTML = '';
-      dtToggleLandingEmpty('fm-landing-actions', 'fm-empty-state', true);
-      return;
-    }
-
-    dtToggleLandingEmpty('fm-landing-actions', 'fm-empty-state', false);
-
-    grid.innerHTML = scenarios.map(function(s) {
-      var sid = s.id;
-      return '<div class="dt-landing-card">' +
-        '<div onclick="fmLoadFleetScenario(\'' + sid + '\'); fmShowTool()" style="cursor:pointer;">' +
-        '<div class="dt-landing-card-name">' + (s.name || 'Untitled') + '</div>' +
-        '<div class="dt-landing-card-meta">' + (s.created_at ? new Date(s.created_at).toLocaleDateString() : '') + '</div>' +
-        '<div class="dt-landing-card-metric">' + (s.notes ? s.notes.substring(0, 60) + '...' : 'Fleet scenario') + '</div>' +
-        '</div>' +
-        '<div class="dt-landing-card-actions">' +
-        '<button class="dt-card-btn-copy" onclick="event.stopPropagation(); dtCopyScenario(\'fleet_scenarios\',\'' + sid + '\',\'fleet\')"><svg width="12" height="12" fill="none" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2" stroke="currentColor" stroke-width="2"/></svg> Copy</button>' +
-        '<button class="dt-card-btn-delete" onclick="event.stopPropagation(); dtDeleteScenario(\'fleet_scenarios\',\'' + sid + '\',\'fleet\')"><svg width="12" height="12" fill="none" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Delete</button>' +
-        '</div></div>';
-    }).join('');
-  } catch (e) {
-    console.error('Error loading scenarios:', e);
-  }
-}
-
-function fmNewScenario() {
-  // Reset fleet modeler for new scenario (if function exists)
-  if (typeof fmClearAllScenarios === 'function') {
-    fmClearAllScenarios();
-  }
-  fmShowTool();
-}
+// NOTE: fmShowLanding, fmShowTool, fmLoadScenariosList, fmNewScenario
+// are defined in fleet-modeler.js alongside the other fm* functions.
 
 async function fmLoadFleetScenario(id) {
   try {
@@ -5185,6 +5161,11 @@ function netoptEvaluateConfig(config, demands, transport, constraints) {
 
 // Exact solver: enumerate all facility combinations to find provably optimal
 function netoptExactOptimize(facilities, demands, transport, constraints) {
+  var candidateCount = facilities.filter(f => f.status === 'Candidate').length;
+  if (candidateCount > 20) {
+    var proceed = confirm('Exact solver with ' + candidateCount + ' candidate facilities may take a long time or hang the browser.\n\nRecommend using Heuristic mode for 15+ candidates.\n\nContinue anyway?');
+    if (!proceed) return [];
+  }
   var minFacs = constraints.minFacilities || 1;
   var maxFacs = Math.min(constraints.maxFacilities || 5, facilities.length);
   var lockedFacs = facilities.filter(f => f.status === 'Locked Open');

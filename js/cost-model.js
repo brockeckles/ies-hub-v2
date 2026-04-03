@@ -5450,7 +5450,7 @@ const dealApp = {
                 return;
             }
 
-            const options = unlinked.map(p => `${p.project_name || '(Untitled)'} (ID: ${p.id.substring(0, 8)})`).join('\n');
+            const options = unlinked.map(p => `${p.name || '(Untitled)'} (ID: ${p.id.substring(0, 8)})`).join('\n');
             const selectedText = prompt('Select a project to link:\n\n' + options);
 
             if (selectedText) {
@@ -5711,8 +5711,12 @@ const dealApp = {
 
         try {
             // Determine which stage to activate
-            var targetStageNum = deal.current_stage_id ? null : 1; // Start at Stage 1 if no stage yet
-            if (!targetStageNum) return;
+            // If no stage yet, start at Stage 1; if already activated, allow re-activation at current stage
+            var targetStageNum = 1;
+            if (deal.current_stage_id) {
+                var existingStage = this.dosStages.find(function(s){ return s.id === deal.current_stage_id; });
+                if (existingStage) targetStageNum = existingStage.stage_number;
+            }
 
             var targetStage = this.dosStages.find(function(s){ return s.stage_number === targetStageNum; });
             if (!targetStage) return;

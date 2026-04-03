@@ -490,7 +490,8 @@ const fmApp = {
     Object.keys(byType).forEach(vtype => {
       const data = byType[vtype];
       const vehiclesFromHours = Math.ceil(data.hours / availableHoursPerWeek);
-      const vehiclesAdjusted = Math.ceil(vehiclesFromHours / (this.config.utilization / 100));
+      const utilPct = (this.config.utilization > 0 ? this.config.utilization : 85) / 100;
+      const vehiclesAdjusted = Math.ceil(vehiclesFromHours / utilPct);
       vehicleFleet[vtype] = vehiclesAdjusted;
     });
 

@@ -375,62 +375,8 @@ function netoptNewScenario() {
   netoptShowTool();
 }
 
-// ── FLEET MODELER LANDING ──
-async function fmShowLanding() {
-  var landing = document.getElementById('fm-landing');
-  var tool = document.getElementById('fm-tool');
-  if (landing) landing.style.display = 'block';
-  if (tool) tool.style.display = 'none';
-  await fmLoadScenariosList();
-}
-
-async function fmShowTool() {
-  var landing = document.getElementById('fm-landing');
-  var tool = document.getElementById('fm-tool');
-  if (landing) landing.style.display = 'none';
-  if (tool) tool.style.display = 'block';
-}
-
-async function fmLoadScenariosList() {
-  try {
-    var scenarios = await cmFetchTable('fleet_scenarios', 'order=created_at.desc');
-    var grid = document.getElementById('fm-landing-grid');
-
-    if (!grid) return;
-
-    if (scenarios.length === 0) {
-      grid.innerHTML = '';
-      dtToggleLandingEmpty('fm-landing-actions', 'fm-empty-state', true);
-      return;
-    }
-
-    dtToggleLandingEmpty('fm-landing-actions', 'fm-empty-state', false);
-
-    grid.innerHTML = scenarios.map(function(s) {
-      var sid = s.id;
-      return '<div class="dt-landing-card">' +
-        '<div onclick="fmLoadFleetScenario(\'' + sid + '\'); fmShowTool()" style="cursor:pointer;">' +
-        '<div class="dt-landing-card-name">' + (s.name || 'Untitled') + '</div>' +
-        '<div class="dt-landing-card-meta">' + (s.created_at ? new Date(s.created_at).toLocaleDateString() : '') + '</div>' +
-        '<div class="dt-landing-card-metric">' + (s.notes ? s.notes.substring(0, 60) + '...' : 'Fleet scenario') + '</div>' +
-        '</div>' +
-        '<div class="dt-landing-card-actions">' +
-        '<button class="dt-card-btn-copy" onclick="event.stopPropagation(); dtCopyScenario(\'fleet_scenarios\',\'' + sid + '\',\'fleet\')"><svg width="12" height="12" fill="none" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2" stroke="currentColor" stroke-width="2"/></svg> Copy</button>' +
-        '<button class="dt-card-btn-delete" onclick="event.stopPropagation(); dtDeleteScenario(\'fleet_scenarios\',\'' + sid + '\',\'fleet\')"><svg width="12" height="12" fill="none" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Delete</button>' +
-        '</div></div>';
-    }).join('');
-  } catch (e) {
-    console.error('Error loading scenarios:', e);
-  }
-}
-
-function fmNewScenario() {
-  // Reset fleet modeler for new scenario (if function exists)
-  if (typeof fmClearAllScenarios === 'function') {
-    fmClearAllScenarios();
-  }
-  fmShowTool();
-}
+// NOTE: fmShowLanding, fmShowTool, fmLoadScenariosList, fmNewScenario
+// are defined in fleet-modeler.js alongside the other fm* functions.
 
 async function fmLoadFleetScenario(id) {
   try {

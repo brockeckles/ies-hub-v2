@@ -894,7 +894,20 @@ const mostApp = {
   scenarios: [],
   allowanceProfiles: [],
 
+  // Persist scenarios to localStorage
+  _saveScenarios() {
+    try { localStorage.setItem('most_scenarios', JSON.stringify(this.scenarios)); } catch(e) {}
+  },
+  _loadScenarios() {
+    try {
+      var saved = localStorage.getItem('most_scenarios');
+      if (saved) this.scenarios = JSON.parse(saved);
+    } catch(e) {}
+  },
+
   async initAnalysis() {
+    this._loadScenarios();
+    if (this.scenarios.length > 0) this.renderScenarios();
     // Load allowance profiles for the dropdown
     if (this.allowanceProfiles.length === 0) {
       try {
@@ -1057,6 +1070,7 @@ const mostApp = {
       annualCost: document.getElementById('qlaResAnnualCost').textContent
     });
 
+    this._saveScenarios();
     this.renderScenarios();
     showToast('Scenario saved', 'success');
   },
@@ -1086,6 +1100,7 @@ const mostApp = {
 
   removeScenario(idx) {
     this.scenarios.splice(idx, 1);
+    this._saveScenarios();
     this.renderScenarios();
   },
 
