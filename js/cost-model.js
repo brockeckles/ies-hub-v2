@@ -983,16 +983,16 @@ const cmApp = {
             // Set deal selector if project is linked to a deal
             // Ensure deals are loaded first (they may not be if page just loaded)
             var cmDealSel = document.getElementById('cmDealSelector');
-            if (cmDealSel && p.deal_id) {
+            if (cmDealSel && p.deal_deals_id) {
                 // If selector has no options yet, reload deals first
                 if (cmDealSel.options.length <= 1) {
                     await daLoadDealsForSelector();
                 }
-                cmDealSel.value = String(p.deal_id);
+                cmDealSel.value = String(p.deal_deals_id);
                 // If value didn't stick (option doesn't exist), try once more after a delay
-                if (cmDealSel.value !== String(p.deal_id)) {
+                if (cmDealSel.value !== String(p.deal_deals_id)) {
                     setTimeout(function() {
-                        cmDealSel.value = String(p.deal_id);
+                        cmDealSel.value = String(p.deal_deals_id);
                     }, 500);
                 }
             } else if (cmDealSel) {
