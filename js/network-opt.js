@@ -3747,6 +3747,8 @@ async function netShowTool() {
   var tool = document.getElementById('net-tool');
   if (landing) landing.style.display = 'none';
   if (tool) tool.style.display = 'block';
+  // Initialize Leaflet map (or invalidateSize if already init'd)
+  setTimeout(function(){ initNetworkMap(); }, 100);
 }
 
 async function netLoadScenariosList() {
