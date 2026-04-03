@@ -2170,7 +2170,12 @@ const cmApp = {
             else if (arr === 'overheadLines') this.renderOverheadTable();
             else if (arr === 'vasLines') this.renderVasTable();
             else if (arr === 'volumeLines') {
-                this.renderVolumeLines();
+                // Update daily volume cell inline instead of full re-render (prevents focus loss)
+                const opDays = this.getOperatingDays();
+                const daily = opDays > 0 ? (line.annual_volume || 0) / opDays : 0;
+                line.daily_volume = daily;
+                const dailyCell = document.getElementById('vol-daily-' + idx);
+                if (dailyCell) dailyCell.textContent = daily.toLocaleString('en-US', {minimumFractionDigits:1, maximumFractionDigits:1});
                 this.syncVolumesToLegacy();
             }
             else if (arr === 'startupLines') {
@@ -3955,7 +3960,7 @@ const cmApp = {
                 '<td>' + this._cmInp('text', line.name, idx, 'volumeLines', 'name', {w:150, ph:'e.g., Cases Shipped'}) + '</td>' +
                 '<td>' + this._volumeUomSelectHtml(idx, line.uom) + '</td>' +
                 '<td class="cm-table-number">' + this._cmInp('number', line.annual_volume, idx, 'volumeLines', 'annual_volume', {w:100, ph:'0'}) + '</td>' +
-                '<td class="cm-table-number">' + dailyVolume.toLocaleString('en-US', {minimumFractionDigits:1, maximumFractionDigits:1}) + '</td>' +
+                '<td class="cm-table-number" id="vol-daily-' + idx + '">' + dailyVolume.toLocaleString('en-US', {minimumFractionDigits:1, maximumFractionDigits:1}) + '</td>' +
                 '<td class="cm-table-actions"><button class="cm-btn-small cm-btn-small-danger" onclick="cmApp.deleteVolumeLine(' + idx + ')">Delete</button></td>';
             tbody.appendChild(row);
         });
