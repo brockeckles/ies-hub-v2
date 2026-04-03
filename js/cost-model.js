@@ -2164,11 +2164,60 @@ const cmApp = {
 
         // Only re-render if a calculated field changed; text-only edits just save data
         if (needsRender) {
-            if (arr === 'laborLines') { this.renderLaborTable(); this.updateLaborTotals(); }
-            else if (arr === 'indirectLaborLines') { this.renderIndirectLaborTable(); this.updateLaborTotals(); }
-            else if (arr === 'equipmentLines') this.renderEquipmentTable();
-            else if (arr === 'overheadLines') this.renderOverheadTable();
-            else if (arr === 'vasLines') this.renderVasTable();
+            if (arr === 'laborLines') {
+                // Inline update computed cells instead of full re-render (prevents focus loss)
+                const operatingHours = this.getOperatingHours();
+                const fte = operatingHours > 0 ? (line.annual_hours || 0) / operatingHours : 0;
+                const annualCost = (line.annual_hours || 0) * (line.hourly_rate || 0) * (1 + (line.burden_pct || 0) / 100);
+                const volCell = document.getElementById('labor-vol-' + idx);
+                const auphCell = document.getElementById('labor-auph-' + idx);
+                const hrsCell = document.getElementById('labor-hrs-' + idx);
+                const fteCell = document.getElementById('labor-fte-' + idx);
+                const costCell = document.getElementById('labor-cost-' + idx);
+                if (volCell) volCell.textContent = Math.round(line.volume || 0).toLocaleString('en-US');
+                if (auphCell) auphCell.textContent = Math.round(line.adjusted_uph || 0).toLocaleString('en-US');
+                if (hrsCell) hrsCell.textContent = (line.annual_hours || 0).toLocaleString('en-US', {minimumFractionDigits:1, maximumFractionDigits:1});
+                if (fteCell) fteCell.textContent = fte.toFixed(2);
+                if (costCell) costCell.textContent = '$' + annualCost.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0});
+                this.updateLaborTotals();
+            }
+            else if (arr === 'indirectLaborLines') {
+                // Inline update computed cell instead of full re-render
+                const hrs = (line.headcount || 0) * this.getOperatingHours();
+                line.annual_hours = hrs;
+                const annualCost = hrs * (line.hourly_rate || 0) * (1 + (line.burden_pct || 0) / 100);
+                const costCell = document.getElementById('indirect-cost-' + idx);
+                if (costCell) costCell.textContent = '$' + annualCost.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0});
+                this.updateLaborTotals();
+            }
+            else if (arr === 'equipmentLines') {
+                // Inline update computed cell instead of full re-render
+                const monthlyTotal = ((line.monthly_cost || 0) + (line.monthly_maintenance || 0)) * (line.quantity || 1);
+                const annualCost = monthlyTotal * 12;
+                const costCell = document.getElementById('equip-cost-' + idx);
+                if (costCell) costCell.textContent = '$' + annualCost.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                const eqTotal = this.calculateEquipmentCost();
+                const eqEl = document.getElementById('totalEquipmentCost');
+                if (eqEl) eqEl.textContent = '$' + eqTotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            }
+            else if (arr === 'overheadLines') {
+                // Inline update computed cell instead of full re-render
+                const annualCost = line.annual_cost || ((line.monthly_cost || 0) * 12);
+                const costCell = document.getElementById('overhead-cost-' + idx);
+                if (costCell) costCell.textContent = '$' + annualCost.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                const totalAnnual = this.calculateOverheadCost();
+                const totalEl = document.getElementById('totalOverheadCost');
+                if (totalEl) totalEl.textContent = '$' + totalAnnual.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            }
+            else if (arr === 'vasLines') {
+                // Inline update computed cell instead of full re-render
+                const annualCost = (line.rate || 0) * (line.volume || 0);
+                const costCell = document.getElementById('vas-cost-' + idx);
+                if (costCell) costCell.textContent = '$' + annualCost.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                const vasTotal = this.calculateVasCost();
+                const vasEl = document.getElementById('totalVasCost');
+                if (vasEl) vasEl.textContent = '$' + vasTotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            }
             else if (arr === 'volumeLines') {
                 // Update daily volume cell inline instead of full re-render (prevents focus loss)
                 const opDays = this.getOperatingDays();
@@ -2184,7 +2233,18 @@ const cmApp = {
                     line.annual_amort = termYears > 0 ? line.one_time_cost / termYears : 0;
                     line.monthly_amort = line.annual_amort / 12;
                 }
-                this.renderStartupTable();
+                // Inline update computed cells instead of full re-render
+                const moCell = document.getElementById('startup-mo-' + idx);
+                const yrCell = document.getElementById('startup-yr-' + idx);
+                if (moCell) moCell.textContent = '$' + (line.monthly_amort || 0).toLocaleString('en-US', {maximumFractionDigits:0});
+                if (yrCell) yrCell.textContent = '$' + (line.annual_amort || 0).toLocaleString('en-US', {maximumFractionDigits:0});
+                // Update summary totals
+                let totalCapital = 0, totalAnnualAmort = 0;
+                this.projectData.startupLines.forEach(l => { totalCapital += l.one_time_cost || 0; totalAnnualAmort += l.annual_amort || 0; });
+                const investEl = document.getElementById('totalCapitalInvestment');
+                const amortEl = document.getElementById('totalAnnualAmortization');
+                if (investEl) investEl.textContent = '$' + totalCapital.toLocaleString('en-US', {maximumFractionDigits:0});
+                if (amortEl) amortEl.textContent = '$' + totalAnnualAmort.toLocaleString('en-US', {maximumFractionDigits:0});
             }
         }
         this.markChanged();
@@ -2443,16 +2503,16 @@ const cmApp = {
                 '<td>' + this._mostSelectHtml(idx, line.most_template_id) + '</td>' +
                 '<td>' + this._uomSelectHtml(idx, line.uom) + '</td>' +
                 '<td>' + volumeSourceHtml + '</td>' +
-                '<td class="cm-table-number">' + Math.round(line.volume || 0).toLocaleString('en-US') + '</td>' +
+                '<td class="cm-table-number" id="labor-vol-' + idx + '">' + Math.round(line.volume || 0).toLocaleString('en-US') + '</td>' +
                 '<td><div style="display:flex;align-items:center;gap:2px;">' + this._cmInp('number', line.base_uph, idx, 'laborLines', 'base_uph', {w:55, step:'1', ph:'UPH'}) + uomLabel + '</div></td>' +
-                '<td class="cm-table-number">' + Math.round(line.adjusted_uph || 0).toLocaleString('en-US') + '</td>' +
+                '<td class="cm-table-number" id="labor-auph-' + idx + '">' + Math.round(line.adjusted_uph || 0).toLocaleString('en-US') + '</td>' +
                 '<td>' + this._complexitySelectHtml(idx, line.complexity_tier) + '</td>' +
-                '<td class="cm-table-number">' + (line.annual_hours || 0).toLocaleString('en-US', {minimumFractionDigits:1, maximumFractionDigits:1}) + '</td>' +
-                '<td class="cm-table-number">' + fte.toFixed(2) + '</td>' +
+                '<td class="cm-table-number" id="labor-hrs-' + idx + '">' + (line.annual_hours || 0).toLocaleString('en-US', {minimumFractionDigits:1, maximumFractionDigits:1}) + '</td>' +
+                '<td class="cm-table-number" id="labor-fte-' + idx + '">' + fte.toFixed(2) + '</td>' +
                 '<td>' + this._equipSelectHtml('MHE', idx, line.mhe_equipment_id, 'mhe_equipment_id') + '</td>' +
                 '<td>' + this._equipSelectHtml('Systems', idx, line.it_equipment_id, 'it_equipment_id') + '</td>' +
                 '<td>' + this._cmInp('number', line.hourly_rate, idx, 'laborLines', 'hourly_rate', {w:60, ph:'$/hr'}) + '</td>' +
-                '<td class="cm-table-number" style="font-weight:600;">$' + annualCost.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0}) + uomWarning + '</td>' +
+                '<td class="cm-table-number" id="labor-cost-' + idx + '" style="font-weight:600;">$' + annualCost.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0}) + uomWarning + '</td>' +
                 '<td>' + this.bucketSelectHtml('labor', idx, line.pricing_bucket) + '</td>' +
                 '<td class="cm-table-actions"><button class="cm-btn-small cm-btn-small-danger" onclick="cmApp.deleteLaborLine(' + idx + ')">Delete</button></td>';
             tbody.appendChild(row);
@@ -2472,7 +2532,7 @@ const cmApp = {
                 '<td>' + this._cmInp('text', line.role_name, idx, 'indirectLaborLines', 'role_name', {w:120, ph:'Role'}) + '</td>' +
                 '<td>' + this._cmInp('number', line.headcount, idx, 'indirectLaborLines', 'headcount', {w:50, step:'1', ph:'#'}) + '</td>' +
                 '<td>' + this._cmInp('number', line.hourly_rate, idx, 'indirectLaborLines', 'hourly_rate', {w:60, ph:'$/hr'}) + '</td>' +
-                '<td class="cm-table-number" style="font-weight:600;">$' + annualCost.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0}) + '</td>' +
+                '<td class="cm-table-number" id="indirect-cost-' + idx + '" style="font-weight:600;">$' + annualCost.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0}) + '</td>' +
                 '<td>' + this.bucketSelectHtml('indirect', idx, line.pricing_bucket) + '</td>' +
                 '<td class="cm-table-actions"><button class="cm-btn-small cm-btn-small-danger" onclick="cmApp.deleteIndirectLaborLine(' + idx + ')">Delete</button></td>';
             tbody.appendChild(row);
@@ -2495,7 +2555,7 @@ const cmApp = {
                 '<td>' + this._cmInp('number', line.monthly_cost, idx, 'equipmentLines', 'monthly_cost', {w:65, ph:'$/mo'}) + '</td>' +
                 '<td>' + this._cmInp('number', line.monthly_maintenance, idx, 'equipmentLines', 'monthly_maintenance', {w:65, ph:'Maint'}) + '</td>' +
                 '<td>' + this._cmInp('number', line.amort_years, idx, 'equipmentLines', 'amort_years', {w:45, step:'1', ph:'5'}) + '</td>' +
-                '<td class="cm-table-number" style="font-weight:600;">$' + annualCost.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</td>' +
+                '<td class="cm-table-number" id="equip-cost-' + idx + '" style="font-weight:600;">$' + annualCost.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</td>' +
                 '<td>' + this._cmInp('text', line.driven_by, idx, 'equipmentLines', 'driven_by', {w:80, ph:'Driver'}) + '</td>' +
                 '<td>' + this.bucketSelectHtml('equipment', idx, line.pricing_bucket) + '</td>' +
                 '<td class="cm-table-actions"><button class="cm-btn-small cm-btn-small-danger" onclick="cmApp.deleteEquipmentLine(' + idx + ')">Delete</button></td>';
@@ -2519,7 +2579,7 @@ const cmApp = {
                 '<td>' + this._cmInp('number', line.rate, idx, 'overheadLines', 'rate', {w:60, ph:'Rate'}) + '</td>' +
                 '<td>' + this._cmInp('number', line.quantity, idx, 'overheadLines', 'quantity', {w:50, step:'1', ph:'Qty'}) + '</td>' +
                 '<td>' + this._cmInp('number', line.monthly_cost, idx, 'overheadLines', 'monthly_cost', {w:70, ph:'$/mo'}) + '</td>' +
-                '<td class="cm-table-number" style="font-weight:600;">$' + annualCost.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</td>' +
+                '<td class="cm-table-number" id="overhead-cost-' + idx + '" style="font-weight:600;">$' + annualCost.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</td>' +
                 '<td>' + this.bucketSelectHtml('overhead', idx, line.pricing_bucket) + '</td>' +
                 '<td class="cm-table-actions"><button class="cm-btn-small cm-btn-small-danger" onclick="cmApp.deleteOverheadLine(' + idx + ')">Delete</button></td>';
             tbody.appendChild(row);
@@ -2544,7 +2604,7 @@ const cmApp = {
                 '<td>' + this._cmInp('number', line.rate, idx, 'vasLines', 'rate', {w:65, ph:'$/unit'}) + '</td>' +
                 '<td>' + this._cmInp('text', line.uom, idx, 'vasLines', 'uom', {w:65, ph:'UOM'}) + '</td>' +
                 '<td>' + this._cmInp('number', line.volume, idx, 'vasLines', 'volume', {w:70, step:'1', ph:'Volume'}) + '</td>' +
-                '<td class="cm-table-number" style="font-weight:600;">$' + annualCost.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</td>' +
+                '<td class="cm-table-number" id="vas-cost-' + idx + '" style="font-weight:600;">$' + annualCost.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</td>' +
                 '<td>' + this.bucketSelectHtml('vas', idx, line.pricing_bucket) + '</td>' +
                 '<td class="cm-table-actions"><button class="cm-btn-small cm-btn-small-danger" onclick="cmApp.deleteVasLine(' + idx + ')">Delete</button></td>';
             tbody.appendChild(row);
@@ -2757,8 +2817,8 @@ const cmApp = {
                 '<td>' + sourceTag + this._cmInp('text', line.category, idx, 'startupLines', 'category', {w:90, ph:'Category'}) + '</td>' +
                 '<td>' + this._cmInp('text', line.description, idx, 'startupLines', 'description', {w:120, ph:'Description'}) + '</td>' +
                 '<td>' + this._cmInp('number', line.one_time_cost, idx, 'startupLines', 'one_time_cost', {w:70, step:'100', ph:'CapEx'}) + '</td>' +
-                '<td class="cm-table-number">$' + (line.monthly_amort || 0).toLocaleString('en-US', {maximumFractionDigits:0}) + '</td>' +
-                '<td class="cm-table-number" style="font-weight:600;">$' + (line.annual_amort || 0).toLocaleString('en-US', {maximumFractionDigits:0}) + '</td>' +
+                '<td class="cm-table-number" id="startup-mo-' + idx + '">$' + (line.monthly_amort || 0).toLocaleString('en-US', {maximumFractionDigits:0}) + '</td>' +
+                '<td class="cm-table-number" id="startup-yr-' + idx + '" style="font-weight:600;">$' + (line.annual_amort || 0).toLocaleString('en-US', {maximumFractionDigits:0}) + '</td>' +
                 '<td>' + this.bucketSelectHtml('startup', idx, line.pricing_bucket) + '</td>' +
                 '<td class="cm-table-actions"><button class="cm-btn-small cm-btn-small-danger" onclick="cmApp.deleteStartupLine(' + idx + ')">Delete</button></td>';
             tbody.appendChild(row);
