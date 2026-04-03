@@ -5,13 +5,7 @@
 // Extracted from index.html
 // ============================================================================
 
-// ── Toggle landing empty state vs actions ──
-function dtToggleLandingEmpty(actionsId, emptyId, isEmpty) {
-  var actions = document.getElementById(actionsId);
-  var empty = document.getElementById(emptyId);
-  if (actions) actions.style.display = isEmpty ? 'none' : 'block';
-  if (empty) empty.style.display = isEmpty ? 'block' : 'none';
-}
+// NOTE: dtToggleLandingEmpty is defined in core.js
 
 // ══════════════════════════════════════════════════════════════════════
 // DESIGN TOOLS — Scenario Copy/Delete/Refresh Infrastructure

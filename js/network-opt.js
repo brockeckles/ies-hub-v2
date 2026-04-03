@@ -773,6 +773,434 @@ function exportNetworkSummary() {
 // WAREHOUSE SIZING CALCULATOR — Core Calculator Functions
 // ═════════════════════════════════════════════════════════════
 
+
+// ═══════════════════ FACILITY LAYOUT RENDERER ═══════════════════
+var wscZoneChart = null;
+
+// ═══════════════════ FACILITY LAYOUT RENDERER ═══════════════════
+function renderLayout(p) {
+  var svg = document.getElementById('wsc-layout-svg');
+  if (!svg) return;
+
+  // ── COLORS (high contrast, distinct per zone) ──
+  var C = {
+    storage: { fill:'rgba(37,99,235,0.18)', stroke:'rgba(37,99,235,0.5)', rack:'rgba(37,99,235,0.45)', text:'rgba(147,197,253,0.95)' },
+    dock:    { fill:'rgba(14,165,233,0.15)', stroke:'rgba(14,165,233,0.4)', text:'rgba(125,211,252,0.9)' },
+    recv:    { fill:'rgba(16,185,129,0.22)', stroke:'rgba(16,185,129,0.55)', text:'rgba(110,231,183,0.95)' },
+    ship:    { fill:'rgba(249,115,22,0.22)', stroke:'rgba(249,115,22,0.55)', text:'rgba(253,186,116,0.95)' },
+    office:  { fill:'rgba(139,92,246,0.22)', stroke:'rgba(139,92,246,0.55)', text:'rgba(196,181,253,0.95)' },
+    opt:     { fill:'rgba(236,72,153,0.2)',  stroke:'rgba(236,72,153,0.5)',  text:'rgba(251,182,206,0.95)' },
+    door:    { inb:'rgba(245,158,11,0.9)', outb:'rgba(234,88,12,0.8)' },
+    dim:'rgba(255,255,255,0.4)', label:'rgba(255,255,255,0.8)',
+    sub:'rgba(255,255,255,0.45)', aisle:'rgba(255,255,255,0.3)', grid:'rgba(255,255,255,0.04)'
+  };
+
+  // ── FONT SIZES ──
+  var F = { title:10, zone:7, detail:5.5, aisle:5, dim:8, door:4.5, sub:5 };
+
+  // ── BUILDING DIMENSIONS ──
+  var twoDock = p.dockConfig === 'two';
+  var isVert = p.rackDir === 'vertical';
+  var dockFaceW = Math.max((twoDock ? Math.max(p.inDoors,p.outDoors) : p.totalDoors) * 14, 120);
+  var bW = Math.max(dockFaceW, Math.ceil(Math.sqrt(p.totalSF * 2.2)));
+  var bD = Math.max(100, Math.ceil(p.totalSF / bW));
+
+  var dimEl = document.getElementById('wsc-layout-dims');
+  if (dimEl) dimEl.textContent = bW.toLocaleString()+' ft × '+bD.toLocaleString()+' ft';
+
+  // ── SVG SETUP ──
+  var pad = 60;
+  var vW = bW+pad*2, vH = bD+pad*2;
+  svg.setAttribute('viewBox','0 0 '+vW+' '+vH);
+  var bX = pad, bY = pad, mg = 4;
+  var s = '';
+
+  // Grid
+  var gs=50;
+  s += '<defs><pattern id="grid" width="'+gs+'" height="'+gs+'" patternUnits="userSpaceOnUse"><path d="M '+gs+' 0 L 0 0 0 '+gs+'" fill="none" stroke="'+C.grid+'" stroke-width="0.5"/></pattern></defs>';
+  s += '<rect x="0" y="0" width="'+vW+'" height="'+vH+'" fill="url(#grid)"/>';
+  // Building outline
+  s += '<rect x="'+bX+'" y="'+bY+'" width="'+bW+'" height="'+bD+'" fill="rgba(255,255,255,0.03)" stroke="rgba(255,255,255,0.7)" stroke-width="1.5" rx="2"/>';
+
+  // ── ZONE HEIGHTS (derived from actual SF values / building width) ──
+  var dockH = Math.max(18, Math.min(Math.ceil(p.dockSF / bW * (twoDock ? 0.5 : 1)), bD * 0.12));
+  var recvStH = Math.max(14, Math.min(Math.ceil(p.recvStagingSF / bW), bD * 0.10));
+  var shipStH = Math.max(14, Math.min(Math.ceil(p.shipStagingSF / bW), bD * 0.10));
+  var topDH = twoDock ? dockH : 0;
+  var topSH = twoDock ? recvStH : 0;
+  var botDY = bY+bD-dockH;
+  var botSY = twoDock ? botDY-shipStH : botDY-Math.max(recvStH, shipStH);
+
+  // ── OFFICE (top-right corner, sized from actual officeSF) ──
+  // Estimate storage zone height for capping office depth
+  var estStH = botSY - (bY + mg + topDH + topSH) - mg;
+  var oW = 0, oD = 0;
+  if (p.officeSF > 0) {
+    // Target roughly square-ish office; width capped at 20% of building
+    oW = Math.max(40, Math.min(bW * 0.20, Math.ceil(Math.sqrt(p.officeSF * 1.4))));
+    oD = Math.max(30, Math.ceil(p.officeSF / oW));
+    // Cap depth at 35% of storage area height so it doesn't dominate
+    oD = Math.min(oD, estStH * 0.35);
+    // Recalculate width if depth was capped
+    if (oD > 0) oW = Math.max(oW, Math.ceil(p.officeSF / oD));
+    oW = Math.min(oW, bW * 0.22);
+  }
+  var hasOffice = oW > 0 && oD > 0;
+
+  // ── OPTIONAL ZONES (right side, below office) ──
+  var optTotalSF = 0;
+  for (var z = 0; z < p.addlItems.length; z++) optTotalSF += p.addlItems[z].sf;
+  var hasOpt = p.addlItems.length > 0 && optTotalSF > 0;
+  // Width scales with total optional SF, anchored to office width if present
+  var optColW = 0;
+  if (hasOpt) {
+    var sfBasedW = Math.ceil(Math.sqrt(optTotalSF * 1.2));
+    optColW = hasOffice ? Math.max(oW, Math.min(sfBasedW, bW * 0.22)) : Math.max(40, Math.min(sfBasedW, bW * 0.22));
+  }
+
+  // ── STORAGE AREA (full width, racks wrap around office+opt column) ──
+  var stX = bX + mg;
+  var stY = bY + mg + topDH + topSH;
+  var stW = bW - mg*2;
+  var stH = botSY - stY - mg;
+
+  s += '<rect x="'+stX+'" y="'+stY+'" width="'+stW+'" height="'+stH+'" fill="'+C.storage.fill+'" stroke="'+C.storage.stroke+'" stroke-width="0.5" rx="1" data-zone="storage"/>';
+
+  // ── OFFICE + OPTIONAL ZONES COLUMN (top-right, inside storage) ──
+  var rightColW = Math.max(oW, optColW);
+  var rightColX = bX + bW - rightColW - mg - 2;
+  var rightColUsed = 0; // track how much vertical space the right column uses
+
+  if (hasOffice) {
+    var oX = rightColX, oY = stY + 2;
+    s += '<rect x="'+oX+'" y="'+oY+'" width="'+rightColW+'" height="'+oD+'" fill="'+C.office.fill+'" stroke="'+C.office.stroke+'" stroke-width="0.6" rx="1" data-zone="office"/>';
+    s += '<line x1="'+oX+'" y1="'+oY+'" x2="'+(oX+rightColW)+'" y2="'+(oY+oD)+'" stroke="'+C.office.stroke+'" stroke-width="0.2" opacity="0.3"/>';
+    s += '<line x1="'+(oX+rightColW)+'" y1="'+oY+'" x2="'+oX+'" y2="'+(oY+oD)+'" stroke="'+C.office.stroke+'" stroke-width="0.2" opacity="0.3"/>';
+    s += '<text x="'+(oX+rightColW/2)+'" y="'+(oY+oD/2-1)+'" text-anchor="middle" fill="'+C.office.text+'" font-size="'+F.zone+'" font-family="Montserrat,sans-serif" font-weight="700" data-zone-label="office">OFFICE</text>';
+    s += '<text x="'+(oX+rightColW/2)+'" y="'+(oY+oD/2+10)+'" text-anchor="middle" fill="'+C.sub+'" font-size="'+F.detail+'" font-family="Montserrat,sans-serif" data-zone-label="office">'+p.officeSF.toLocaleString()+' sf</text>';
+    rightColUsed = oD + 4;
+  }
+
+  if (hasOpt) {
+    var ozX = rightColX;
+    var ozY = stY + 2 + rightColUsed;
+    var ozAvailH = stH - rightColUsed - 4;
+    // Calculate each zone's height proportional to its SF value
+    // Each zone: height = (zoneSF / rightColW), clamped to available space
+    var ozHeights = [];
+    var ozTotalRawH = 0;
+    for (var oi = 0; oi < p.addlItems.length; oi++) {
+      var rawH = Math.max(16, Math.ceil(p.addlItems[oi].sf / rightColW));
+      ozHeights.push(rawH);
+      ozTotalRawH += rawH;
+    }
+    // Scale heights to fit available space if they'd overflow
+    var ozScale = ozTotalRawH > ozAvailH ? (ozAvailH / ozTotalRawH) : 1;
+    var oyCursor = ozY;
+    for (var oi = 0; oi < p.addlItems.length; oi++) {
+      var itemH = Math.max(14, Math.floor(ozHeights[oi] * ozScale)) - 3;
+      s += '<rect x="'+ozX+'" y="'+oyCursor+'" width="'+rightColW+'" height="'+itemH+'" fill="'+C.opt.fill+'" stroke="'+C.opt.stroke+'" stroke-width="0.4" rx="1" data-zone="opt-'+oi+'"/>';
+      s += '<text x="'+(ozX+rightColW/2)+'" y="'+(oyCursor+itemH/2-1)+'" text-anchor="middle" fill="'+C.opt.text+'" font-size="'+F.detail+'" font-family="Montserrat,sans-serif" font-weight="600" data-zone-label="opt-'+oi+'">'+p.addlItems[oi].label.toUpperCase()+'</text>';
+      s += '<text x="'+(ozX+rightColW/2)+'" y="'+(oyCursor+itemH/2+7)+'" text-anchor="middle" fill="'+C.sub+'" font-size="'+F.sub+'" font-family="Montserrat,sans-serif" data-zone-label="opt-'+oi+'">'+p.addlItems[oi].sf.toLocaleString()+' sf</text>';
+      oyCursor += itemH + 3;
+    }
+    rightColUsed = oyCursor - (stY + 2); // update so rack area knows total column height
+  }
+
+  // ── RACK DRAWING AREA (wraps around right column) ──
+  var rPad = 8;
+  var rLabelH = 20;
+  var hasRightCol = hasOffice || hasOpt;
+  // Upper rack zone (beside right column) — height matches right column content
+  var upperH = hasRightCol ? Math.max(rightColUsed, stH * 0.35) : 0;
+  upperH = Math.min(upperH, stH - 30);
+  // If right column is taller than storage, just use narrow width for whole area
+  var rFullW = stW - rPad*2;
+  var rNarrowW = stW - rPad*2 - (hasRightCol ? rightColW + 6 : 0);
+  var raX = stX + rPad;
+  var raY = stY + rLabelH;
+  var raH = stH - rLabelH - 6;
+
+  // Helper: draw rack rows in a rectangular region
+  // modFt = back-to-back rack depth (8.5 for single, 16.5 for double)
+  // aisleFt = aisle width between modules
+  // fixedPitch = optional fixed SVG module width/height to align across sections
+  // Uses geometry to calculate module COUNT, then distributes proportionally in SVG space
+  function drawRacks(x, y, w, h, modFt, aisleFt, fixedPitch) {
+    var totFt = modFt + aisleFt;
+    var rackRatio = modFt / totFt;
+    if (isVert) {
+      // Vertical: racks run top-to-bottom, modules repeat left-to-right
+      var mW, nm;
+      if (fixedPitch) {
+        mW = fixedPitch;
+        nm = Math.max(1, Math.floor(w / mW));
+      } else {
+        nm = Math.max(2, Math.min(18, Math.floor(w / totFt)));
+        mW = w / nm;
+      }
+      var rkW = mW * rackRatio;
+      var hr = (rkW - 1) / 2;
+      for (var i = 0; i < nm; i++) {
+        var mx = x + i * mW;
+        if (mx + rkW > x + w + 1) break; // don't draw past bounds
+        s += '<rect x="'+mx+'" y="'+y+'" width="'+hr+'" height="'+h+'" fill="'+C.storage.rack+'" rx="0.5" data-rack="1"/>';
+        s += '<rect x="'+(mx+hr+1)+'" y="'+y+'" width="'+hr+'" height="'+h+'" fill="'+C.storage.rack+'" rx="0.5" data-rack="1"/>';
+        if (mW - rkW > 4 && i < nm-1) {
+          var ax = mx + rkW + (mW - rkW)/2;
+          s += '<text x="'+ax+'" y="'+(y+h/2)+'" text-anchor="middle" fill="'+C.aisle+'" font-size="'+F.aisle+'" font-family="Montserrat,sans-serif" data-rack="1" transform="rotate(90 '+ax+' '+(y+h/2)+')">'+aisleFt+'\' aisle</text>';
+        }
+      }
+    } else {
+      // Horizontal: racks run left-to-right, modules repeat top-to-bottom
+      var mH, nm;
+      if (fixedPitch) {
+        mH = fixedPitch;
+        nm = Math.max(1, Math.floor(h / mH));
+      } else {
+        nm = Math.max(2, Math.min(18, Math.floor(h / totFt)));
+        mH = h / nm;
+      }
+      var rkH = mH * rackRatio;
+      var hr = (rkH - 1) / 2;
+      for (var i = 0; i < nm; i++) {
+        var my = y + i * mH;
+        if (my + rkH > y + h + 1) break;
+        s += '<rect x="'+x+'" y="'+my+'" width="'+w+'" height="'+hr+'" fill="'+C.storage.rack+'" rx="0.5" data-rack="1"/>';
+        s += '<rect x="'+x+'" y="'+(my+hr+1)+'" width="'+w+'" height="'+hr+'" fill="'+C.storage.rack+'" rx="0.5" data-rack="1"/>';
+        if (mH - rkH > 4 && i < nm-1) {
+          s += '<text x="'+(x+w/2)+'" y="'+(my+rkH+(mH-rkH)/2+2)+'" text-anchor="middle" fill="'+C.aisle+'" font-size="'+F.aisle+'" font-family="Montserrat,sans-serif" data-rack="1">'+aisleFt+'\' aisle</text>';
+        }
+      }
+    }
+  }
+
+  function drawBulk(x, y, w, h) {
+    // Bulk module geometry: 2 rows of bulkDepth pallets (each 4ft) back-to-back + 12ft aisle
+    var bayDepthFt = p.bulkDepth * 4; // one side of back-to-back bay
+    var bulkAisleFt = 12;
+    var moduleFt = (2 * bayDepthFt) + bulkAisleFt; // full module depth
+    var bayRatio = (2 * bayDepthFt) / moduleFt; // proportion that is bay vs aisle
+    if (isVert) {
+      // Bays run top-to-bottom, modules repeat left-to-right
+      var nm = Math.max(1, Math.min(14, Math.floor(w / moduleFt)));
+      var mW = w / Math.max(nm, 1);
+      var bayW = mW * bayRatio;
+      for (var b = 0; b < nm; b++) {
+        var bx = x + b * mW;
+        s += '<rect x="'+bx+'" y="'+y+'" width="'+bayW+'" height="'+h+'" fill="'+C.storage.rack+'" stroke="'+C.storage.stroke+'" stroke-width="0.3" rx="0.5" data-rack="1"/>';
+        // Draw depth lines — one per pallet depth position
+        var totalPallets = p.bulkDepth * 2; // both sides of back-to-back
+        for (var d = 1; d < totalPallets; d++) {
+          var lx = bx + (bayW / totalPallets) * d;
+          var lineOpacity = (d === p.bulkDepth) ? 0.25 : 0.08; // center flue line brighter
+          s += '<line x1="'+lx+'" y1="'+y+'" x2="'+lx+'" y2="'+(y+h)+'" stroke="rgba(255,255,255,'+lineOpacity+')" stroke-width="0.3" data-rack="1"/>';
+        }
+      }
+    } else {
+      // Bays run left-to-right, modules repeat top-to-bottom
+      var nm = Math.max(1, Math.min(14, Math.floor(h / moduleFt)));
+      var mH = h / Math.max(nm, 1);
+      var bayH = mH * bayRatio;
+      for (var b = 0; b < nm; b++) {
+        var by = y + b * mH;
+        s += '<rect x="'+x+'" y="'+by+'" width="'+w+'" height="'+bayH+'" fill="'+C.storage.rack+'" stroke="'+C.storage.stroke+'" stroke-width="0.3" rx="0.5" data-rack="1"/>';
+        // Draw depth lines — one per pallet depth position
+        var totalPallets = p.bulkDepth * 2;
+        for (var d = 1; d < totalPallets; d++) {
+          var ly = by + (bayH / totalPallets) * d;
+          var lineOpacity = (d === p.bulkDepth) ? 0.25 : 0.08;
+          s += '<line x1="'+x+'" y1="'+ly+'" x2="'+(x+w)+'" y2="'+ly+'" stroke="rgba(255,255,255,'+lineOpacity+')" stroke-width="0.3" data-rack="1"/>';
+        }
+      }
+    }
+  }
+
+  // Draw racks — two regions if right column present: upper (narrow) + lower (full width)
+  var storLabel = '';
+  if (p.storeType === 'single') storLabel = 'SINGLE-DEEP SELECTIVE — '+p.rackLevels+' LEVELS ('+p.clearHeightFt+'\' CLR)';
+  else if (p.storeType === 'double') storLabel = 'DOUBLE-DEEP — '+p.rackLevels+' LEVELS ('+p.clearHeightFt+'\' CLR)';
+  else if (p.storeType === 'bulk') storLabel = 'BULK FLOOR — '+p.bulkDepth+'-DEEP × '+p.stackHi+' HIGH';
+  else if (p.storeType === 'carton') storLabel = 'CARTON FLOW / SHELVING ('+p.clearHeightFt+'\' CLR)';
+  else storLabel = 'MIXED — '+Math.round(p.mixRackPct*100)+'% RACK / '+Math.round((1-p.mixRackPct)*100)+'% BULK';
+
+  s += '<text x="'+(raX+3)+'" y="'+(raY-5)+'" fill="'+C.storage.text+'" font-size="'+F.zone+'" font-family="Montserrat,sans-serif" font-weight="700" data-zone-label="storage">'+storLabel+'</text>';
+  s += '<text x="'+(raX+3)+'" y="'+(raY-5+9)+'" fill="'+C.sub+'" font-size="'+F.sub+'" font-family="Montserrat,sans-serif" data-zone-label="storage">'+p.storageSF.toLocaleString()+' sf</text>';
+
+  if (hasRightCol && upperH > 0 && upperH < raH - 20) {
+    // Upper zone: narrow (beside office/opt)
+    var uH = Math.min(upperH, raH * 0.6);
+    // Lower zone: full width (below office/opt)
+    var lY = raY + uH + 4;
+    var lH = raH - uH - 4;
+
+    // Pre-calculate shared module pitch from the NARROW section so aisles align
+    // Both sections will use this same pitch; lower section just fits more modules
+    function sharedPitch(modFt, aisleFt) {
+      var totFt = modFt + aisleFt;
+      if (isVert) {
+        var nm = Math.max(2, Math.min(18, Math.floor(rNarrowW / totFt)));
+        return rNarrowW / nm;
+      } else {
+        var nm = Math.max(2, Math.min(18, Math.floor(uH / totFt)));
+        return uH / nm;
+      }
+    }
+
+    if (p.storeType === 'single') {
+      var sp = sharedPitch(8.5, p.aisleW);
+      drawRacks(raX, raY, rNarrowW, uH, 8.5, p.aisleW, sp);
+      drawRacks(raX, lY, rFullW, lH, 8.5, p.aisleW, sp);
+    } else if (p.storeType === 'double') {
+      var sp = sharedPitch(16.5, p.aisleW);
+      drawRacks(raX, raY, rNarrowW, uH, 16.5, p.aisleW, sp);
+      drawRacks(raX, lY, rFullW, lH, 16.5, p.aisleW, sp);
+    } else if (p.storeType === 'bulk') {
+      drawBulk(raX, raY, rNarrowW, uH);
+      drawBulk(raX, lY, rFullW, lH);
+    } else if (p.storeType === 'carton') {
+      drawShelving(raX, raY, rNarrowW, uH);
+      drawShelving(raX, lY, rFullW, lH);
+    } else {
+      // Mix: rack in upper, bulk in lower (natural split)
+      var sp = sharedPitch(8.5, p.aisleW);
+      drawRacks(raX, raY, rNarrowW, uH, 8.5, p.aisleW, sp);
+      s += '<text x="'+(raX+3)+'" y="'+(lY-4)+'" fill="'+C.storage.text+'" font-size="'+F.detail+'" font-family="Montserrat,sans-serif" font-weight="600">BULK ('+Math.round((1-p.mixRackPct)*100)+'%)</text>';
+      drawBulk(raX, lY, rFullW, lH);
+      s += '<line x1="'+raX+'" y1="'+(lY-2)+'" x2="'+(raX+rFullW)+'" y2="'+(lY-2)+'" stroke="rgba(255,255,255,0.15)" stroke-width="0.5" stroke-dasharray="4,4"/>';
+    }
+  } else {
+    // No right column or it fills the whole height — use full width
+    var useW = hasRightCol ? rNarrowW : rFullW;
+    if (p.storeType === 'single') drawRacks(raX, raY, useW, raH, 8.5, p.aisleW);
+    else if (p.storeType === 'double') drawRacks(raX, raY, useW, raH, 16.5, p.aisleW);
+    else if (p.storeType === 'bulk') drawBulk(raX, raY, useW, raH);
+    else if (p.storeType === 'carton') drawShelving(raX, raY, useW, raH);
+    else {
+      var rPct = p.mixRackPct;
+      if (isVert) {
+        var rW2 = useW*rPct-3, bX2 = raX+useW*rPct+3, bW2 = useW*(1-rPct)-3;
+        drawRacks(raX, raY, rW2, raH, 8.5, p.aisleW);
+        drawBulk(bX2, raY, bW2, raH);
+        s += '<text x="'+(bX2+3)+'" y="'+(raY-5)+'" fill="'+C.storage.text+'" font-size="'+F.detail+'" font-family="Montserrat,sans-serif" font-weight="600">BULK</text>';
+        s += '<line x1="'+(raX+rW2+3)+'" y1="'+raY+'" x2="'+(raX+rW2+3)+'" y2="'+(raY+raH)+'" stroke="rgba(255,255,255,0.15)" stroke-width="0.5" stroke-dasharray="4,4"/>';
+      } else {
+        var rH2 = raH*rPct-3, bY2 = raY+raH*rPct+3, bH2 = raH*(1-rPct)-3;
+        drawRacks(raX, raY, useW, rH2, 8.5, p.aisleW);
+        drawBulk(raX, bY2, useW, bH2);
+        s += '<text x="'+(raX+3)+'" y="'+(bY2-4)+'" fill="'+C.storage.text+'" font-size="'+F.detail+'" font-family="Montserrat,sans-serif" font-weight="600">BULK</text>';
+        s += '<line x1="'+raX+'" y1="'+(raY+rH2+2)+'" x2="'+(raX+useW)+'" y2="'+(raY+rH2+2)+'" stroke="rgba(255,255,255,0.15)" stroke-width="0.5" stroke-dasharray="4,4"/>';
+      }
+    }
+  }
+
+  // Draw carton flow / shelving modules
+  function drawShelving(x, y, w, h) {
+    // Shelving module: 4.5 ft back-to-back shelves + 5 ft pick aisle = 9.5 ft
+    var shelfModFt = 9.5;
+    var shelfRatio = 4.5 / 9.5; // shelf portion vs aisle
+    var shelfColor = '#4a90d9'; // lighter blue to distinguish from pallet rack
+    var shelfStroke = 'rgba(255,255,255,0.15)';
+    if (isVert) {
+      var nm = Math.max(1, Math.min(20, Math.floor(w / shelfModFt)));
+      var mW = w / Math.max(nm, 1);
+      var sW = mW * shelfRatio;
+      for (var i = 0; i < nm; i++) {
+        var sx = x + i * mW;
+        s += '<rect x="'+sx+'" y="'+y+'" width="'+sW+'" height="'+h+'" fill="'+shelfColor+'" stroke="'+shelfStroke+'" stroke-width="0.3" rx="0.5" data-rack="1"/>';
+        // Draw horizontal shelf dividers (~3ft apart to represent bays)
+        var bayCount = Math.max(1, Math.floor(h / 3));
+        for (var b = 1; b < bayCount; b++) {
+          var ly = y + (h / bayCount) * b;
+          s += '<line x1="'+sx+'" y1="'+ly+'" x2="'+(sx+sW)+'" y2="'+ly+'" stroke="rgba(255,255,255,0.12)" stroke-width="0.2" data-rack="1"/>';
+        }
+        // Center line for back-to-back
+        var cx = sx + sW / 2;
+        s += '<line x1="'+cx+'" y1="'+y+'" x2="'+cx+'" y2="'+(y+h)+'" stroke="rgba(255,255,255,0.2)" stroke-width="0.3" data-rack="1"/>';
+      }
+    } else {
+      var nm = Math.max(1, Math.min(20, Math.floor(h / shelfModFt)));
+      var mH = h / Math.max(nm, 1);
+      var sH = mH * shelfRatio;
+      for (var i = 0; i < nm; i++) {
+        var sy = y + i * mH;
+        s += '<rect x="'+x+'" y="'+sy+'" width="'+w+'" height="'+sH+'" fill="'+shelfColor+'" stroke="'+shelfStroke+'" stroke-width="0.3" rx="0.5" data-rack="1"/>';
+        // Draw vertical shelf dividers
+        var bayCount = Math.max(1, Math.floor(w / 3));
+        for (var b = 1; b < bayCount; b++) {
+          var lx = x + (w / bayCount) * b;
+          s += '<line x1="'+lx+'" y1="'+sy+'" x2="'+lx+'" y2="'+(sy+sH)+'" stroke="rgba(255,255,255,0.12)" stroke-width="0.2" data-rack="1"/>';
+        }
+        // Center line for back-to-back
+        var cy = sy + sH / 2;
+        s += '<line x1="'+x+'" y1="'+cy+'" x2="'+(x+w)+'" y2="'+cy+'" stroke="rgba(255,255,255,0.2)" stroke-width="0.3" data-rack="1"/>';
+      }
+    }
+  }
+
+  // ── DOCK WALLS ──
+  function drawDockWall(wy, wh, doors, isTop, lbl) {
+    var dockZone = isTop ? 'dock-top' : 'dock-bot';
+    s += '<rect x="'+bX+'" y="'+wy+'" width="'+bW+'" height="'+wh+'" fill="'+C.dock.fill+'" stroke="'+C.dock.stroke+'" stroke-width="0.3" data-zone="'+dockZone+'"/>';
+    var dW = Math.min(12, (bW-10)/doors*0.55), dSp = bW/doors;
+    for (var d = 0; d < doors; d++) {
+      var dx = bX+(d+0.5)*dSp-dW/2, dy = isTop ? wy-3 : wy+wh-3;
+      var isIn = twoDock ? isTop : (d < p.inDoors);
+      s += '<rect x="'+dx+'" y="'+dy+'" width="'+dW+'" height="4" fill="'+(isIn?C.door.inb:C.door.outb)+'" rx="1"/>';
+      if (dW > 5) s += '<text x="'+(dx+dW/2)+'" y="'+(wy+wh/2+2)+'" text-anchor="middle" fill="'+C.dock.text+'" font-size="'+F.door+'" font-family="Montserrat,sans-serif" font-weight="600">'+(isIn?'IN':'OUT')+'</text>';
+    }
+    // Place label INSIDE the dock rect (left-aligned) to avoid overlapping staging text
+    s += '<text x="'+(bX+6)+'" y="'+(wy+wh/2+2)+'" text-anchor="start" fill="'+C.dock.text+'" font-size="'+F.detail+'" font-family="Montserrat,sans-serif" font-weight="600" data-zone-label="'+dockZone+'">'+lbl+'</text>';
+  }
+
+  if (twoDock) {
+    drawDockWall(bY, dockH, p.inDoors, true, p.inDoors+' INBOUND DOORS');
+    var rSY = bY+dockH;
+    s += '<rect x="'+(bX+mg)+'" y="'+rSY+'" width="'+(bW-mg*2)+'" height="'+recvStH+'" fill="'+C.recv.fill+'" stroke="'+C.recv.stroke+'" stroke-width="0.3" rx="1" data-zone="recv"/>';
+    s += '<text x="'+(bX+bW/2)+'" y="'+(rSY+recvStH/2+2)+'" text-anchor="middle" fill="'+C.recv.text+'" font-size="'+F.zone+'" font-family="Montserrat,sans-serif" font-weight="600" data-zone-label="recv">RECV STAGING — '+p.recvStagingSF.toLocaleString()+' sf</text>';
+    drawDockWall(botDY, dockH, p.outDoors, false, p.outDoors+' OUTBOUND DOORS');
+    s += '<rect x="'+(bX+mg)+'" y="'+botSY+'" width="'+(bW-mg*2)+'" height="'+shipStH+'" fill="'+C.ship.fill+'" stroke="'+C.ship.stroke+'" stroke-width="0.3" rx="1" data-zone="ship"/>';
+    s += '<text x="'+(bX+bW/2)+'" y="'+(botSY+shipStH/2+2)+'" text-anchor="middle" fill="'+C.ship.text+'" font-size="'+F.zone+'" font-family="Montserrat,sans-serif" font-weight="600" data-zone-label="ship">SHIP STAGING — '+p.shipStagingSF.toLocaleString()+' sf</text>';
+  } else {
+    var combStH = Math.max(recvStH, shipStH);
+    drawDockWall(botDY, dockH, p.totalDoors, false, p.totalDoors+' DOCK DOORS ('+p.inDoors+' IN / '+p.outDoors+' OUT)');
+    var hW = (bW-mg*3)/2;
+    s += '<rect x="'+(bX+mg)+'" y="'+botSY+'" width="'+hW+'" height="'+combStH+'" fill="'+C.recv.fill+'" stroke="'+C.recv.stroke+'" stroke-width="0.3" rx="1" data-zone="recv"/>';
+    s += '<text x="'+(bX+mg+hW/2)+'" y="'+(botSY+combStH/2-1)+'" text-anchor="middle" fill="'+C.recv.text+'" font-size="'+F.zone+'" font-family="Montserrat,sans-serif" font-weight="600" data-zone-label="recv">RECV STAGING</text>';
+    s += '<text x="'+(bX+mg+hW/2)+'" y="'+(botSY+combStH/2+7)+'" text-anchor="middle" fill="'+C.sub+'" font-size="'+F.sub+'" font-family="Montserrat,sans-serif" data-zone-label="recv">'+p.recvStagingSF.toLocaleString()+' sf</text>';
+    var sX = bX+mg+hW+mg;
+    s += '<rect x="'+sX+'" y="'+botSY+'" width="'+hW+'" height="'+combStH+'" fill="'+C.ship.fill+'" stroke="'+C.ship.stroke+'" stroke-width="0.3" rx="1" data-zone="ship"/>';
+    s += '<text x="'+(sX+hW/2)+'" y="'+(botSY+combStH/2-1)+'" text-anchor="middle" fill="'+C.ship.text+'" font-size="'+F.zone+'" font-family="Montserrat,sans-serif" font-weight="600" data-zone-label="ship">SHIP STAGING</text>';
+    s += '<text x="'+(sX+hW/2)+'" y="'+(botSY+combStH/2+7)+'" text-anchor="middle" fill="'+C.sub+'" font-size="'+F.sub+'" font-family="Montserrat,sans-serif" data-zone-label="ship">'+p.shipStagingSF.toLocaleString()+' sf</text>';
+  }
+
+  // ── DIMENSION LINES ──
+  var dY = bY+bD+25;
+  s += '<line x1="'+bX+'" y1="'+dY+'" x2="'+(bX+bW)+'" y2="'+dY+'" stroke="'+C.dim+'" stroke-width="0.5"/>';
+  s += '<line x1="'+bX+'" y1="'+(dY-4)+'" x2="'+bX+'" y2="'+(dY+4)+'" stroke="'+C.dim+'" stroke-width="0.5"/>';
+  s += '<line x1="'+(bX+bW)+'" y1="'+(dY-4)+'" x2="'+(bX+bW)+'" y2="'+(dY+4)+'" stroke="'+C.dim+'" stroke-width="0.5"/>';
+  s += '<text x="'+(bX+bW/2)+'" y="'+(dY+14)+'" text-anchor="middle" fill="'+C.label+'" font-size="'+F.dim+'" font-family="Montserrat,sans-serif" font-weight="700">'+bW.toLocaleString()+' ft</text>';
+  var dX = bX+bW+25;
+  s += '<line x1="'+dX+'" y1="'+bY+'" x2="'+dX+'" y2="'+(bY+bD)+'" stroke="'+C.dim+'" stroke-width="0.5"/>';
+  s += '<line x1="'+(dX-4)+'" y1="'+bY+'" x2="'+(dX+4)+'" y2="'+bY+'" stroke="'+C.dim+'" stroke-width="0.5"/>';
+  s += '<line x1="'+(dX-4)+'" y1="'+(bY+bD)+'" x2="'+(dX+4)+'" y2="'+(bY+bD)+'" stroke="'+C.dim+'" stroke-width="0.5"/>';
+  s += '<text x="'+(dX+7)+'" y="'+(bY+bD/2)+'" text-anchor="middle" fill="'+C.label+'" font-size="'+F.dim+'" font-family="Montserrat,sans-serif" font-weight="700" transform="rotate(90 '+(dX+7)+' '+(bY+bD/2)+')">'+bD.toLocaleString()+' ft</text>';
+
+  // ── HEADER ──
+  s += '<text x="'+(bX+bW/2)+'" y="'+(bY-15)+'" text-anchor="middle" fill="'+C.label+'" font-size="'+F.title+'" font-family="Montserrat,sans-serif" font-weight="800">'+p.totalSF.toLocaleString()+' SF FACILITY</text>';
+  s += '<text x="'+(bX+bW/2)+'" y="'+(bY-4)+'" text-anchor="middle" fill="'+C.sub+'" font-size="'+F.detail+'" font-family="Montserrat,sans-serif">'+(twoDock?'Two-sided docks':'Single-sided docks')+' · '+(isVert?'Vertical':'Horizontal')+' rack orientation</text>';
+
+  svg.innerHTML = s;
+
+  // Save params for manual mode re-renders
+  wscLastLayoutParams = p;
+
+  // Enable drag handlers if in manual mode
+  if (wscManualMode) {
+    enableManualHandlers();
+  }
+}
+
 function toggleStorageOptions() {
   var st = document.getElementById('wsc-storetype').value;
   document.getElementById('wsc-rack-opts').style.display = (st === 'single' || st === 'double' || st === 'mix') ? 'block' : 'none';
