@@ -367,6 +367,7 @@ function showDesignTool(panelId, tabEl) {
   if (panelId === 'dt-network') { netShowLanding(); }
   // If switching to netopt, show landing page
   if (panelId === 'dt-netopt') { netoptShowLanding(); }
+}
 
 // ═══════════ COST MODEL BUILDER JAVASCRIPT ═══════════
 // SUPABASE_URL already declared in Hub globals above
