@@ -89,7 +89,7 @@ function pmPopulateCustomerFilter() {
   var sel = document.getElementById('pm-filter-customer');
   if (!sel) return;
   var html = '<option value="">All Customers</option>';
-  pmData.customers.forEach(function(c){ html += '<option value="'+c.id+'">'+c.name+'</option>'; });
+  pmData.customers.forEach(function(c){ html += '<option value="'+c.id+'">'+esc(c.name)+'</option>'; });
   sel.innerHTML = html;
 }
 
@@ -127,7 +127,7 @@ function pmRenderPipeline() {
       var tasksBlocked = oppTasks.filter(function(t){ return t.status==='blocked'; }).length;
       html += '<div class="pm-card" onclick="pmOpenDetail(\''+o.id+'\')">';
       html += '<div class="pm-card-customer">' + pmGetCustomerName(o.customer_id) + '</div>';
-      html += '<div class="pm-card-title">' + (o.name || 'Untitled') + '</div>';
+      html += '<div class="pm-card-title">' + esc(o.name || 'Untitled') + '</div>';
       if (o.facility_type || o.state) {
         html += '<div style="font-size:11px;color:var(--ies-gray-400);margin-bottom:6px;">';
         if (o.facility_type) html += o.facility_type;
@@ -179,7 +179,7 @@ function pmRenderListView(searchVal, custFilter) {
     var deltaClass = delta > 0 ? 'pm-delta-neg' : (delta < 0 ? 'pm-delta-pos' : '');
     html += '<tr style="cursor:pointer;" onclick="pmOpenDetail(\''+o.id+'\')">';
     html += '<td style="font-weight:600;">' + pmGetCustomerName(o.customer_id) + '</td>';
-    html += '<td>' + (o.name || 'Untitled') + '</td>';
+    html += '<td>' + esc(o.name || 'Untitled') + '</td>';
     html += '<td><span class="pm-card-tag" style="background:var(--ies-gray-100);color:var(--ies-gray-600);">' + stageLabel + '</span></td>';
     html += '<td><span class="pm-card-tag" style="' + statusStyle + '">' + statusLabel + '</span></td>';
     html += '<td style="text-align:right;font-weight:600;">' + (forecast || '—') + '</td>';
@@ -591,12 +591,12 @@ function pmRenderTasks() {
     html += '<div class="pm-task-row">';
     html += '<div class="pm-task-check ' + checkClass + '" onclick="pmCycleTaskStatus('+t.id+')">' + checkIcon + '</div>';
     html += '<div class="pm-task-body">';
-    html += '<div class="pm-task-title' + (isDone ? ' done' : '') + '">' + t.title + '</div>';
-    if (t.description) html += '<div class="pm-task-desc">' + t.description + '</div>';
+    html += '<div class="pm-task-title' + (isDone ? ' done' : '') + '">' + esc(t.title) + '</div>';
+    if (t.description) html += '<div class="pm-task-desc">' + esc(t.description) + '</div>';
     html += '<div class="pm-task-meta">';
     html += '<span class="pm-task-tag ' + (PM_TASK_STATUS_TAGS[t.status]||'') + '">' + t.status.replace(/_/g,' ') + '</span>';
     html += '<span class="pm-task-tag ' + (PM_PRIORITY_TAGS[t.priority]||'') + '">' + t.priority + '</span>';
-    if (t.assignee) html += '<span style="font-size:11px;color:var(--ies-gray-400);">' + t.assignee + '</span>';
+    if (t.assignee) html += '<span style="font-size:11px;color:var(--ies-gray-400);">' + esc(t.assignee) + '</span>';
     if (t.due_date) {
       var overdue = !isDone && new Date(t.due_date+'T00:00:00') < new Date();
       html += '<span style="font-size:11px;color:' + (overdue?'var(--ies-red)':'var(--ies-gray-400)') + ';font-weight:'+(overdue?'700':'400')+';">Due ' + t.due_date + '</span>';

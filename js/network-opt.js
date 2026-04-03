@@ -285,7 +285,7 @@ function showCityDropdown(idx, inputEl) {
   if (matches.length === 0) { dd.style.display = 'none'; return; }
   var html = '';
   for (var i = 0; i < matches.length; i++) {
-    html += '<div onmousedown="selectCity(' + idx + ',\'' + matches[i].c.replace(/'/g,"\\'") + '\')" style="padding:6px 10px;font-size:12px;cursor:pointer;border-bottom:1px solid var(--ies-gray-100);color:var(--ies-navy);" onmouseover="this.style.background=\'var(--ies-gray-50)\'" onmouseout="this.style.background=\'#fff\'">' + matches[i].c + '</div>';
+    html += '<div onmousedown="selectCity(' + idx + ',\'' + esc(matches[i].c).replace(/'/g,"\\'") + '\')" style="padding:6px 10px;font-size:12px;cursor:pointer;border-bottom:1px solid var(--ies-gray-100);color:var(--ies-navy);" onmouseover="this.style.background=\'var(--ies-gray-50)\'" onmouseout="this.style.background=\'#fff\'">' + esc(matches[i].c) + '</div>';
   }
   dd.innerHTML = html;
   dd.style.display = 'block';
@@ -2503,9 +2503,9 @@ function wscCollectInputs() {
     }
 
     // Capture current calculation results
-    var totalSfEl = document.getElementById('wsc-res-total-sqft');
-    var positionsEl = document.getElementById('wsc-res-positions');
-    var docksEl = document.getElementById('wsc-res-docks');
+    var totalSfEl = document.getElementById('wsc-r-sqft');
+    var positionsEl = document.getElementById('wsc-r-positions');
+    var docksEl = document.getElementById('wsc-r-docks');
 
     data.result_total_sqft = totalSfEl ? parseFloat(totalSfEl.textContent.replace(/[^0-9.]/g, '')) || 0 : 0;
     data.result_positions = positionsEl ? parseFloat(positionsEl.textContent.replace(/[^0-9.]/g, '')) || 0 : 0;
@@ -3683,14 +3683,14 @@ async function wscLoadScenariosList() {
 
     grid.innerHTML = scenarios.map(function(s) {
       return '<div class="dt-landing-card">' +
-        '<div onclick="wscLoadScenario(\'' + s.id + '\'); wscShowTool()" style="cursor:pointer;">' +
-        '<div class="dt-landing-card-name">' + (s.scenario_name || 'Untitled') + '</div>' +
+        '<div onclick="wscLoadScenario(\'' + esc(s.id) + '\'); wscShowTool()" style="cursor:pointer;">' +
+        '<div class="dt-landing-card-name">' + esc(s.scenario_name || 'Untitled') + '</div>' +
         '<div class="dt-landing-card-meta">' + (s.created_at ? new Date(s.created_at).toLocaleDateString() : '') + '</div>' +
         '<div class="dt-landing-card-metric">SF: ' + (s.facility_sqft ? s.facility_sqft.toLocaleString() : '—') + '</div>' +
         '</div>' +
         '<div class="dt-landing-card-actions">' +
-        '<button class="dt-card-btn-copy" onclick="event.stopPropagation(); dtCopyScenario(\'warehouse_sizing_scenarios\',\'' + s.id + '\',\'wsc\')"><svg width="12" height="12" fill="none" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2" stroke="currentColor" stroke-width="2"/></svg> Copy</button>' +
-        '<button class="dt-card-btn-delete" onclick="event.stopPropagation(); dtDeleteScenario(\'warehouse_sizing_scenarios\',\'' + s.id + '\',\'wsc\')"><svg width="12" height="12" fill="none" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Delete</button>' +
+        '<button class="dt-card-btn-copy" onclick="event.stopPropagation(); dtCopyScenario(\'warehouse_sizing_scenarios\',\'' + esc(s.id) + '\',\'wsc\')"><svg width="12" height="12" fill="none" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2" stroke="currentColor" stroke-width="2"/></svg> Copy</button>' +
+        '<button class="dt-card-btn-delete" onclick="event.stopPropagation(); dtDeleteScenario(\'warehouse_sizing_scenarios\',\'' + esc(s.id) + '\',\'wsc\')"><svg width="12" height="12" fill="none" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Delete</button>' +
         '</div></div>';
     }).join('');
   } catch (e) {
@@ -3736,14 +3736,14 @@ async function netLoadScenariosList() {
 
     grid.innerHTML = scenarios.map(function(s) {
       return '<div class="dt-landing-card">' +
-        '<div onclick="netLoadScenario(\'' + s.id + '\'); netShowTool()" style="cursor:pointer;">' +
-        '<div class="dt-landing-card-name">' + (s.scenario_name || 'Untitled') + '</div>' +
+        '<div onclick="netLoadScenario(\'' + esc(s.id) + '\'); netShowTool()" style="cursor:pointer;">' +
+        '<div class="dt-landing-card-name">' + esc(s.scenario_name || 'Untitled') + '</div>' +
         '<div class="dt-landing-card-meta">' + (s.created_at ? new Date(s.created_at).toLocaleDateString() : '') + '</div>' +
         '<div class="dt-landing-card-metric">DCs: ' + (s.dc_count || '—') + ' | Freight: $' + (s.result_est_freight ? s.result_est_freight.toLocaleString(undefined, {maximumFractionDigits: 0}) : '—') + '</div>' +
         '</div>' +
         '<div class="dt-landing-card-actions">' +
-        '<button class="dt-card-btn-copy" onclick="event.stopPropagation(); dtCopyScenario(\'network_optimization_scenarios\',\'' + s.id + '\',\'net\')"><svg width="12" height="12" fill="none" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2" stroke="currentColor" stroke-width="2"/></svg> Copy</button>' +
-        '<button class="dt-card-btn-delete" onclick="event.stopPropagation(); dtDeleteScenario(\'network_optimization_scenarios\',\'' + s.id + '\',\'net\')"><svg width="12" height="12" fill="none" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Delete</button>' +
+        '<button class="dt-card-btn-copy" onclick="event.stopPropagation(); dtCopyScenario(\'network_optimization_scenarios\',\'' + esc(s.id) + '\',\'net\')"><svg width="12" height="12" fill="none" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2" stroke="currentColor" stroke-width="2"/></svg> Copy</button>' +
+        '<button class="dt-card-btn-delete" onclick="event.stopPropagation(); dtDeleteScenario(\'network_optimization_scenarios\',\'' + esc(s.id) + '\',\'net\')"><svg width="12" height="12" fill="none" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Delete</button>' +
         '</div></div>';
     }).join('');
   } catch (e) {
@@ -3789,14 +3789,14 @@ async function netoptLoadScenariosList() {
 
     grid.innerHTML = scenarios.map(function(s) {
       return '<div class="dt-landing-card">' +
-        '<div onclick="netoptLoadScenario(\'' + s.id + '\'); netoptShowTool()" style="cursor:pointer;">' +
-        '<div class="dt-landing-card-name">' + (s.scenario_name || 'Untitled') + '</div>' +
+        '<div onclick="netoptLoadScenario(\'' + esc(s.id) + '\'); netoptShowTool()" style="cursor:pointer;">' +
+        '<div class="dt-landing-card-name">' + esc(s.scenario_name || 'Untitled') + '</div>' +
         '<div class="dt-landing-card-meta">' + (s.created_at ? new Date(s.created_at).toLocaleDateString() : '') + '</div>' +
         '<div class="dt-landing-card-metric">Cost: $' + (s.result_total_cost ? s.result_total_cost.toLocaleString(undefined, {maximumFractionDigits: 0}) : '—') + ' | Mode: ' + (s.solver_mode || '—') + '</div>' +
         '</div>' +
         '<div class="dt-landing-card-actions">' +
-        '<button class="dt-card-btn-copy" onclick="event.stopPropagation(); dtCopyScenario(\'netopt_scenarios\',\'' + s.id + '\',\'netopt\')"><svg width="12" height="12" fill="none" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2" stroke="currentColor" stroke-width="2"/></svg> Copy</button>' +
-        '<button class="dt-card-btn-delete" onclick="event.stopPropagation(); dtDeleteScenario(\'netopt_scenarios\',\'' + s.id + '\',\'netopt\')"><svg width="12" height="12" fill="none" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Delete</button>' +
+        '<button class="dt-card-btn-copy" onclick="event.stopPropagation(); dtCopyScenario(\'netopt_scenarios\',\'' + esc(s.id) + '\',\'netopt\')"><svg width="12" height="12" fill="none" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2" stroke="currentColor" stroke-width="2"/></svg> Copy</button>' +
+        '<button class="dt-card-btn-delete" onclick="event.stopPropagation(); dtDeleteScenario(\'netopt_scenarios\',\'' + esc(s.id) + '\',\'netopt\')"><svg width="12" height="12" fill="none" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Delete</button>' +
         '</div></div>';
     }).join('');
   } catch (e) {
@@ -5767,7 +5767,7 @@ function netoptRenderRecommendation(r) {
   }
 
   var recScen = scenarios[recIdx];
-  var recFacNames = recScen.openFacilities.map(function(f) { return f.name; }).join(', ');
+  var recFacNames = recScen.openFacilities.map(function(f) { return esc(f.name); }).join(', ');
   var rec2Day = (recScen.dayPct.d1 + recScen.dayPct.d2).toFixed(0);
 
   // Determine badge color/label based on recommendation type
@@ -5816,7 +5816,7 @@ function netoptRenderRecommendation(r) {
     html += '<div style="display:flex;border-top:1px solid rgba(0,0,0,.06);font-size:11px;">';
 
     // Cost-optimal mini card
-    var cFacs = costScen.openFacilities.map(function(f) { return f.name; }).join(', ');
+    var cFacs = costScen.openFacilities.map(function(f) { return esc(f.name); }).join(', ');
     var c2Day = (costScen.dayPct.d1 + costScen.dayPct.d2).toFixed(0);
     html += '<div style="flex:1;padding:10px 16px;border-right:1px solid rgba(0,0,0,.06);' + (recIdx === bestCostIdx ? 'background:rgba(16,185,129,.04);' : '') + '">';
     html += '<div style="font-weight:700;color:#059669;font-size:10px;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;">';
@@ -5827,7 +5827,7 @@ function netoptRenderRecommendation(r) {
     html += '</div>';
 
     // Service-optimal mini card
-    var sFacs = serviceScen.openFacilities.map(function(f) { return f.name; }).join(', ');
+    var sFacs = serviceScen.openFacilities.map(function(f) { return esc(f.name); }).join(', ');
     var s2Day = (serviceScen.dayPct.d1 + serviceScen.dayPct.d2).toFixed(0);
     html += '<div style="flex:1;padding:10px 16px;' + (recIdx === bestServiceIdx ? 'background:rgba(59,130,246,.04);' : '') + '">';
     html += '<div style="font-weight:700;color:#2563eb;font-size:10px;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;">';
@@ -6218,10 +6218,10 @@ function netoptRenderAllocationTable() {
   rows.forEach(function(row) {
     var tr = document.createElement('tr');
     tr.style.borderBottom = '1px solid var(--ies-gray-200)';
-    tr.innerHTML = '<td style="padding:10px 14px;">' + row.demand + '</td>' +
-      '<td style="padding:10px 14px;">' + row.city + '</td>' +
+    tr.innerHTML = '<td style="padding:10px 14px;">' + esc(row.demand) + '</td>' +
+      '<td style="padding:10px 14px;">' + esc(row.city) + '</td>' +
       '<td style="padding:10px 14px;text-align:right;">' + row.volume.toFixed(0) + '</td>' +
-      '<td style="padding:10px 14px;">' + row.facility + '</td>' +
+      '<td style="padding:10px 14px;">' + esc(row.facility) + '</td>' +
       '<td style="padding:10px 14px;text-align:right;">' + row.distance.toFixed(0) + '</td>' +
       '<td style="padding:10px 14px;text-align:right;">$' + (row.cost / 1000).toFixed(0) + 'K</td>' +
       '<td style="padding:10px 14px;text-align:right;">' + row.days.toFixed(1) + '</td>';
@@ -6258,10 +6258,10 @@ function netoptSortAllocationTable(btn, field) {
   rows.forEach(function(row) {
     var tr = document.createElement('tr');
     tr.style.borderBottom = '1px solid var(--ies-gray-200)';
-    tr.innerHTML = '<td style="padding:10px 14px;">' + row.demand + '</td>' +
-      '<td style="padding:10px 14px;">' + row.city + '</td>' +
+    tr.innerHTML = '<td style="padding:10px 14px;">' + esc(row.demand) + '</td>' +
+      '<td style="padding:10px 14px;">' + esc(row.city) + '</td>' +
       '<td style="padding:10px 14px;text-align:right;">' + row.volume.toFixed(0) + '</td>' +
-      '<td style="padding:10px 14px;">' + row.facility + '</td>' +
+      '<td style="padding:10px 14px;">' + esc(row.facility) + '</td>' +
       '<td style="padding:10px 14px;text-align:right;">' + row.distance.toFixed(0) + '</td>' +
       '<td style="padding:10px 14px;text-align:right;">$' + (row.cost / 1000).toFixed(0) + 'K</td>' +
       '<td style="padding:10px 14px;text-align:right;">' + row.days.toFixed(1) + '</td>';

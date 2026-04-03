@@ -3623,19 +3623,19 @@ const cmApp = {
 
         this.projectData.laborLines.forEach(l => {
             if (!l.pricing_bucket || !bucketIds.includes(l.pricing_bucket))
-                items.push('Labor: ' + (l.activity_name || 'Unknown'));
+                items.push('Labor: ' + esc(l.activity_name || 'Unknown'));
         });
         this.projectData.indirectLaborLines.forEach(l => {
             if (!l.pricing_bucket || !bucketIds.includes(l.pricing_bucket))
-                items.push('Indirect: ' + (l.role_name || 'Unknown'));
+                items.push('Indirect: ' + esc(l.role_name || 'Unknown'));
         });
         this.projectData.equipmentLines.forEach(l => {
             if (!l.pricing_bucket || !bucketIds.includes(l.pricing_bucket))
-                items.push('Equipment: ' + (l.equipment_name || 'Unknown'));
+                items.push('Equipment: ' + esc(l.equipment_name || 'Unknown'));
         });
         this.projectData.overheadLines.forEach(l => {
             if (!l.pricing_bucket || !bucketIds.includes(l.pricing_bucket))
-                items.push('Overhead: ' + (l.description || 'Unknown'));
+                items.push('Overhead: ' + esc(l.description || 'Unknown'));
         });
 
         if (items.length === 0) {
@@ -4511,7 +4511,7 @@ const cmApp = {
                                   this.calculateVasCost(),
                 pricing_buckets: JSON.stringify(this.projectData.pricingBuckets || []),
                 status: 'draft',
-                deal_id: (function() { var v = document.getElementById('cmDealSelector')?.value || ''; var n = parseInt(v, 10); return isNaN(n) ? null : n; })()
+                deal_deals_id: (function() { var v = document.getElementById('cmDealSelector')?.value || ''; var n = parseInt(v, 10); return isNaN(n) ? null : n; })()
             };
 
             if (this.currentProject) {
@@ -4522,10 +4522,10 @@ const cmApp = {
             }
 
             // Auto-link to deal workspace if deal is selected
-            if (projectData.deal_id && this.currentProject && typeof sb !== 'undefined' && sb) {
+            if (projectData.deal_deals_id && this.currentProject && typeof sb !== 'undefined' && sb) {
                 try {
                     var { data: existing } = await sb.from('deal_artifacts')
-                        .select('id').eq('deal_id', projectData.deal_id)
+                        .select('id').eq('deal_id', projectData.deal_deals_id)
                         .eq('artifact_type', 'cost_model')
                         .eq('artifact_id', String(this.currentProject.id)).limit(1);
                     if (!existing || existing.length === 0) {
@@ -4534,7 +4534,7 @@ const cmApp = {
                         if (projectData.facility_sqft) parts.push(Number(projectData.facility_sqft).toLocaleString() + ' SF');
                         if (projectData.environment_type) parts.push(projectData.environment_type);
                         await sb.from('deal_artifacts').insert({
-                            deal_id: projectData.deal_id,
+                            deal_id: projectData.deal_deals_id,
                             artifact_type: 'cost_model',
                             artifact_id: String(this.currentProject.id),
                             artifact_name: projectData.name,
@@ -4544,6 +4544,39 @@ const cmApp = {
                     }
                 } catch(e) { console.warn('Could not auto-link cost model to deal:', e); }
             }
+
+            // ── Persist child tables ──
+            const pid = this.currentProject.id;
+
+            // Helper: delete-then-insert pattern for child tables
+            const persistChildTable = async (tableName, rows) => {
+                // Delete existing rows for this project
+                try {
+                    const existing = await cmFetchTable(tableName, 'project_id=eq.' + pid);
+                    for (const row of existing) {
+                        await cmApiDelete(tableName, row.id);
+                    }
+                } catch(e) { /* table may be empty */ }
+                // Insert current rows
+                if (rows && rows.length > 0) {
+                    for (const row of rows) {
+                        const clean = Object.assign({}, row);
+                        delete clean.id; // let DB assign new IDs
+                        clean.project_id = pid;
+                        await cmApiPost(tableName, clean);
+                    }
+                }
+            };
+
+            try {
+                await Promise.all([
+                    persistChildTable('cost_model_labor', this.projectData.laborLines),
+                    persistChildTable('cost_model_equipment', this.projectData.equipmentLines),
+                    persistChildTable('cost_model_overhead', this.projectData.overheadLines),
+                    persistChildTable('cost_model_vas', this.projectData.vasLines),
+                    persistChildTable('cost_model_volumes', this.projectData.volumeLines)
+                ]);
+            } catch(e) { console.warn('Child table save error:', e); }
 
             const indicator = document.getElementById('saveIndicator');
             indicator.textContent = 'Saved';
@@ -4910,9 +4943,9 @@ const dealApp = {
             var row = document.createElement('tr');
             row.style.borderBottom = '1px solid var(--ies-gray-100)';
             row.innerHTML =
-                '<td style="padding:12px;"><strong>' + (site.name || '(Untitled)') + '</strong></td>' +
+                '<td style="padding:12px;"><strong>' + esc(site.name || '(Untitled)') + '</strong></td>' +
                 '<td style="padding:12px;">' + market + '</td>' +
-                '<td style="padding:12px;">' + (site.environment_type || '—') + '</td>' +
+                '<td style="padding:12px;">' + esc(site.environment_type || '—') + '</td>' +
                 '<td style="padding:12px;text-align:right;">' + self.fmt.num(parseFloat(site.facility_sqft) || 0, 0) + '</td>' +
                 '<td style="padding:12px;text-align:right;">' + self.fmt.currency(parseFloat(site.total_annual_cost) || 0) + '</td>' +
                 '<td style="padding:12px;text-align:right;">' + (site.target_margin_pct ? site.target_margin_pct + '%' : '—') + '</td>' +

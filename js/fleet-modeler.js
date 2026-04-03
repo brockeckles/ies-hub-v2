@@ -39,9 +39,9 @@ async function fmLoadScenariosList() {
       var sid = s.id;
       return '<div class="dt-landing-card">' +
         '<div onclick="fmLoadFleetScenario(\'' + sid + '\'); fmShowTool()" style="cursor:pointer;">' +
-        '<div class="dt-landing-card-name">' + (s.name || 'Untitled') + '</div>' +
+        '<div class="dt-landing-card-name">' + esc(s.name || 'Untitled') + '</div>' +
         '<div class="dt-landing-card-meta">' + (s.created_at ? new Date(s.created_at).toLocaleDateString() : '') + '</div>' +
-        '<div class="dt-landing-card-metric">' + (s.notes ? s.notes.substring(0, 60) + '...' : 'Fleet scenario') + '</div>' +
+        '<div class="dt-landing-card-metric">' + (s.notes ? esc(s.notes.substring(0, 60)) + '...' : 'Fleet scenario') + '</div>' +
         '</div>' +
         '<div class="dt-landing-card-actions">' +
         '<button class="dt-card-btn-copy" onclick="event.stopPropagation(); dtCopyScenario(\'fleet_scenarios\',\'' + sid + '\',\'fleet\')"><svg width="12" height="12" fill="none" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2" stroke="currentColor" stroke-width="2"/></svg> Copy</button>' +
@@ -1100,7 +1100,7 @@ const fmApp = {
     container.innerHTML = this.scenarios.map(s => `
       <div class="fm-scenario-item">
         <div class="fm-scenario-info">
-          <div class="fm-scenario-name">${s.name}</div>
+          <div class="fm-scenario-name">${esc(s.name)}</div>
           <div class="fm-scenario-meta">${s.lanes && s.lanes.length ? s.lanes.length + ' lanes • ' : ''}${s.created_at}</div>
         </div>
         <div style="display:flex;gap:8px;">

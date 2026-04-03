@@ -445,7 +445,7 @@ const mostApp = {
       var elCount = self.elements.filter(function(e) { return e.template_id === t.id; }).length;
       var totalTmu = parseFloat(t.total_tmu_base) || 0;
       var uph = parseFloat(t.units_per_hour_base) || 0;
-      var pickMethod = t.pick_method ? '<span style="font-size:11px;padding:2px 8px;border-radius:4px;background:rgba(100,116,139,0.1);color:var(--ies-gray-500);font-weight:600;">' + t.pick_method + '</span>' : '';
+      var pickMethod = t.pick_method ? '<span style="font-size:11px;padding:2px 8px;border-radius:4px;background:rgba(100,116,139,0.1);color:var(--ies-gray-500);font-weight:600;">' + esc(t.pick_method) + '</span>' : '';
       var catColors = { manual: { bg: 'rgba(245,158,11,0.1)', text: '#92400e' }, mhe: { bg: 'rgba(59,130,246,0.1)', text: '#1e40af' }, hybrid: { bg: 'rgba(139,92,246,0.1)', text: '#6d28d9' } };
       var catC = catColors[t.labor_category] || catColors.manual;
       var catLabel = t.labor_category === 'mhe' ? 'MHE' : (t.labor_category === 'hybrid' ? 'Hybrid' : 'Manual');
@@ -457,19 +457,19 @@ const mostApp = {
         'onclick="mostApp.showDetail(' + t.id + ')">' +
         '<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:12px;">' +
           '<div style="display:flex;gap:6px;align-items:center;">' +
-            '<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:4px;background:' + ac.bg + ';color:' + ac.text + ';text-transform:uppercase;letter-spacing:0.5px;">' + t.process_area + '</span>' +
+            '<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:4px;background:' + ac.bg + ';color:' + ac.text + ';text-transform:uppercase;letter-spacing:0.5px;">' + esc(t.process_area) + '</span>' +
             catBadge +
           '</div>' +
           pickMethod +
         '</div>' +
-        '<div style="font-size:14px;font-weight:700;color:var(--ies-navy);margin-bottom:6px;">' + t.activity_name + '</div>' +
-        '<div style="font-size:11px;color:var(--ies-gray-500);margin-bottom:14px;">' + (t.equipment_type || '') + (t.wms_transaction ? ' &middot; ' + t.wms_transaction : '') + '</div>' +
+        '<div style="font-size:14px;font-weight:700;color:var(--ies-navy);margin-bottom:6px;">' + esc(t.activity_name) + '</div>' +
+        '<div style="font-size:11px;color:var(--ies-gray-500);margin-bottom:14px;">' + esc(t.equipment_type || '') + (t.wms_transaction ? ' &middot; ' + esc(t.wms_transaction) : '') + '</div>' +
         '<div style="display:flex;gap:16px;align-items:center;">' +
           '<div style="text-align:center;"><div style="font-size:20px;font-weight:700;color:var(--ies-orange);">' + uph.toFixed(1) + '</div><div style="font-size:11px;color:var(--ies-gray-400);">UPH</div></div>' +
           '<div style="width:1px;height:28px;background:var(--ies-gray-200);"></div>' +
           '<div style="text-align:center;"><div style="font-size:14px;font-weight:600;color:var(--ies-navy);">' + totalTmu.toLocaleString() + '</div><div style="font-size:11px;color:var(--ies-gray-400);">TMU</div></div>' +
           '<div style="width:1px;height:28px;background:var(--ies-gray-200);"></div>' +
-          '<div style="text-align:center;"><div style="font-size:14px;font-weight:600;color:var(--ies-navy);">' + t.uom + '</div><div style="font-size:11px;color:var(--ies-gray-400);">UOM</div></div>' +
+          '<div style="text-align:center;"><div style="font-size:14px;font-weight:600;color:var(--ies-navy);">' + esc(t.uom) + '</div><div style="font-size:11px;color:var(--ies-gray-400);">UOM</div></div>' +
           '<div style="width:1px;height:28px;background:var(--ies-gray-200);"></div>' +
           '<div style="text-align:center;"><div style="font-size:14px;font-weight:600;color:var(--ies-navy);">' + elCount + '</div><div style="font-size:11px;color:var(--ies-gray-400);">Elements</div></div>' +
         '</div>' +
@@ -496,11 +496,11 @@ const mostApp = {
     var detCatC = detCatColors[t.labor_category] || detCatColors.manual;
     var detCatLabel = t.labor_category === 'mhe' ? 'MHE' : (t.labor_category === 'hybrid' ? 'Hybrid' : 'Manual');
     html += '<div style="display:flex;gap:8px;align-items:center;">';
-    html += '<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:4px;background:' + ac.bg + ';color:' + ac.text + ';text-transform:uppercase;letter-spacing:0.5px;">' + t.process_area + '</span>';
+    html += '<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:4px;background:' + ac.bg + ';color:' + ac.text + ';text-transform:uppercase;letter-spacing:0.5px;">' + esc(t.process_area) + '</span>';
     html += '<span style="font-size:10px;font-weight:600;padding:3px 8px;border-radius:4px;background:' + detCatC.bg + ';color:' + detCatC.text + ';text-transform:uppercase;letter-spacing:0.3px;">' + detCatLabel + '</span>';
     html += '</div>';
-    html += '<div style="font-size:28px;font-weight:700;color:var(--ies-navy);margin-top:8px;">' + t.activity_name + '</div>';
-    html += '<div style="font-size:13px;color:var(--ies-gray-500);margin-top:4px;">' + (t.equipment_type || '') + (t.wms_transaction ? ' &middot; ' + t.wms_transaction : '') + ' &middot; UOM: ' + t.uom + (t.pick_method ? ' &middot; Method: ' + t.pick_method : '') + '</div>';
+    html += '<div style="font-size:28px;font-weight:700;color:var(--ies-navy);margin-top:8px;">' + esc(t.activity_name) + '</div>';
+    html += '<div style="font-size:13px;color:var(--ies-gray-500);margin-top:4px;">' + esc(t.equipment_type || '') + (t.wms_transaction ? ' &middot; ' + esc(t.wms_transaction) : '') + ' &middot; UOM: ' + esc(t.uom) + (t.pick_method ? ' &middot; Method: ' + esc(t.pick_method) : '') + '</div>';
     html += '</div>';
     html += '<div style="display:flex;gap:8px;align-items:center;">';
     html += '<button class="hub-btn" onclick="mostApp.duplicateTemplate(' + t.id + ')" style="padding:5px 12px;font-size:11px;font-weight:600;background:var(--ies-gray-100);color:var(--ies-navy);border:1px solid var(--ies-gray-200);border-radius:6px;cursor:pointer;">Duplicate</button>';
@@ -552,14 +552,14 @@ const mostApp = {
       var seqType = (el.sequence_type || '').replace(/_/g, ' ');
       var typeColor = seqType === 'general move' ? '#3b82f6' : seqType === 'controlled move' ? '#10b981' : '#f59e0b';
       var varBadge = el.is_variable
-        ? '<span style="background:#fef3c7;color:#92400e;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:600;">' + (el.variable_driver || 'Yes') + '</span>'
+        ? '<span style="background:#fef3c7;color:#92400e;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:600;">' + esc(el.variable_driver || 'Yes') + '</span>'
         : '<span style="color:var(--ies-gray-300);">&mdash;</span>';
       var rowBg = idx % 2 === 0 ? '' : 'background:var(--ies-gray-50,#f9fafb);';
 
       html += '<tr style="' + rowBg + '">';
       html += '<td style="font-weight:600;color:var(--ies-gray-400);">' + el.sequence_order + '</td>';
-      html += '<td style="font-weight:600;color:var(--ies-navy);">' + el.element_name + '</td>';
-      html += '<td><code style="font-family:Consolas,monospace;font-size:12px;background:var(--ies-gray-100);padding:2px 6px;border-radius:4px;">' + el.most_sequence + '</code></td>';
+      html += '<td style="font-weight:600;color:var(--ies-navy);">' + esc(el.element_name) + '</td>';
+      html += '<td><code style="font-family:Consolas,monospace;font-size:12px;background:var(--ies-gray-100);padding:2px 6px;border-radius:4px;">' + esc(el.most_sequence) + '</code></td>';
       html += '<td style="text-align:center;"><span style="font-size:11px;color:' + typeColor + ';font-weight:600;text-transform:capitalize;">' + seqType + '</span></td>';
       html += '<td style="text-align:right;font-weight:600;">' + parseFloat(el.tmu_value).toLocaleString() + '</td>';
       html += '<td style="text-align:center;">' + (el.is_variable ? '&#9679;' : '') + '</td>';
@@ -690,8 +690,8 @@ const mostApp = {
       var isVar = el.is_variable ? 'checked' : '';
       return '<tr data-idx="' + idx + '">' +
         '<td style="font-weight:600;color:var(--ies-gray-400);text-align:center;">' + seq + '</td>' +
-        '<td><input type="text" class="cm-input most-ed-field" data-field="element_name" value="' + (el.element_name || '').replace(/"/g, '&quot;') + '" placeholder="Element name" style="width:100%;font-size:12px;padding:4px 8px;" onchange="mostApp.updateElement(' + idx + ',\'element_name\',this.value)"></td>' +
-        '<td><input type="text" class="cm-input most-ed-field" data-field="most_sequence" value="' + (el.most_sequence || '').replace(/"/g, '&quot;') + '" placeholder="A1 B0 G1 A0..." style="width:100%;font-size:12px;padding:4px 8px;font-family:Consolas,monospace;" onchange="mostApp.updateElement(' + idx + ',\'most_sequence\',this.value)"></td>' +
+        '<td><input type="text" class="cm-input most-ed-field" data-field="element_name" value="' + esc(el.element_name || '') + '" placeholder="Element name" style="width:100%;font-size:12px;padding:4px 8px;" onchange="mostApp.updateElement(' + idx + ',\'element_name\',this.value)"></td>' +
+        '<td><input type="text" class="cm-input most-ed-field" data-field="most_sequence" value="' + esc(el.most_sequence || '') + '" placeholder="A1 B0 G1 A0..." style="width:100%;font-size:12px;padding:4px 8px;font-family:Consolas,monospace;" onchange="mostApp.updateElement(' + idx + ',\'most_sequence\',this.value)"></td>' +
         '<td><select class="cm-select most-ed-field" data-field="sequence_type" style="width:100%;font-size:12px;padding:4px 6px;" onchange="mostApp.updateElement(' + idx + ',\'sequence_type\',this.value)">' +
           '<option value="general_move"' + (el.sequence_type === 'general_move' ? ' selected' : '') + '>General Move</option>' +
           '<option value="controlled_move"' + (el.sequence_type === 'controlled_move' ? ' selected' : '') + '>Controlled Move</option>' +
@@ -699,9 +699,9 @@ const mostApp = {
         '</select></td>' +
         '<td><input type="number" class="cm-input most-ed-field" data-field="tmu_value" value="' + (el.tmu_value || 0) + '" min="0" step="1" style="width:70px;font-size:12px;padding:4px 8px;text-align:right;" onchange="mostApp.updateElement(' + idx + ',\'tmu_value\',this.value)"></td>' +
         '<td style="text-align:center;"><input type="checkbox" ' + isVar + ' onchange="mostApp.updateElement(' + idx + ',\'is_variable\',this.checked)" style="cursor:pointer;"></td>' +
-        '<td><input type="text" class="cm-input most-ed-field" data-field="variable_driver" value="' + (el.variable_driver || '').replace(/"/g, '&quot;') + '" placeholder="e.g., travel_dist" style="width:100%;font-size:12px;padding:4px 8px;" onchange="mostApp.updateElement(' + idx + ',\'variable_driver\',this.value)"' + (!el.is_variable ? ' disabled' : '') + '></td>' +
-        '<td><input type="text" class="cm-input most-ed-field" data-field="variable_formula" value="' + (el.variable_formula || '').replace(/"/g, '&quot;') + '" placeholder="Formula" style="width:100%;font-size:12px;padding:4px 8px;" onchange="mostApp.updateElement(' + idx + ',\'variable_formula\',this.value)"' + (!el.is_variable ? ' disabled' : '') + '></td>' +
-        '<td style="text-align:center;"><input type="text" class="cm-input most-ed-field" data-field="notes" value="' + (el.notes || '').replace(/"/g, '&quot;') + '" placeholder="—" style="width:60px;font-size:12px;padding:4px 6px;text-align:center;" onchange="mostApp.updateElement(' + idx + ',\'notes\',this.value)"></td>' +
+        '<td><input type="text" class="cm-input most-ed-field" data-field="variable_driver" value="' + esc(el.variable_driver || '') + '" placeholder="e.g., travel_dist" style="width:100%;font-size:12px;padding:4px 8px;" onchange="mostApp.updateElement(' + idx + ',\'variable_driver\',this.value)"' + (!el.is_variable ? ' disabled' : '') + '></td>' +
+        '<td><input type="text" class="cm-input most-ed-field" data-field="variable_formula" value="' + esc(el.variable_formula || '') + '" placeholder="Formula" style="width:100%;font-size:12px;padding:4px 8px;" onchange="mostApp.updateElement(' + idx + ',\'variable_formula\',this.value)"' + (!el.is_variable ? ' disabled' : '') + '></td>' +
+        '<td style="text-align:center;"><input type="text" class="cm-input most-ed-field" data-field="notes" value="' + esc(el.notes || '') + '" placeholder="—" style="width:60px;font-size:12px;padding:4px 6px;text-align:center;" onchange="mostApp.updateElement(' + idx + ',\'notes\',this.value)"></td>' +
         '<td style="text-align:center;">' +
           '<div style="display:flex;gap:2px;justify-content:center;">' +
             (idx > 0 ? '<button onclick="mostApp.moveElement(' + idx + ',-1)" style="background:none;border:none;cursor:pointer;padding:2px;font-size:14px;color:var(--ies-gray-400);" title="Move up">&#9650;</button>' : '<span style="width:18px;display:inline-block;"></span>') +
@@ -867,7 +867,7 @@ const mostApp = {
       showToast('Template saved successfully', 'success');
     } catch (err) {
       console.error('MOST save error:', err);
-      valDiv.innerHTML = 'Save failed: ' + (err.message || 'Unknown error');
+      valDiv.innerHTML = 'Save failed: ' + esc(err.message || 'Unknown error');
       valDiv.style.display = 'block';
     }
   },
@@ -968,9 +968,9 @@ const mostApp = {
         grouped[tmpl.process_area].push(tmpl);
       });
       Object.keys(grouped).sort().forEach(function(area) {
-        selHtml += '<optgroup label="' + area + '">';
+        selHtml += '<optgroup label="' + esc(area) + '">';
         grouped[area].forEach(function(tmpl) {
-          selHtml += '<option value="' + tmpl.id + '"' + (String(tmpl.id) === String(line.templateId) ? ' selected' : '') + '>' + tmpl.activity_name + ' (' + (parseFloat(tmpl.units_per_hour_base)||0).toFixed(0) + ' UPH)</option>';
+          selHtml += '<option value="' + tmpl.id + '"' + (String(tmpl.id) === String(line.templateId) ? ' selected' : '') + '>' + esc(tmpl.activity_name) + ' (' + (parseFloat(tmpl.units_per_hour_base)||0).toFixed(0) + ' UPH)</option>';
         });
         selHtml += '</optgroup>';
       });
@@ -1156,9 +1156,9 @@ const mostApp = {
         grouped[tmpl.process_area].push(tmpl);
       });
       Object.keys(grouped).sort().forEach(function(area) {
-        selHtml += '<optgroup label="' + area + '">';
+        selHtml += '<optgroup label="' + esc(area) + '">';
         grouped[area].forEach(function(tmpl) {
-          selHtml += '<option value="' + tmpl.id + '"' + (String(tmpl.id) === String(step.templateId) ? ' selected' : '') + '>' + tmpl.activity_name + '</option>';
+          selHtml += '<option value="' + tmpl.id + '"' + (String(tmpl.id) === String(step.templateId) ? ' selected' : '') + '>' + esc(tmpl.activity_name) + '</option>';
         });
         selHtml += '</optgroup>';
       });
@@ -1173,7 +1173,7 @@ const mostApp = {
       html += '<div style="min-width:200px;max-width:240px;background:var(--ies-gray-50);border-radius:10px;padding:14px;border:2px solid ' + ac.border + ';flex-shrink:0;">';
       // Step header with move/delete controls
       html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">';
-      html += '<input type="text" class="cm-input" value="' + (step.stepName || '').replace(/"/g, '&quot;') + '" onchange="mostApp.updateComposerStep(' + idx + ',\'stepName\',this.value)" style="font-size:12px;font-weight:700;color:var(--ies-navy);padding:2px 6px;width:100px;border:1px solid transparent;background:transparent;" onfocus="this.style.borderColor=\'var(--ies-gray-200)\';this.style.background=\'#fff\'" onblur="this.style.borderColor=\'transparent\';this.style.background=\'transparent\'">';
+      html += '<input type="text" class="cm-input" value="' + esc(step.stepName || '') + '" onchange="mostApp.updateComposerStep(' + idx + ',\'stepName\',this.value)" style="font-size:12px;font-weight:700;color:var(--ies-navy);padding:2px 6px;width:100px;border:1px solid transparent;background:transparent;" onfocus="this.style.borderColor=\'var(--ies-gray-200)\';this.style.background=\'#fff\'" onblur="this.style.borderColor=\'transparent\';this.style.background=\'transparent\'">';
       html += '<div style="display:flex;gap:2px;">';
       if (idx > 0) html += '<button onclick="mostApp.moveComposerStep(' + idx + ',-1)" style="background:none;border:none;cursor:pointer;padding:2px;font-size:12px;color:var(--ies-gray-400);" title="Move left">&#9664;</button>';
       if (idx < self.composerSteps.length - 1) html += '<button onclick="mostApp.moveComposerStep(' + idx + ',1)" style="background:none;border:none;cursor:pointer;padding:2px;font-size:12px;color:var(--ies-gray-400);" title="Move right">&#9654;</button>';
