@@ -5151,7 +5151,7 @@ function checkAuth(){
   if(code==='ies2026'||code==='ieshub'){
     authGate.style.display='none';
     sessionStorage.setItem('ies-auth','1');
-    setTimeout(function(){ anInitTracking(); }, 500);
+    setTimeout(function(){ anInitTracking(); if(typeof loadAllData==='function') loadAllData(); }, 500);
   } else {
     authError.style.display='block';
     authInput.style.borderColor='#ef4444';
@@ -5159,7 +5159,7 @@ function checkAuth(){
   }
 }
 if(sessionStorage.getItem('ies-auth')==='1'){document.getElementById('auth-gate').style.display='none';}
-window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth')==='1' && typeof anInitTracking==='function') anInitTracking(); });
+window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth')==='1') { if(typeof anInitTracking==='function') anInitTracking(); if(typeof loadAllData==='function') loadAllData(); } });
 </script>
 
 <!-- ═══════════════════ HEADER ═══════════════════ -->

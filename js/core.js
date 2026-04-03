@@ -204,6 +204,11 @@ function navigate(section, el) {
     dmLoadDeals();
   }
 
+  // Load Command Center data when navigating to overview
+  if (section === 'overview') {
+    if (typeof loadAllData === 'function') loadAllData();
+  }
+
   // Load Change Management data when navigating to it
   if (section === 'changemanagement') {
     cmLoadAll();
