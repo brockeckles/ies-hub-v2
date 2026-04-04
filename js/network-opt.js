@@ -3751,7 +3751,7 @@ async function wscLoadScenariosList() {
         '<div onclick="wscLoadScenario(\'' + esc(s.id) + '\'); wscShowTool()" style="cursor:pointer;">' +
         '<div class="dt-landing-card-name">' + esc(s.scenario_name || 'Untitled') + '</div>' +
         '<div class="dt-landing-card-meta">' + (s.created_at ? new Date(s.created_at).toLocaleDateString() : '') + '</div>' +
-        '<div class="dt-landing-card-metric">SF: ' + (s.facility_sqft ? s.facility_sqft.toLocaleString() : '—') + '</div>' +
+        '<div class="dt-landing-card-metric">SF: ' + (s.facility_sqft ? s.facility_sqft.toLocaleString() : (s.peak_units && s.units_per_pallet ? Math.round((s.peak_units / s.units_per_pallet) * 25 * 2.2).toLocaleString() + '*' : '—')) + '</div>' +
         '</div>' +
         '<div class="dt-landing-card-actions">' +
         '<button class="dt-card-btn-copy" onclick="event.stopPropagation(); dtCopyScenario(\'warehouse_sizing_scenarios\',\'' + esc(s.id) + '\',\'wsc\')"><svg width="12" height="12" fill="none" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2" stroke="currentColor" stroke-width="2"/></svg> Copy</button>' +
@@ -6995,11 +6995,24 @@ function render3DLayout(p) {
   var cW = container.clientWidth || 800;
   var cH = container.clientHeight || 480;
 
-  // ── Building dimensions — use tightened values from 2D render if available ──
+  // ── Building dimensions — use tightened values from 2D render ──
   var twoDock = p.dockConfig === 'two';
   var dockFaceW = Math.max((twoDock ? Math.max(p.inDoors, p.outDoors) : p.totalDoors) * 14, 120);
-  var bW = wscTightenedBW || Math.max(dockFaceW, Math.ceil(Math.sqrt(p.totalSF * 2.2)));
-  var bD = wscTightenedBD || Math.max(100, Math.ceil(p.totalSF / bW));
+  var bW, bD;
+  if (wscTightenedBW > 0 && wscTightenedBD > 0) {
+    bW = wscTightenedBW;
+    bD = wscTightenedBD;
+  } else {
+    // Fallback: calculate and tighten inline (same logic as 2D renderLayout)
+    bW = Math.max(dockFaceW, Math.ceil(Math.sqrt(p.totalSF * 2.2)));
+    bD = Math.max(100, Math.ceil(p.totalSF / bW));
+    var mg = 4;
+    var dockH = Math.max(18, Math.min(Math.ceil(p.dockSF / bW * (twoDock ? 0.5 : 1)), bD * 0.12));
+    var recvStH = Math.max(14, Math.min(Math.ceil(p.recvStagingSF / bW), bD * 0.10));
+    var shipStH = Math.max(14, Math.min(Math.ceil(p.shipStagingSF / bW), bD * 0.10));
+    var reqD = (twoDock ? dockH + recvStH : 0) + dockH + Math.max(recvStH, shipStH) + mg * 6 + 40;
+    if (bD > reqD + 20) bD = reqD + 10;
+  }
   var clearH = p.clearHeightFt || 32;
   var pad = 60;
 
@@ -7397,20 +7410,27 @@ function render3DLayout(p) {
           }
         }
       } else {
-        // Standard rack storage (single or double)
+        // Standard rack storage (single or double) — back-to-back pairs
+        // Module = back-to-back rack pair + aisle (matches 2D: 8.5ft for single, 16.5ft for double)
+        var modDepth = (p.storeType === 'double') ? 16.5 : 8.5;
+        var pairStep = aisleW + modDepth;
         if (isVert) {
-          var step = aisleW + rackDepth;
-          var numRows = Math.max(1, Math.floor((w3d - aisleW) / step));
-          for (var rv = 0; rv < numRows; rv++) {
-            var rx = x3d + aisleW + rv * step;
+          var numPairs = Math.max(1, Math.floor((w3d - aisleW) / pairStep));
+          for (var rv = 0; rv < numPairs; rv++) {
+            var rx = x3d + aisleW + rv * pairStep;
+            // Row A (facing left aisle)
             _wsc3dBuildRackRow(scene, rx, z3d + 4, d3d - 8, rackLevels, clearH * 0.9, 'vertical', rackDepth);
+            // Row B (back-to-back, facing right aisle)
+            _wsc3dBuildRackRow(scene, rx + rackDepth + 0.5, z3d + 4, d3d - 8, rackLevels, clearH * 0.9, 'vertical', rackDepth);
           }
         } else {
-          var step = aisleW + rackDepth;
-          var numRows = Math.max(1, Math.floor((d3d - aisleW) / step));
-          for (var rh = 0; rh < numRows; rh++) {
-            var rz = z3d + aisleW + rh * step;
+          var numPairs = Math.max(1, Math.floor((d3d - aisleW) / pairStep));
+          for (var rh = 0; rh < numPairs; rh++) {
+            var rz = z3d + aisleW + rh * pairStep;
+            // Row A (facing top aisle)
             _wsc3dBuildRackRow(scene, x3d + 4, rz, w3d - 8, rackLevels, clearH * 0.9, 'horizontal', rackDepth);
+            // Row B (back-to-back, facing bottom aisle)
+            _wsc3dBuildRackRow(scene, x3d + 4, rz + rackDepth + 0.5, w3d - 8, rackLevels, clearH * 0.9, 'horizontal', rackDepth);
           }
         }
       }
