@@ -2056,7 +2056,7 @@ function calcWarehouse() { try {
 
       storageDetailHtml = '<strong>Pallet Storage: Single-Deep Selective</strong> \u2014 ' + rackLevels + ' levels, ' + aisleType.replace('vna','VNA') + ' aisles (' + aisleW + ' ft)';
       storageDetailHtml += '<br>' + grossPalletPositions.toLocaleString() + ' pallet positions \u00f7 ' + rackLevels + ' levels = <strong>' + floorPositions.toLocaleString() + ' floor positions</strong>';
-      storageDetailHtml += '<br>Module: 8.5 ft back-to-back + ' + aisleW + ' ft aisle = ' + moduleDepth + ' ft \u2192 ' + sfPerFloorPos + ' sf/floor position';
+      storageDetailHtml += '<br>Module: 8.5 ft back-to-back + ' + aisleW + ' ft aisle = ' + moduleDepth + ' ft \u2192 ' + fmtNum(sfPerFloorPos, 0) + ' sf/floor position';
 
     } else if (storeType === 'double') {
       var ddModuleDepth = 16.5 + aisleW;
@@ -2066,7 +2066,7 @@ function calcWarehouse() { try {
 
       storageDetailHtml = '<strong>Pallet Storage: Double-Deep</strong> \u2014 ' + rackLevels + ' levels, ' + aisleW + ' ft aisles';
       storageDetailHtml += '<br>' + grossPalletPositions.toLocaleString() + ' pallet positions \u00f7 ' + rackLevels + ' levels = ' + floorPositions.toLocaleString() + ' floor positions';
-      storageDetailHtml += '<br>Module: 16.5 ft + ' + aisleW + ' ft = ' + ddModuleDepth + ' ft \u2192 ' + sfPerFloorPos + ' sf/position';
+      storageDetailHtml += '<br>Module: 16.5 ft + ' + aisleW + ' ft = ' + ddModuleDepth + ' ft \u2192 ' + fmtNum(sfPerFloorPos, 0) + ' sf/position';
 
     } else if (storeType === 'bulk') {
       var bulkAisle = 12;
@@ -2078,7 +2078,7 @@ function calcWarehouse() { try {
       palletStorageSF = Math.ceil(grossPalletPositions * sfPerFloorPos);
 
       storageDetailHtml = '<strong>Pallet Storage: Bulk Floor</strong> \u2014 ' + bulkDepth + '-deep, stacked ' + stackHi + ' high';
-      storageDetailHtml += '<br>' + grossPalletPositions.toLocaleString() + ' pallet positions at ' + sfPerFloorPos + ' sf/position';
+      storageDetailHtml += '<br>' + fmtNum(grossPalletPositions) + ' pallet positions at ' + fmtNum(sfPerFloorPos, 0) + ' sf/position';
 
     } else if (storeType === 'carton') {
       // If storage type is carton, pallet positions still use single-deep selective as fallback
@@ -2405,13 +2405,15 @@ function calcWarehouse() { try {
     rackLevels: rackLevels, aisleW: aisleW };
   var cmBtn = document.getElementById('wsc-cm-integration');
   if (cmBtn) cmBtn.style.display = 'block';
-  // Update 3D view if active
-  if (wsc3dMode && typeof render3DLayout === 'function') render3DLayout(wscLastLayoutParams || {totalSF:0});
+  // Update 3D/elevation view if active
+  if (wscViewMode === '3d' && typeof render3DLayout === 'function') render3DLayout(p);
+  if (wscViewMode === 'elevation' && typeof renderElevationView === 'function') renderElevationView(p);
   // Sync input panel height with right column
   syncCalcPanelHeight();
 
   // Trigger auto-save if a scenario is loaded
   wscMarkChanged();
+  return p;
 } catch(err) { console.error('calcWarehouse error:', err); } }
 
 function syncCalcPanelHeight() {
@@ -2625,9 +2627,10 @@ async function wscSaveScenario(projectId, scenarioName) {
             is_active: true,
             ...inputs
         };
-        // Include calculated facility SF from last run
-        if (window._lastWscParams && window._lastWscParams.totalSF) {
-            payload.facility_sqft = Math.round(window._lastWscParams.totalSF);
+        // Always recalculate before saving to ensure fresh values
+        var freshParams = calcWarehouse();
+        if (freshParams && freshParams.totalSF) {
+            payload.facility_sqft = Math.round(freshParams.totalSF);
         }
         if (projectId) payload.project_id = projectId;
 
@@ -6751,13 +6754,17 @@ function _wsc3dBuildRackRow(scene, x, z, length, rackLevels, clearHeight, direct
     var bx = bay * bayWidth;
     var uprightGeo = new THREE.BoxGeometry(0.3, clearHeight, 0.3);
 
-    // Two uprights per bay
-    for (var side = 0; side < 2; side++) {
+    // Uprights per bay — double-deep gets intermediate upright at back-to-back point
+    var uprightPositions = [0, depth];
+    if (depth >= 8) {
+      uprightPositions = [0, depth / 2, depth];
+    }
+    for (var ui = 0; ui < uprightPositions.length; ui++) {
       var upright = new THREE.Mesh(uprightGeo, uprightMat);
       if (direction === 'vertical') {
-        upright.position.set(x + side * depth, clearHeight / 2, z + bx);
+        upright.position.set(x + uprightPositions[ui], clearHeight / 2, z + bx);
       } else {
-        upright.position.set(x + bx, clearHeight / 2, z + side * depth);
+        upright.position.set(x + bx, clearHeight / 2, z + uprightPositions[ui]);
       }
       upright.castShadow = true;
       scene.add(upright);
@@ -6766,28 +6773,58 @@ function _wsc3dBuildRackRow(scene, x, z, length, rackLevels, clearHeight, direct
     // Beams per level
     for (var lvl = 1; lvl <= rackLevels; lvl++) {
       var beamY = lvl * beamH;
-      var beamGeo;
-      if (direction === 'vertical') {
-        beamGeo = new THREE.BoxGeometry(depth, 0.2, 0.2);
+      if (depth >= 8) {
+        // Double-deep: two separate beams (front half + back half)
+        var halfDepth = depth / 2;
+        var beamGeoHalf;
+        if (direction === 'vertical') {
+          beamGeoHalf = new THREE.BoxGeometry(halfDepth, 0.2, 0.2);
+        } else {
+          beamGeoHalf = new THREE.BoxGeometry(0.2, 0.2, halfDepth);
+        }
+        // Front beam pair
+        var bf1 = new THREE.Mesh(beamGeoHalf, beamMat);
+        var bf2 = new THREE.Mesh(beamGeoHalf, beamMat);
+        // Back beam pair
+        var bb1 = new THREE.Mesh(beamGeoHalf, beamMat);
+        var bb2 = new THREE.Mesh(beamGeoHalf, beamMat);
+        if (direction === 'vertical') {
+          bf1.position.set(x + halfDepth / 2, beamY, z + bx);
+          bf2.position.set(x + halfDepth / 2, beamY, z + bx + bayWidth);
+          bb1.position.set(x + halfDepth + halfDepth / 2, beamY, z + bx);
+          bb2.position.set(x + halfDepth + halfDepth / 2, beamY, z + bx + bayWidth);
+        } else {
+          bf1.position.set(x + bx, beamY, z + halfDepth / 2);
+          bf2.position.set(x + bx + bayWidth, beamY, z + halfDepth / 2);
+          bb1.position.set(x + bx, beamY, z + halfDepth + halfDepth / 2);
+          bb2.position.set(x + bx + bayWidth, beamY, z + halfDepth + halfDepth / 2);
+        }
+        scene.add(bf1); scene.add(bf2); scene.add(bb1); scene.add(bb2);
       } else {
-        beamGeo = new THREE.BoxGeometry(0.2, 0.2, depth);
+        // Single-deep: one beam spanning full depth
+        var beamGeo;
+        if (direction === 'vertical') {
+          beamGeo = new THREE.BoxGeometry(depth, 0.2, 0.2);
+        } else {
+          beamGeo = new THREE.BoxGeometry(0.2, 0.2, depth);
+        }
+        // Front beam
+        var beam1 = new THREE.Mesh(beamGeo, beamMat);
+        if (direction === 'vertical') {
+          beam1.position.set(x + depth / 2, beamY, z + bx);
+        } else {
+          beam1.position.set(x + bx, beamY, z + depth / 2);
+        }
+        scene.add(beam1);
+        // Back beam
+        var beam2 = new THREE.Mesh(beamGeo, beamMat);
+        if (direction === 'vertical') {
+          beam2.position.set(x + depth / 2, beamY, z + bx + bayWidth);
+        } else {
+          beam2.position.set(x + bx + bayWidth, beamY, z + depth / 2);
+        }
+        scene.add(beam2);
       }
-      // Front beam
-      var beam1 = new THREE.Mesh(beamGeo, beamMat);
-      if (direction === 'vertical') {
-        beam1.position.set(x + depth / 2, beamY, z + bx);
-      } else {
-        beam1.position.set(x + bx, beamY, z + depth / 2);
-      }
-      scene.add(beam1);
-      // Back beam
-      var beam2 = new THREE.Mesh(beamGeo, beamMat);
-      if (direction === 'vertical') {
-        beam2.position.set(x + depth / 2, beamY, z + bx + bayWidth);
-      } else {
-        beam2.position.set(x + bx + bayWidth, beamY, z + depth / 2);
-      }
-      scene.add(beam2);
 
       // Pallets on this level (3 per bay)
       var palletBottom = (lvl - 1) * beamH + 0.5;
