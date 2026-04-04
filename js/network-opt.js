@@ -2347,7 +2347,7 @@ function calcWarehouse() { try {
   reco += 'IES sizes <strong>' + designedPositions.toLocaleString() + ' positions</strong>';
   if (surgeBufPct > 0) reco += ' + <strong>' + surgePositions.toLocaleString() + ' surge positions (' + surgeBufPct + '%)</strong>';
   reco += ' in ' + storageSF.toLocaleString() + ' sf of storage (' + rackLevels + ' levels at ' + clearHeightFt + ' ft clear). ';
-  reco += 'Dock requirements: <strong>' + totalDoors + ' doors</strong> (' + inDoors + ' inbound, ' + outDoors + ' outbound; adjusted to ' + adjustedDoors + ' with 25% surge buffer) based on ' + inPal.toLocaleString() + '/' + outPal.toLocaleString() + ' daily pallets at ' + pdph + ' pallets/door/hr over ' + dockHrs + ' hrs.';
+  reco += 'Dock requirements: <strong>' + fmtNum(totalDoors) + ' doors</strong> (' + fmtNum(inDoors) + ' inbound, ' + fmtNum(outDoors) + ' outbound; adjusted to ' + fmtNum(adjustedDoors) + ' with 25% surge buffer) based on ' + fmtNum(inPal) + '/' + fmtNum(outPal) + ' daily pallets at ' + fmtNum(pdph) + ' pallets/door/hr over ' + fmtNum(dockHrs) + ' hrs.';
 
   // FIX 2: Utilization warning if average utilization > 85%
   if (utilPct > 85) {
@@ -2627,10 +2627,10 @@ async function wscSaveScenario(projectId, scenarioName) {
             is_active: true,
             ...inputs
         };
-        // Always recalculate before saving to ensure fresh values
-        var freshParams = calcWarehouse();
-        if (freshParams && freshParams.totalSF) {
-            payload.facility_sqft = Math.round(freshParams.totalSF);
+        // Recalculate to refresh _lastWscParams, then read from the global
+        try { calcWarehouse(); } catch(e) {}
+        if (window._lastWscParams && window._lastWscParams.totalSF) {
+            payload.facility_sqft = Math.round(window._lastWscParams.totalSF);
         }
         if (projectId) payload.project_id = projectId;
 
@@ -8065,7 +8065,7 @@ function renderElevationView(p) {
   ctx.fillText('Dock', toX(dockStart + dockDepth / 2), toY(0) - 8);
 
   // Dock height dimension (4' dock elevation)
-  _elevDimV(ctx, toX(dockStart + dockDepth / 2), toY(0), toY(4), "4' dock ht");
+  _elevDimV(ctx, toX(dockStart + dockDepth) + 8, toY(0), toY(4), "4' dock ht");
 
   // ── RIGHT-SIDE BUILDING DIMENSIONS (stacked outward from building edge) ──
   var roofPeak = 4;
@@ -8099,10 +8099,10 @@ function renderElevationView(p) {
     }
   }
 
-  // ── LEFT-SIDE DOCK/TRAILER DIMENSIONS (separate from building dims) ──
-  var leftBaseX = toX(dockStart) - 25;
-  _elevDimV(ctx, leftBaseX, toY(0), toY(14), "14' door clr");
-  _elevDimV(ctx, leftBaseX - dimSpacing, toY(4), toY(4 + 13.5), "13.5' trailer");
+  // ── EXTERIOR DOCK/TRAILER DIMENSIONS (outside building, near trailer) ──
+  var truckDimX = toX(truckX + 22);
+  _elevDimV(ctx, truckDimX, toY(0), toY(13.5), "13.5' trailer");
+  _elevDimV(ctx, truckDimX + dimSpacing, toY(0), toY(14), "14' door clr");
 
   // ── INTERNAL DIMENSIONS ──
   // Pallet load height (inside first rack bay) — only if >= 4 ft
