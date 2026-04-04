@@ -2382,6 +2382,13 @@ function calcWarehouse() { try {
     rackDir: rackDir,
     dockConfig: dockConfig
   });
+  // Store params for CM integration and show button
+  window._lastWscParams = { totalSF: totalSqFt, storageSF: storageSF, dockSF: dockSF, officeSF: officeSF,
+    totalDoors: totalDoors, inDoors: inDoors, outDoors: outDoors, clearHeightFt: clearHeightFt,
+    recvStagingSF: recvStagingSF, shipStagingSF: shipStagingSF, storeType: storeType,
+    rackLevels: rackLevels, aisleW: aisleW };
+  var cmBtn = document.getElementById('wsc-cm-integration');
+  if (cmBtn) cmBtn.style.display = 'block';
   // Update 3D view if active
   if (wsc3dMode && typeof render3DLayout === 'function') render3DLayout(wscLastLayoutParams || {totalSF:0});
   // Sync input panel height with right column
@@ -3178,7 +3185,10 @@ var netoptState = {
     minFacilities: 1,
     maxFacilities: 5,
     budgetCap: null,
-    inventoryCarryPct: 15
+    inventoryCarryPct: 15,
+    globalMaxDays: 3,
+    hardConstraint: false,
+    targetServicePct: 95
   },
   results: null,
   activeTab: 'setup',
@@ -4203,7 +4213,7 @@ var NETOPT_ARCHETYPES = {
     topRegion: 'Northeast 28%',
     zipCount: 200,
     regionWeights: { ne: 1.3, se: 1.0, mw: 0.9, sw: 0.8, w: 1.1 },
-    popExponent: 1.1  // slightly favor dense areas
+    popExponent: 1.1, maxDays: 3
   },
   dtc_east: {
     name: 'DTC E-Commerce — East Coast Heavy',
@@ -4212,7 +4222,7 @@ var NETOPT_ARCHETYPES = {
     topRegion: 'Northeast 45%',
     zipCount: 180,
     regionWeights: { ne: 2.2, se: 1.2, mw: 0.5, sw: 0.3, w: 0.4 },
-    popExponent: 1.2
+    popExponent: 1.2, maxDays: 2
   },
   dtc_west: {
     name: 'DTC E-Commerce — West Coast Heavy',
@@ -4221,7 +4231,7 @@ var NETOPT_ARCHETYPES = {
     topRegion: 'West 48%',
     zipCount: 180,
     regionWeights: { ne: 0.5, se: 0.4, mw: 0.3, sw: 0.6, w: 2.5 },
-    popExponent: 1.2
+    popExponent: 1.2, maxDays: 2
   },
   cpg_bigbox: {
     name: 'CPG → Big Box Retail',
@@ -4230,7 +4240,7 @@ var NETOPT_ARCHETYPES = {
     topRegion: 'South 30%',
     zipCount: 120,
     regionWeights: { ne: 0.9, se: 1.2, mw: 1.1, sw: 1.0, w: 0.8 },
-    popExponent: 0.7  // more spread out (follows store count not pop density)
+    popExponent: 0.7, maxDays: 5
   },
   cpg_grocery: {
     name: 'CPG → Grocery Chains',
@@ -4239,7 +4249,7 @@ var NETOPT_ARCHETYPES = {
     topRegion: 'Midwest 25%',
     zipCount: 100,
     regionWeights: { ne: 1.0, se: 1.1, mw: 1.2, sw: 0.8, w: 0.9 },
-    popExponent: 0.6
+    popExponent: 0.6, maxDays: 5
   },
   industrial: {
     name: 'Industrial / MRO Distribution',
@@ -4248,7 +4258,7 @@ var NETOPT_ARCHETYPES = {
     topRegion: 'Midwest 35%',
     zipCount: 150,
     regionWeights: { ne: 0.8, se: 0.7, mw: 1.8, sw: 0.6, w: 0.5 },
-    popExponent: 0.5
+    popExponent: 0.5, maxDays: 5
   },
   food_bev: {
     name: 'Food & Beverage',
@@ -4257,7 +4267,7 @@ var NETOPT_ARCHETYPES = {
     topRegion: 'Northeast 28%',
     zipCount: 160,
     regionWeights: { ne: 1.2, se: 1.1, mw: 1.0, sw: 0.8, w: 1.0 },
-    popExponent: 1.0
+    popExponent: 1.0, maxDays: 2
   },
   healthcare: {
     name: 'Healthcare / Pharma',
@@ -4266,7 +4276,7 @@ var NETOPT_ARCHETYPES = {
     topRegion: 'Northeast 30%',
     zipCount: 180,
     regionWeights: { ne: 1.4, se: 1.0, mw: 0.9, sw: 0.7, w: 1.0 },
-    popExponent: 1.1
+    popExponent: 1.1, maxDays: 1
   },
   auto_parts: {
     name: 'Auto Parts / Aftermarket',
@@ -4275,7 +4285,7 @@ var NETOPT_ARCHETYPES = {
     topRegion: 'South 28%',
     zipCount: 170,
     regionWeights: { ne: 0.9, se: 1.2, mw: 1.1, sw: 1.0, w: 0.9 },
-    popExponent: 0.8
+    popExponent: 0.8, maxDays: 3
   },
   bto_tech: {
     name: 'Build-to-Order / Tech',
@@ -4284,7 +4294,7 @@ var NETOPT_ARCHETYPES = {
     topRegion: 'West 35%',
     zipCount: 160,
     regionWeights: { ne: 1.1, se: 0.7, mw: 0.6, sw: 0.8, w: 1.6 },
-    popExponent: 1.3  // strongly favor dense/tech areas
+    popExponent: 1.3, maxDays: 3
   }
 };
 
@@ -4360,6 +4370,7 @@ function netoptGenerateDemoDemand() {
       state: z.state,
       volume: volume,
       maxMiles: sla,
+      maxDays: arch.maxDays || 3,
       lat: z.lat,
       lng: z.lng,
       zip3: z.zip3
@@ -4546,6 +4557,7 @@ function netoptRenderDemandsTable() {
       <td style="padding:12px 16px;"><input type="text" value="${esc(d.state)}" class="wsc-input" style="width:100%;font-size:12px;" onchange="netoptState.demands.find(x=>x.id==='${did}').state=this.value;"></td>
       <td style="padding:12px 16px;text-align:right;"><input type="number" value="${d.volume}" min="1" step="10" class="wsc-input" style="width:100%;text-align:right;font-size:12px;" onchange="netoptState.demands.find(x=>x.id==='${did}').volume=parseFloat(this.value);netoptUpdateKPI();"></td>
       <td style="padding:12px 16px;text-align:right;"><input type="number" value="${d.maxMiles}" min="50" step="50" class="wsc-input" style="width:100%;text-align:right;font-size:12px;" onchange="netoptState.demands.find(x=>x.id==='${did}').maxMiles=parseFloat(this.value);"></td>
+      <td style="padding:12px 16px;text-align:right;"><input type="number" value="${d.maxDays || 3}" min="1" max="7" step="1" class="wsc-input" style="width:100%;text-align:right;font-size:12px;" onchange="netoptState.demands.find(x=>x.id==='${did}').maxDays=parseInt(this.value);"></td>
       <td style="padding:12px 16px;text-align:center;"><button onclick="netoptRemoveDemand('${did}')" style="padding:4px 8px;background:#fff;border:1px solid var(--ies-red);color:var(--ies-red);border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;">Remove</button></td>
     `;
     tbody.appendChild(row);
@@ -4590,6 +4602,7 @@ function netoptAddDemandPoint() {
     state: 'NY',
     volume: 100,
     maxMiles: 500,
+    maxDays: 3,
     lat: null,
     lng: null
   });
@@ -5028,6 +5041,12 @@ function netoptGreedyOptimize(facilities, demands, transport, constraints) {
   scenarios.forEach(function(s, i) {
     s._isBestCost = (i === bestCostIdx);
     s._isBestService = (i === bestServiceIdx);
+    // Hard constraint enforcement: mark scenarios below target service as infeasible
+    var targetPct = constraints.targetServicePct || constraints.serviceLevelPct || 95;
+    if (constraints.hardConstraint && s.serviceLevel < targetPct) {
+      s._hardConstraintFail = true;
+      s._hardConstraintReason = 'Service ' + s.serviceLevel.toFixed(1) + '% < ' + targetPct + '% target';
+    }
   });
 
   // Default recommended = best cost among feasible (backward compatible)
@@ -5108,6 +5127,19 @@ function netoptCalculateTotalCost(config, demands, transport, constraints) {
   return (fixedCost + transportCost) / 1000000; // Return in M$
 }
 
+// Reusable transit day estimation helper
+function estimateTransitDays(distMiles, transport) {
+  var speed = (transport && transport.truckSpeedMiPerDay) || 500;
+  var mix = (transport && transport.modeMix) || { tl: 0.7, ltl: 0.2, parcel: 0.1 };
+  var groundDays = distMiles <= 150 ? 1 : Math.ceil(distMiles / speed) + 1;
+  var parcelDays = distMiles <= 50 ? 1 : distMiles <= 150 ? 2 : distMiles <= 400 ? 3 : distMiles <= 800 ? 4 : 5;
+  var groundPct = (mix.tl || 0) + (mix.ltl || 0);
+  var parcelPct = mix.parcel || 0;
+  var total = groundPct + parcelPct;
+  if (total === 0) return groundDays;
+  return Math.max(1, Math.round(((groundDays * groundPct + parcelDays * parcelPct) / total) * 10) / 10);
+}
+
 // Evaluate a configuration
 function netoptEvaluateConfig(config, demands, transport, constraints) {
   var fixedCost = config.reduce((s, f) => s + (f.fixedCost || 0), 0);
@@ -5115,6 +5147,8 @@ function netoptEvaluateConfig(config, demands, transport, constraints) {
   var assignedVolume = {};
   var distances = [];
   var serviceCt = 0;
+  var slaMet = 0;
+  var slaTotal = 0;
   var truckSpeed = transport.truckSpeedMiPerDay || 500;
 
   // Delivery day buckets: volume-weighted (units in K)
@@ -5131,10 +5165,17 @@ function netoptEvaluateConfig(config, demands, transport, constraints) {
   var pendingAssignments = [];
   demands.forEach(function(d) {
     if (config.length === 0) return;
-    // Sort facilities by distance for overflow logic
+    // Sort facilities by distance, penalizing those that violate transit SLA
+    var maxD = d.maxDays || (constraints && constraints.globalMaxDays) || 999;
     var sorted = config.map(function(f) {
-      return { facility: f, dist: roadDist(d.lat, d.lng, f.lat, f.lng) };
-    }).sort(function(a, b) { return a.dist - b.dist; });
+      var dist = roadDist(d.lat, d.lng, f.lat, f.lng);
+      var days = estimateTransitDays(dist, transport);
+      return { facility: f, dist: dist, transitDays: days };
+    }).sort(function(a, b) {
+      var penA = a.transitDays > maxD ? 1e6 : 0;
+      var penB = b.transitDays > maxD ? 1e6 : 0;
+      return (a.dist + penA) - (b.dist + penB);
+    });
     pendingAssignments.push({ demand: d, sortedFacs: sorted });
   });
 
@@ -5169,17 +5210,12 @@ function netoptEvaluateConfig(config, demands, transport, constraints) {
       transportCost += tlCost + ltlCost + parcelCost;
       distances.push(dist);
 
-      if (dist <= d.maxMiles) serviceCt += (allocated / vol);
-
-      // Delivery day estimation
-      var parcelPct = mix.parcel || 0;
-      var groundPct = (mix.tl || 0) + (mix.ltl || 0);
-      var groundDays = dist <= 150 ? 1 : Math.ceil(dist / truckSpeed) + 1;
-      var parcelDays = dist <= 50 ? 1 : dist <= 150 ? 2 : dist <= 400 ? 3 : dist <= 800 ? 4 : 5;
-      var transitDays = groundPct > 0 || parcelPct > 0
-        ? (groundDays * groundPct + parcelDays * parcelPct) / (groundPct + parcelPct)
-        : groundDays;
-      transitDays = Math.max(1, Math.round(transitDays * 10) / 10);
+      // Service level: check both distance AND transit day SLA
+      var transitDays = estimateTransitDays(dist, transport);
+      var demandMaxDays = d.maxDays || (constraints && constraints.globalMaxDays) || 999;
+      var meetsDistance = dist <= (d.maxMiles || 9999);
+      var meetsDays = transitDays <= demandMaxDays;
+      if (meetsDistance && meetsDays) serviceCt += (allocated / vol);
 
       totalVolume += allocated;
       weightedDaySum += transitDays * allocated;
@@ -5217,6 +5253,15 @@ function netoptEvaluateConfig(config, demands, transport, constraints) {
         facilityLat: nearest.facility.lat, facilityLng: nearest.facility.lng,
         volume: remaining, distance: nearest.dist, transitDays: 0, transportCost: 0
       });
+    }
+
+    // Track SLA compliance per demand point
+    slaTotal++;
+    var demandMaxD = d.maxDays || (constraints && constraints.globalMaxDays) || 999;
+    // Check if primary assignment meets SLA (use first assignment for this demand)
+    var primaryAssign = demandAssignments.filter(function(a) { return a.demandId === d.id; })[0];
+    if (primaryAssign && primaryAssign.transitDays <= demandMaxD && primaryAssign.distance <= (d.maxMiles || 9999)) {
+      slaMet++;
     }
   });
 
@@ -5288,7 +5333,9 @@ function netoptEvaluateConfig(config, demands, transport, constraints) {
     avgDistance: avgDistance,
     serviceLevel: serviceLevel,
     avgDeliveryDays: avgDeliveryDays,
-    dayPct: dayPct
+    dayPct: dayPct,
+    slaMet: slaMet,
+    slaTotal: slaTotal
   };
 }
 
@@ -5424,6 +5471,9 @@ function netoptRenderResults() {
     var avgDaysDisplay = r.avgDeliveryDays ? r.avgDeliveryDays.toFixed(1) : '—';
     var cumul2Day = (dp.d1 + dp.d2).toFixed(0);
     var cumul3Day = (dp.d1 + dp.d2 + dp.d3).toFixed(0);
+    var slaHtml = (r.slaMet != null && r.slaTotal > 0) ?
+      '<div style="margin-top:8px;font-size:10px;font-weight:600;color:' + (r.slaMet === r.slaTotal ? '#059669' : r.slaMet >= r.slaTotal * 0.9 ? '#d97706' : '#dc2626') + ';">' + r.slaMet + '/' + r.slaTotal + ' demand points meet SLA</div>' : '';
+    var svcColor = r.serviceLevel >= (netoptState.constraints.targetServicePct || 95) ? '#059669' : r.serviceLevel >= (netoptState.constraints.targetServicePct || 95) - 5 ? '#d97706' : '#dc2626';
 
     spBody.innerHTML = `
       <div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap;">
@@ -5431,6 +5481,8 @@ function netoptRenderResults() {
           <div style="font-size:28px;font-weight:800;color:var(--ies-navy);">${avgDaysDisplay}</div>
           <div style="font-size:10px;font-weight:600;color:var(--ies-gray-500);text-transform:uppercase;letter-spacing:.5px;">Avg Days</div>
           <div style="margin-top:6px;font-size:10px;color:var(--ies-gray-500);">${cumul2Day}% within 2 days &middot; ${cumul3Day}% within 3 days</div>
+          <div style="margin-top:4px;font-size:14px;font-weight:700;color:${svcColor};">${r.serviceLevel ? r.serviceLevel.toFixed(1) : '—'}% Service</div>
+          ${slaHtml}
         </div>
         <div style="flex:1;min-width:200px;">
           <div style="font-size:10px;font-weight:600;color:var(--ies-gray-500);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">% of Orders by Delivery Day</div>
@@ -5467,6 +5519,7 @@ function netoptRenderResults() {
       var badges = [];
       if (scenario._isBestCost) badges.push('<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:9px;font-weight:700;background:rgba(16,185,129,.12);color:#059669;">BEST COST</span>');
       if (scenario._isBestService) badges.push('<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:9px;font-weight:700;background:rgba(59,130,246,.12);color:#2563eb;">BEST SERVICE</span>');
+      if (scenario._hardConstraintFail) badges.push('<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:9px;font-weight:700;background:rgba(239,68,68,.12);color:#dc2626;">SLA FAIL</span>');
       if (scenario.feasibility === 'red') badges.push('<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:9px;font-weight:700;background:rgba(239,68,68,.12);color:#dc2626;">INFEASIBLE</span>');
       else if (scenario.feasibility === 'yellow') badges.push('<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:9px;font-weight:700;background:rgba(245,158,11,.12);color:#d97706;">AT CAPACITY</span>');
       var verdictHtml = badges.length > 0 ? badges.join(' ') : '<span style="color:var(--ies-gray-400);font-size:10px;">—</span>';
@@ -5501,6 +5554,7 @@ function netoptRenderResults() {
         '<td style="padding:10px 14px;text-align:right;">' + (scenario.serviceLevel ? scenario.serviceLevel.toFixed(0) + '%' : '—') + '</td>' +
         '<td style="padding:10px 14px;text-align:right;font-weight:600;">' + (scenario.avgDeliveryDays ? scenario.avgDeliveryDays.toFixed(1) : '—') + '</td>' +
         '<td style="padding:10px 14px;text-align:right;font-weight:600;">' + deltaHtml + '</td>' +
+        '<td style="padding:10px 14px;text-align:center;font-size:11px;">' + (scenario.slaMet != null ? scenario.slaMet + '/' + scenario.slaTotal : '—') + '</td>' +
         '<td style="padding:10px 14px;text-align:center;">' + feasIcon + '</td>' +
         '<td style="padding:10px 14px;text-align:center;">' + verdictHtml + '</td>';
       cBody.appendChild(row);
@@ -6510,6 +6564,43 @@ function netoptSortAllocationTable(btn, field) {
       '<td style="padding:10px 14px;text-align:right;">' + row.days.toFixed(1) + '</td>';
     tbody.appendChild(tr);
   });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// WAREHOUSE SIZING → COST MODEL INTEGRATION
+// ═══════════════════════════════════════════════════════════════════
+
+function wscUseInCostModel() {
+  var p = window._lastWscParams;
+  if (!p) { alert('Run the calculator first.'); return; }
+
+  // If CM project open, confirm before overwriting facility fields
+  if (typeof cmApp !== 'undefined' && cmApp.projectData && cmApp.projectData.id) {
+    if (!confirm('Populate facility section of "' + (cmApp.projectData.project_name || 'current project') + '" with WSC results?')) return;
+  }
+
+  // Populate CM facility fields
+  var fields = {
+    totalSqft: p.totalSF || '',
+    clearHeight: p.clearHeightFt || '',
+    dockDoors: p.totalDoors || '',
+    stagingSqft: (p.recvStagingSF || 0) + (p.shipStagingSF || 0),
+    officeSqft: p.officeSF || ''
+  };
+  Object.keys(fields).forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) { el.value = fields[id]; el.dispatchEvent(new Event('input', { bubbles: true })); }
+  });
+
+  // Navigate to Cost Model → Facility section
+  if (typeof navigate === 'function') navigate('costmodel');
+  if (typeof cmApp !== 'undefined') {
+    setTimeout(function() {
+      cmApp.updateFacilityMetrics();
+      cmApp.switchSection('facility');
+      cmApp.markChanged();
+    }, 200);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════

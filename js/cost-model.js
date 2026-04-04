@@ -1228,6 +1228,20 @@ const cmApp = {
         this.renderFacilityCostCard();
     },
 
+    launchWSC() {
+        // Navigate to WSC in Design Tools
+        if (typeof navigate === 'function') navigate('designtools');
+        setTimeout(function() {
+            if (typeof showDesignTool === 'function') showDesignTool('dt-warehouse');
+            // Pre-fill WSC inputs from CM project data if available
+            setTimeout(function() {
+                var pd = cmApp.projectData || {};
+                var clearEl = document.getElementById('wsc-clear-height');
+                if (clearEl && pd.clear_height_ft) clearEl.value = pd.clear_height_ft;
+            }, 200);
+        }, 100);
+    },
+
     renderFacilityCostCard() {
         var card = document.getElementById('facilityCostCard');
         if (!card) return;
