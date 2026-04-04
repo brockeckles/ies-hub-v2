@@ -2382,6 +2382,8 @@ function calcWarehouse() { try {
     rackDir: rackDir,
     dockConfig: dockConfig
   });
+  // Update 3D view if active
+  if (wsc3dMode && typeof render3DLayout === 'function') render3DLayout(wscLastLayoutParams || {totalSF:0});
   // Sync input panel height with right column
   syncCalcPanelHeight();
 
@@ -6508,5 +6510,383 @@ function netoptSortAllocationTable(btn, field) {
       '<td style="padding:10px 14px;text-align:right;">' + row.days.toFixed(1) + '</td>';
     tbody.appendChild(tr);
   });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// WAREHOUSE SIZING — 3D VIEW (Three.js r128)
+// ═══════════════════════════════════════════════════════════════════
+
+var wsc3dMode = false;
+var wsc3dScene = null;
+var wsc3dCamera = null;
+var wsc3dRenderer = null;
+var wsc3dAnimationId = null;
+var wsc3dCameraTheta = Math.PI / 4;   // horizontal orbit angle
+var wsc3dCameraPhi = Math.PI / 5;     // vertical tilt
+var wsc3dCameraDist = 600;
+var wsc3dCameraTarget = null;
+var wsc3dMouseDown = false;
+var wsc3dMouseBtn = 0;
+var wsc3dLastMouse = { x: 0, y: 0 };
+
+function _initWsc3dTarget() {
+  if (!wsc3dCameraTarget && typeof THREE !== 'undefined') {
+    wsc3dCameraTarget = new THREE.Vector3(0, 0, 0);
+  }
+}
+
+function toggleWsc3DView() {
+  wsc3dMode = !wsc3dMode;
+  var svgEl = document.getElementById('wsc-layout-svg');
+  var container = document.getElementById('wsc-3d-container');
+  var btn = document.getElementById('wsc-3d-toggle');
+  if (!svgEl || !container) return;
+
+  if (wsc3dMode) {
+    svgEl.style.display = 'none';
+    container.style.display = 'block';
+    if (btn) { btn.textContent = '2D View'; btn.style.background = 'rgba(59,130,246,.3)'; btn.style.borderColor = 'rgba(59,130,246,.5)'; }
+    var p = wscLastLayoutParams;
+    if (p) render3DLayout(p);
+  } else {
+    container.style.display = 'none';
+    svgEl.style.display = 'block';
+    if (btn) { btn.textContent = '3D View'; btn.style.background = 'rgba(255,255,255,.1)'; btn.style.borderColor = 'rgba(255,255,255,.15)'; }
+    dispose3DView();
+  }
+}
+
+function dispose3DView() {
+  if (wsc3dAnimationId) { cancelAnimationFrame(wsc3dAnimationId); wsc3dAnimationId = null; }
+  if (wsc3dRenderer) {
+    wsc3dRenderer.dispose();
+    var canvas = wsc3dRenderer.domElement;
+    if (canvas && canvas.parentNode) canvas.parentNode.removeChild(canvas);
+    wsc3dRenderer = null;
+  }
+  wsc3dScene = null;
+  wsc3dCamera = null;
+}
+
+function render3DLayout(p) {
+  if (typeof THREE === 'undefined') { console.warn('Three.js not loaded'); return; }
+  var container = document.getElementById('wsc-3d-container');
+  if (!container) return;
+
+  dispose3DView();
+  _initWsc3dTarget();
+
+  var cW = container.clientWidth || 800;
+  var cH = container.clientHeight || 480;
+
+  // ── Building dimensions (same calc as renderLayout) ──
+  var twoDock = p.dockConfig === 'two';
+  var dockFaceW = Math.max((twoDock ? Math.max(p.inDoors, p.outDoors) : p.totalDoors) * 14, 120);
+  var bW = Math.max(dockFaceW, Math.ceil(Math.sqrt(p.totalSF * 2.2)));
+  var bD = Math.max(100, Math.ceil(p.totalSF / bW));
+  var clearH = p.clearHeightFt || 32;
+  var pad = 60; // SVG padding — zone coords offset by this
+
+  // ── Scene, camera, renderer ──
+  var scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0f1623);
+  scene.fog = new THREE.Fog(0x0f1623, bW * 2, bW * 4);
+
+  var camera = new THREE.PerspectiveCamera(45, cW / cH, 1, bW * 10);
+  wsc3dCameraDist = Math.max(bW, bD) * 1.4;
+  wsc3dCameraTarget.set(bW / 2, clearH / 4, bD / 2);
+
+  var renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+  renderer.setSize(cW, cH);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  container.appendChild(renderer.domElement);
+
+  wsc3dScene = scene;
+  wsc3dCamera = camera;
+  wsc3dRenderer = renderer;
+
+  // ── Lighting ──
+  var ambient = new THREE.AmbientLight(0xffffff, 0.5);
+  scene.add(ambient);
+  var dirLight = new THREE.DirectionalLight(0xffffff, 0.7);
+  dirLight.position.set(bW * 0.8, clearH * 3, -bD * 0.3);
+  scene.add(dirLight);
+
+  // ── Floor ──
+  var floorGeo = new THREE.BoxGeometry(bW, 0.5, bD);
+  var floorMat = new THREE.MeshLambertMaterial({ color: 0x1a2233 });
+  var floor = new THREE.Mesh(floorGeo, floorMat);
+  floor.position.set(bW / 2, -0.25, bD / 2);
+  scene.add(floor);
+
+  // Floor grid
+  var gridHelper = new THREE.GridHelper(Math.max(bW, bD) * 1.2, Math.floor(Math.max(bW, bD) / 50), 0x2a3a4a, 0x1a2a3a);
+  gridHelper.position.set(bW / 2, 0.01, bD / 2);
+  scene.add(gridHelper);
+
+  // ── Walls (semi-transparent) ──
+  var wallMat = new THREE.MeshLambertMaterial({ color: 0x3a4a5a, transparent: true, opacity: 0.15, side: THREE.DoubleSide });
+  var wallThick = 1;
+  // Front wall (z=0)
+  var wFront = new THREE.Mesh(new THREE.BoxGeometry(bW, clearH, wallThick), wallMat);
+  wFront.position.set(bW / 2, clearH / 2, 0); scene.add(wFront);
+  // Back wall (z=bD)
+  var wBack = new THREE.Mesh(new THREE.BoxGeometry(bW, clearH, wallThick), wallMat);
+  wBack.position.set(bW / 2, clearH / 2, bD); scene.add(wBack);
+  // Left wall (x=0)
+  var wLeft = new THREE.Mesh(new THREE.BoxGeometry(wallThick, clearH, bD), wallMat);
+  wLeft.position.set(0, clearH / 2, bD / 2); scene.add(wLeft);
+  // Right wall (x=bW)
+  var wRight = new THREE.Mesh(new THREE.BoxGeometry(wallThick, clearH, bD), wallMat);
+  wRight.position.set(bW, clearH / 2, bD / 2); scene.add(wRight);
+
+  // ── Zone colors (3D hex values) ──
+  var zoneColors = {
+    'storage': 0x2563EB, 'recv': 0x10B981, 'ship': 0xF97316,
+    'office': 0x8B5CF6, 'dock-top': 0x0EA5E3, 'dock-bot': 0x0EA5E3, 'opt': 0xEC4899
+  };
+  var zoneHeights = {
+    'storage': clearH * 0.7, 'recv': 3, 'ship': 3,
+    'office': 10, 'dock-top': 4, 'dock-bot': 4, 'opt': 5
+  };
+
+  // ── Read zone positions from SVG rects ──
+  var zones = wscManualMode ? wscManualZones : wscAutoZones;
+  if (!zones || Object.keys(zones).length === 0) {
+    zones = {};
+    var svg = document.getElementById('wsc-layout-svg');
+    if (svg) {
+      var rects = svg.querySelectorAll('[data-zone]');
+      rects.forEach(function(r) {
+        var name = r.getAttribute('data-zone');
+        zones[name] = {
+          x: parseFloat(r.getAttribute('x')),
+          y: parseFloat(r.getAttribute('y')),
+          w: parseFloat(r.getAttribute('width')),
+          h: parseFloat(r.getAttribute('height'))
+        };
+      });
+    }
+  }
+
+  // ── Render zone blocks ──
+  Object.keys(zones).forEach(function(name) {
+    var z = zones[name];
+    if (!z || !z.w || !z.h) return;
+
+    // Convert SVG coords to 3D: SVG origin is top-left with pad offset
+    var x3d = z.x - pad;
+    var z3d = z.y - pad;
+    var w3d = z.w;
+    var d3d = z.h;
+
+    var colorKey = name;
+    if (name.indexOf('opt') === 0) colorKey = 'opt';
+    var color = zoneColors[colorKey] || 0x888888;
+    var height = zoneHeights[colorKey] || 5;
+
+    var mat = new THREE.MeshLambertMaterial({ color: color, transparent: true, opacity: 0.65 });
+    var geo = new THREE.BoxGeometry(w3d, height, d3d);
+    var mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(x3d + w3d / 2, height / 2, z3d + d3d / 2);
+    scene.add(mesh);
+
+    // Edge wireframe
+    var edgeMat = new THREE.LineBasicMaterial({ color: color, transparent: true, opacity: 0.9 });
+    var edgeGeo = new THREE.EdgesGeometry(geo);
+    var edges = new THREE.LineSegments(edgeGeo, edgeMat);
+    edges.position.copy(mesh.position);
+    scene.add(edges);
+
+    // Sprite label
+    var label = name.replace('dock-top', 'DOCK (IN)').replace('dock-bot', 'DOCK (OUT)')
+      .replace('recv', 'RECEIVING').replace('ship', 'SHIPPING').replace(/opt-\d/, 'OPTIONAL').toUpperCase();
+    if (name === 'storage') label = 'STORAGE';
+    if (name === 'office') label = 'OFFICE';
+    var sf = Math.round(w3d * d3d);
+    var sprite = wsc3dMakeTextSprite(label + '\n' + sf.toLocaleString() + ' SF', color);
+    sprite.position.set(x3d + w3d / 2, height + 4, z3d + d3d / 2);
+    sprite.scale.set(Math.max(w3d * 0.6, 30), Math.max(w3d * 0.3, 15), 1);
+    scene.add(sprite);
+  });
+
+  // ── Dock doors ──
+  var dockZone = zones['dock-bot'];
+  if (dockZone) {
+    var dX = dockZone.x - pad;
+    var dZ = dockZone.y - pad;
+    var dW = dockZone.w;
+    var doorW = 10, doorH = 12;
+    var totalDoors = p.totalDoors || 10;
+    var spacing = dW / (totalDoors + 1);
+    var doorMat = new THREE.MeshLambertMaterial({ color: 0xF59E0B, transparent: true, opacity: 0.85 });
+    for (var d = 0; d < totalDoors; d++) {
+      var dx = dX + spacing * (d + 1);
+      var dGeo = new THREE.BoxGeometry(doorW, doorH, 2);
+      var door = new THREE.Mesh(dGeo, doorMat);
+      door.position.set(dx, doorH / 2, dZ + dockZone.h);
+      scene.add(door);
+    }
+  }
+  // Top dock doors
+  var dockTop = zones['dock-top'];
+  if (dockTop) {
+    var dtX = dockTop.x - pad;
+    var dtZ = dockTop.y - pad;
+    var dtW = dockTop.w;
+    var doors2 = p.inDoors || Math.ceil(p.totalDoors / 2);
+    var spacing2 = dtW / (doors2 + 1);
+    var doorMat2 = new THREE.MeshLambertMaterial({ color: 0xF59E0B, transparent: true, opacity: 0.85 });
+    for (var d2 = 0; d2 < doors2; d2++) {
+      var dx2 = dtX + spacing2 * (d2 + 1);
+      var dGeo2 = new THREE.BoxGeometry(10, 12, 2);
+      var door2 = new THREE.Mesh(dGeo2, doorMat2);
+      door2.position.set(dx2, 6, dtZ);
+      scene.add(door2);
+    }
+  }
+
+  // ── Racking rows (inside storage zone) ──
+  var storageZone = zones['storage'];
+  if (storageZone && (p.storeType === 'single' || p.storeType === 'double' || p.storeType === 'mix')) {
+    var sX = storageZone.x - pad;
+    var sZ = storageZone.y - pad;
+    var sW = storageZone.w;
+    var sD = storageZone.h;
+    var rackH = clearH * 0.65;
+    var aisleW = p.aisleW || 10;
+    var rackDepth = p.storeType === 'double' ? 8 : 4;
+    var rackMat = new THREE.MeshLambertMaterial({ color: 0x3B82F6, transparent: true, opacity: 0.4 });
+    var isVert = p.rackDir === 'vertical';
+
+    if (isVert) {
+      var step = aisleW + rackDepth;
+      var numRows = Math.floor((sW - aisleW) / step);
+      for (var rv = 0; rv < numRows; rv++) {
+        var rx = sX + aisleW + rv * step;
+        var rGeo = new THREE.BoxGeometry(rackDepth, rackH, sD - 8);
+        var rack = new THREE.Mesh(rGeo, rackMat);
+        rack.position.set(rx + rackDepth / 2, rackH / 2, sZ + sD / 2);
+        scene.add(rack);
+      }
+    } else {
+      var step = aisleW + rackDepth;
+      var numRows = Math.floor((sD - aisleW) / step);
+      for (var rh = 0; rh < numRows; rh++) {
+        var rz = sZ + aisleW + rh * step;
+        var rGeo = new THREE.BoxGeometry(sW - 8, rackH, rackDepth);
+        var rack = new THREE.Mesh(rGeo, rackMat);
+        rack.position.set(sX + sW / 2, rackH / 2, rz + rackDepth / 2);
+        scene.add(rack);
+      }
+    }
+  }
+
+  // ── Camera position ──
+  updateWsc3dCamera();
+
+  // ── Mouse controls ──
+  var canvas = renderer.domElement;
+  canvas.addEventListener('mousedown', wsc3dOnMouseDown);
+  canvas.addEventListener('mousemove', wsc3dOnMouseMove);
+  canvas.addEventListener('mouseup', wsc3dOnMouseUp);
+  canvas.addEventListener('mouseleave', wsc3dOnMouseUp);
+  canvas.addEventListener('wheel', wsc3dOnWheel, { passive: false });
+  canvas.addEventListener('contextmenu', function(e) { e.preventDefault(); });
+
+  // ── Animation loop ──
+  function animate() {
+    wsc3dAnimationId = requestAnimationFrame(animate);
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  // ── Resize handler ──
+  if (!window._wsc3dResizeHandler) {
+    window._wsc3dResizeHandler = function() {
+      if (!wsc3dMode || !wsc3dRenderer) return;
+      var c = document.getElementById('wsc-3d-container');
+      if (!c) return;
+      var w = c.clientWidth;
+      var h = c.clientHeight || 480;
+      wsc3dCamera.aspect = w / h;
+      wsc3dCamera.updateProjectionMatrix();
+      wsc3dRenderer.setSize(w, h);
+    };
+    window.addEventListener('resize', window._wsc3dResizeHandler);
+  }
+}
+
+// ── Text sprite helper ──
+function wsc3dMakeTextSprite(text, color) {
+  var canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 128;
+  var ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, 256, 128);
+  ctx.font = 'bold 22px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#' + ('000000' + (color || 0xffffff).toString(16)).slice(-6);
+  var lines = text.split('\n');
+  for (var i = 0; i < lines.length; i++) {
+    ctx.fillText(lines[i], 128, 40 + i * 28);
+  }
+  var tex = new THREE.CanvasTexture(canvas);
+  tex.needsUpdate = true;
+  var mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
+  return new THREE.Sprite(mat);
+}
+
+// ── Camera update ──
+function updateWsc3dCamera() {
+  if (!wsc3dCamera) return;
+  var dist = wsc3dCameraDist;
+  var theta = wsc3dCameraTheta;
+  var phi = Math.max(0.05, Math.min(Math.PI / 2 - 0.05, wsc3dCameraPhi));
+  wsc3dCameraPhi = phi;
+  wsc3dCamera.position.set(
+    wsc3dCameraTarget.x + dist * Math.sin(theta) * Math.cos(phi),
+    wsc3dCameraTarget.y + dist * Math.sin(phi),
+    wsc3dCameraTarget.z + dist * Math.cos(theta) * Math.cos(phi)
+  );
+  wsc3dCamera.lookAt(wsc3dCameraTarget);
+}
+
+// ── Mouse handlers ──
+function wsc3dOnMouseDown(e) {
+  wsc3dMouseDown = true;
+  wsc3dMouseBtn = e.button;
+  wsc3dLastMouse.x = e.clientX;
+  wsc3dLastMouse.y = e.clientY;
+}
+function wsc3dOnMouseUp() { wsc3dMouseDown = false; }
+function wsc3dOnMouseMove(e) {
+  if (!wsc3dMouseDown) return;
+  var dx = e.clientX - wsc3dLastMouse.x;
+  var dy = e.clientY - wsc3dLastMouse.y;
+  wsc3dLastMouse.x = e.clientX;
+  wsc3dLastMouse.y = e.clientY;
+
+  if (wsc3dMouseBtn === 0 && !e.shiftKey) {
+    // Left drag: orbit
+    wsc3dCameraTheta -= dx * 0.005;
+    wsc3dCameraPhi += dy * 0.005;
+    updateWsc3dCamera();
+  } else {
+    // Right drag or shift+left: pan
+    var panScale = wsc3dCameraDist * 0.002;
+    var right = new THREE.Vector3();
+    var up = new THREE.Vector3(0, 1, 0);
+    right.crossVectors(wsc3dCamera.getWorldDirection(new THREE.Vector3()), up).normalize();
+    wsc3dCameraTarget.addScaledVector(right, -dx * panScale);
+    wsc3dCameraTarget.y += dy * panScale;
+    updateWsc3dCamera();
+  }
+}
+function wsc3dOnWheel(e) {
+  e.preventDefault();
+  wsc3dCameraDist *= (1 + e.deltaY * 0.001);
+  wsc3dCameraDist = Math.max(50, Math.min(5000, wsc3dCameraDist));
+  updateWsc3dCamera();
 }
 

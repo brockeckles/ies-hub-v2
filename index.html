@@ -15,6 +15,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.heat/0.2.0/leaflet-heat.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/gitbrent/PptxGenJS@3.12.0/dist/pptxgen.bundle.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <style>
   :root {
     /* IES Brand Palette - Refined for premium SaaS */
@@ -6611,10 +6612,14 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
             <span style="font-size:11px;color:rgba(255,255,255,.5);font-weight:600;">Manual</span>
           </div>
         </div>
-        <div id="wsc-layout-dims" style="font-size:12px;font-weight:600;color:rgba(255,255,255,.5);"></div>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div id="wsc-layout-dims" style="font-size:12px;font-weight:600;color:rgba(255,255,255,.5);"></div>
+          <button id="wsc-3d-toggle" class="hub-btn" onclick="toggleWsc3DView()" style="font-size:11px;padding:4px 12px;border-radius:6px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.7);border:1px solid rgba(255,255,255,.15);cursor:pointer;transition:.2s;">3D View</button>
+        </div>
       </div>
       <div style="position:relative;width:100%;min-height:480px;margin-bottom:12px;">
         <svg id="wsc-layout-svg" width="100%" height="480" preserveAspectRatio="xMidYMid meet" style="display:block;"></svg>
+        <div id="wsc-3d-container" style="display:none;width:100%;height:480px;border-radius:8px;overflow:hidden;"></div>
       </div>
       <div style="display:flex;gap:16px;flex-wrap:wrap;padding-top:12px;border-top:1px solid rgba(255,255,255,.06);">
         <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:rgba(255,255,255,.6);"><span style="width:10px;height:10px;border-radius:2px;background:#2563eb;"></span>Storage</div>
