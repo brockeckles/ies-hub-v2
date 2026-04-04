@@ -2933,6 +2933,7 @@ function netoptCollectInputs() {
     return {
         facilities: JSON.parse(JSON.stringify(netoptState.facilities)),
         demands: JSON.parse(JSON.stringify(netoptState.demands)),
+        suppliers: JSON.parse(JSON.stringify(netoptState.suppliers || [])),
         transport: JSON.parse(JSON.stringify(netoptState.transport)),
         constraints: JSON.parse(JSON.stringify(netoptState.constraints)),
         solver_mode: netoptState.solverMode || 'heuristic'
@@ -2943,6 +2944,7 @@ function netoptCollectInputs() {
 function netoptApplyInputs(data) {
     if (data.facilities) { netoptState.facilities = data.facilities; netoptRenderFacilitiesTable(); }
     if (data.demands) { netoptState.demands = data.demands; netoptRenderDemandsTable(); }
+    if (data.suppliers) { netoptState.suppliers = data.suppliers; netoptRenderSuppliersTable(); }
     if (data.transport) {
         Object.assign(netoptState.transport, data.transport);
         var tl = document.getElementById('netopt-tl-rate');
@@ -3162,6 +3164,7 @@ document.addEventListener('DOMContentLoaded', function() {
 var netoptState = {
   facilities: [],
   demands: [],
+  suppliers: [],   // B5: Inbound origin points
   transport: {
     outboundPerUnitMile: 0.00296,
     inboundPerUnitMile: 0.00178,
@@ -4611,6 +4614,59 @@ function netoptRemoveDemand(id) {
   netoptUpdateKPI();
 }
 
+// B5: Supplier/Origin point management
+function netoptAddSupplier() {
+  var id = 'sup-' + Date.now();
+  netoptState.suppliers.push({
+    id: id,
+    city: 'Los Angeles, CA',
+    volume: 200,
+    mode: 'TL',
+    lat: null,
+    lng: null
+  });
+  netoptRenderSuppliersTable();
+  var g = geocodeCity('Los Angeles, CA');
+  if (g) {
+    var s = netoptState.suppliers.find(function(x) { return x.id === id; });
+    if (s) { s.lat = g.lat; s.lng = g.lng; }
+  }
+}
+
+function netoptRemoveSupplier(id) {
+  netoptState.suppliers = netoptState.suppliers.filter(function(s) { return s.id !== id; });
+  netoptRenderSuppliersTable();
+}
+
+function netoptRenderSuppliersTable() {
+  var tbody = document.getElementById('netopt-suppliers-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  netoptState.suppliers.forEach(function(s) {
+    var row = document.createElement('tr');
+    row.style.borderBottom = '1px solid var(--ies-gray-200)';
+    var sid = esc(s.id);
+    row.innerHTML =
+      '<td style="padding:12px 16px;"><input type="text" value="' + esc(s.city) + '" class="wsc-input" style="width:100%;font-size:12px;" onchange="var sup=netoptState.suppliers.find(function(x){return x.id===\'' + sid + '\'});if(sup){sup.city=this.value;var g=geocodeCity(this.value);if(g){sup.lat=g.lat;sup.lng=g.lng;}}"></td>' +
+      '<td style="padding:12px 16px;text-align:right;"><input type="number" value="' + s.volume + '" min="1" step="10" class="wsc-input" style="width:100%;text-align:right;font-size:12px;" onchange="var sup=netoptState.suppliers.find(function(x){return x.id===\'' + sid + '\'});if(sup)sup.volume=parseFloat(this.value);"></td>' +
+      '<td style="padding:12px 16px;text-align:center;">' +
+        '<select class="wsc-select" style="width:100%;font-size:12px;" onchange="var sup=netoptState.suppliers.find(function(x){return x.id===\'' + sid + '\'});if(sup)sup.mode=this.value;">' +
+        '<option' + (s.mode === 'TL' ? ' selected' : '') + '>TL</option>' +
+        '<option' + (s.mode === 'LTL' ? ' selected' : '') + '>LTL</option>' +
+        '</select></td>' +
+      '<td style="padding:12px 16px;text-align:center;"><button onclick="netoptRemoveSupplier(\'' + sid + '\')" style="padding:4px 8px;background:#fff;border:1px solid var(--ies-red);color:var(--ies-red);border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;">Remove</button></td>';
+    tbody.appendChild(row);
+  });
+}
+
+function netoptGeocodeSupplier(id) {
+  var s = netoptState.suppliers.find(function(x) { return x.id === id; });
+  if (s) {
+    var g = geocodeCity(s.city);
+    if (g) { s.lat = g.lat; s.lng = g.lng; }
+  }
+}
+
 // ── MARKET PICKER (select from 10 pre-defined markets) ──
 function netoptShowMarketPicker() {
   var picker = document.getElementById('netopt-market-picker');
@@ -5064,65 +5120,101 @@ function netoptEvaluateConfig(config, demands, transport, constraints) {
   var totalVolume = 0;
   var weightedDaySum = 0;
 
+  // B1: Track demand-to-facility assignments for flow visualization and allocation table
+  var demandAssignments = [];
+
   config.forEach(f => assignedVolume[f.id] = 0);
 
-  demands.forEach(d => {
-    if (config.length > 0) {
-      var closest = config[0];
-      var minDist = roadDist(d.lat, d.lng, closest.lat, closest.lng);
-      for (var i = 1; i < config.length; i++) {
-        var dist = roadDist(d.lat, d.lng, config[i].lat, config[i].lng);
-        if (dist < minDist) {
-          minDist = dist;
-          closest = config[i];
-        }
-      }
+  // B1: First pass — assign demands to nearest facility, track assignments
+  var pendingAssignments = [];
+  demands.forEach(function(d) {
+    if (config.length === 0) return;
+    // Sort facilities by distance for overflow logic
+    var sorted = config.map(function(f) {
+      return { facility: f, dist: roadDist(d.lat, d.lng, f.lat, f.lng) };
+    }).sort(function(a, b) { return a.dist - b.dist; });
+    pendingAssignments.push({ demand: d, sortedFacs: sorted });
+  });
 
-      assignedVolume[closest.id] = (assignedVolume[closest.id] || 0) + (d.volume || 0);
-      var vol = (d.volume || 0) * 1000;
+  // B1: Capacity-aware assignment with overflow
+  // Pass 1: assign to nearest; Pass 2: overflow excess to next-nearest
+  var capacityK = {};
+  config.forEach(function(f) { capacityK[f.id] = f.capacity || Infinity; });
+
+  pendingAssignments.forEach(function(pa) {
+    var d = pa.demand;
+    var vol = d.volume || 0;
+    var remaining = vol;
+
+    for (var fi = 0; fi < pa.sortedFacs.length && remaining > 0; fi++) {
+      var sf = pa.sortedFacs[fi];
+      var fac = sf.facility;
+      var dist = sf.dist;
+      var available = capacityK[fac.id] - (assignedVolume[fac.id] || 0);
+
+      if (available <= 0) continue;
+
+      var allocated = Math.min(remaining, available);
+      assignedVolume[fac.id] = (assignedVolume[fac.id] || 0) + allocated;
+      remaining -= allocated;
+
+      // Transport cost for this allocation
+      var volUnits = allocated * 1000;
       var mix = transport.modeMix || { tl: 1, ltl: 0, parcel: 0 };
-      // Multi-mode transport cost
-      var tlCost = vol * mix.tl * minDist * (transport.tlUnitMile || transport.outboundPerUnitMile || 0.0025);
-      var ltlCost = vol * mix.ltl * minDist * (transport.ltlUnitMile || transport.outboundPerUnitMile || 0.0040);
-      var parcelCost = vol * mix.parcel * (transport.parcelUnitCost || 8.50);
+      var tlCost = volUnits * mix.tl * dist * (transport.tlUnitMile || transport.outboundPerUnitMile || 0.0025);
+      var ltlCost = volUnits * mix.ltl * dist * (transport.ltlUnitMile || transport.outboundPerUnitMile || 0.0040);
+      var parcelCost = volUnits * mix.parcel * (transport.parcelUnitCost || 8.50);
       transportCost += tlCost + ltlCost + parcelCost;
-      distances.push(minDist);
+      distances.push(dist);
 
-      if (minDist <= d.maxMiles) serviceCt++;
+      if (dist <= d.maxMiles) serviceCt += (allocated / vol);
 
-      // Delivery day estimation: distance / truck speed + 1 day handling
-      // Parcel uses carrier transit tables (simplified: zone-based days)
-      var transitDays;
+      // Delivery day estimation
       var parcelPct = mix.parcel || 0;
       var groundPct = (mix.tl || 0) + (mix.ltl || 0);
-      // Ground transit: local (<150mi) = 1 day (same-day processing + local carrier)
-      // Regional = distance-based using truck speed + 1 day processing
-      var groundDays;
-      if (minDist <= 150) groundDays = 1;
-      else groundDays = Math.ceil(minDist / truckSpeed) + 1;
-      // Parcel transit: zone-based carrier transit tables
-      var parcelDays;
-      if (minDist <= 50) parcelDays = 1;          // Local: same-city next-day
-      else if (minDist <= 150) parcelDays = 2;    // Zone 2-3
-      else if (minDist <= 400) parcelDays = 3;    // Zone 4-5
-      else if (minDist <= 800) parcelDays = 4;    // Zone 6-7
-      else parcelDays = 5;                         // Zone 8+
-      // Blended delivery days across modes
-      transitDays = groundPct > 0 || parcelPct > 0
+      var groundDays = dist <= 150 ? 1 : Math.ceil(dist / truckSpeed) + 1;
+      var parcelDays = dist <= 50 ? 1 : dist <= 150 ? 2 : dist <= 400 ? 3 : dist <= 800 ? 4 : 5;
+      var transitDays = groundPct > 0 || parcelPct > 0
         ? (groundDays * groundPct + parcelDays * parcelPct) / (groundPct + parcelPct)
         : groundDays;
       transitDays = Math.max(1, Math.round(transitDays * 10) / 10);
 
-      var demVol = d.volume || 1;
-      totalVolume += demVol;
-      weightedDaySum += transitDays * demVol;
+      totalVolume += allocated;
+      weightedDaySum += transitDays * allocated;
 
-      // Volume-weighted day bucket assignment
-      if (transitDays <= 1.5) dayBuckets.d1 += demVol;
-      else if (transitDays <= 2.5) dayBuckets.d2 += demVol;
-      else if (transitDays <= 3.5) dayBuckets.d3 += demVol;
-      else if (transitDays <= 4.5) dayBuckets.d4 += demVol;
-      else dayBuckets.d5plus += demVol;
+      if (transitDays <= 1.5) dayBuckets.d1 += allocated;
+      else if (transitDays <= 2.5) dayBuckets.d2 += allocated;
+      else if (transitDays <= 3.5) dayBuckets.d3 += allocated;
+      else if (transitDays <= 4.5) dayBuckets.d4 += allocated;
+      else dayBuckets.d5plus += allocated;
+
+      // Track assignment for flow visualization
+      demandAssignments.push({
+        demandId: d.id, demandCity: d.city, demandLat: d.lat, demandLng: d.lng,
+        facilityId: fac.id, facilityName: fac.name, facilityLat: fac.lat, facilityLng: fac.lng,
+        volume: allocated, distance: dist, transitDays: transitDays,
+        transportCost: (tlCost + ltlCost + parcelCost) / 1000000
+      });
+    }
+
+    // If still remaining after all facilities full, assign to nearest anyway (infeasible overflow)
+    if (remaining > 0 && pa.sortedFacs.length > 0) {
+      var nearest = pa.sortedFacs[0];
+      assignedVolume[nearest.facility.id] = (assignedVolume[nearest.facility.id] || 0) + remaining;
+      var volUnits = remaining * 1000;
+      var mix = transport.modeMix || { tl: 1, ltl: 0, parcel: 0 };
+      transportCost += volUnits * mix.tl * nearest.dist * (transport.tlUnitMile || transport.outboundPerUnitMile || 0.0025);
+      transportCost += volUnits * mix.ltl * nearest.dist * (transport.ltlUnitMile || transport.outboundPerUnitMile || 0.0040);
+      transportCost += volUnits * mix.parcel * (transport.parcelUnitCost || 8.50);
+      distances.push(nearest.dist);
+      totalVolume += remaining;
+
+      demandAssignments.push({
+        demandId: d.id, demandCity: d.city, demandLat: d.lat, demandLng: d.lng,
+        facilityId: nearest.facility.id, facilityName: nearest.facility.name,
+        facilityLat: nearest.facility.lat, facilityLng: nearest.facility.lng,
+        volume: remaining, distance: nearest.dist, transitDays: 0, transportCost: 0
+      });
     }
   });
 
@@ -5131,8 +5223,29 @@ function netoptEvaluateConfig(config, demands, transport, constraints) {
     return s + (vol * 1000 * (f.varCost || 0) / 1000000);
   }, 0);
 
+  // B5: Inbound transport cost from suppliers to facilities
+  var inboundCost = 0;
+  var suppliers = netoptState.suppliers || [];
+  if (suppliers.length > 0 && config.length > 0) {
+    var inboundRate = transport.inboundPerUnitMile || 0.00178;
+    suppliers.forEach(function(sup) {
+      if (!sup.lat || !sup.lng) return;
+      var supVol = (sup.volume || 0) * 1000; // K to units
+      // Distribute supplier volume proportionally across facilities by their assigned demand
+      var totalAssigned = config.reduce(function(s, f) { return s + (assignedVolume[f.id] || 0); }, 0) || 1;
+      config.forEach(function(f) {
+        var facShare = (assignedVolume[f.id] || 0) / totalAssigned;
+        var dist = roadDist(sup.lat, sup.lng, f.lat, f.lng);
+        var supMix = sup.mode === 'LTL' ? { tl: 0, ltl: 1 } : { tl: 1, ltl: 0 };
+        var tlRate = transport.tlUnitMile || inboundRate;
+        var ltlRate = transport.ltlUnitMile || inboundRate * 1.6;
+        inboundCost += supVol * facShare * dist * (supMix.tl * tlRate + supMix.ltl * ltlRate);
+      });
+    });
+  }
+
   var inventoryCost = (fixedCost + varCost) * (constraints.inventoryCarryPct || 15) / 100 / 12; // Monthly carry
-  var totalCost = fixedCost + (transportCost / 1000000) + varCost + inventoryCost;
+  var totalCost = fixedCost + (transportCost / 1000000) + (inboundCost / 1000000) + varCost + inventoryCost;
   var avgDistance = distances.length > 0 ? distances.reduce((a, b) => a + b) / distances.length : 0;
   var serviceLevel = demands.length > 0 ? (serviceCt / demands.length) * 100 : 0;
   var avgDeliveryDays = totalVolume > 0 ? weightedDaySum / totalVolume : 0;
@@ -5146,11 +5259,27 @@ function netoptEvaluateConfig(config, demands, transport, constraints) {
     d5plus: totalVolume > 0 ? (dayBuckets.d5plus / totalVolume * 100) : 0
   };
 
+  // B1: Compute utilization and feasibility per facility
+  var utilization = {};
+  var feasibility = 'green'; // green = all OK, yellow = some 80-100%, red = over capacity
+  config.forEach(function(f) {
+    var vol = assignedVolume[f.id] || 0;
+    var cap = f.capacity || Infinity;
+    var pct = cap !== Infinity ? (vol / cap * 100) : 0;
+    utilization[f.id] = { volume: vol, capacity: cap, pct: pct };
+    if (pct > 100 && feasibility !== 'red') feasibility = 'red';
+    else if (pct >= 80 && feasibility === 'green') feasibility = 'yellow';
+  });
+
   return {
     openFacilities: config,
     assignedVolume: assignedVolume,
+    demandAssignments: demandAssignments,
+    utilization: utilization,
+    feasibility: feasibility,
     fixedCostM: fixedCost,
     transportCostM: transportCost / 1000000,
+    inboundCostM: inboundCost / 1000000,
     varCostM: varCost,
     inventoryCostM: inventoryCost,
     totalCost: totalCost,
@@ -5261,8 +5390,12 @@ function netoptRenderResults() {
       <td style="padding:10px 0;text-align:right;font-weight:700;color:var(--ies-blue);">$${r.fixedCostM.toFixed(2)}M</td>
     </tr>
     <tr style="border-bottom:1px solid var(--ies-gray-200);">
-      <td style="padding:10px 0;font-weight:600;">Transportation Costs</td>
+      <td style="padding:10px 0;font-weight:600;">Outbound Transport</td>
       <td style="padding:10px 0;text-align:right;font-weight:700;color:var(--ies-blue);">$${r.transportCostM.toFixed(2)}M</td>
+    </tr>
+    <tr style="border-bottom:1px solid var(--ies-gray-200);">
+      <td style="padding:10px 0;font-weight:600;">Inbound Transport</td>
+      <td style="padding:10px 0;text-align:right;font-weight:700;color:var(--ies-blue);">$${(r.inboundCostM || 0).toFixed(2)}M</td>
     </tr>
     <tr style="border-bottom:1px solid var(--ies-gray-200);">
       <td style="padding:10px 0;font-weight:600;">Variable Handling</td>
@@ -5320,17 +5453,30 @@ function netoptRenderResults() {
     var selectedIdx = netoptState.selectedScenarioIdx != null ? netoptState.selectedScenarioIdx : r.allScenarios.indexOf(r);
     if (selectedIdx < 0) selectedIdx = r.allScenarios.findIndex(s => s.openFacilities.length === r.openFacilities.length);
 
+    // B3: Baseline is the 1-DC scenario for delta calculation
+    var baseline = r.allScenarios[0];
+
     r.allScenarios.forEach((scenario, i) => {
       var numDCs = scenario.openFacilities.length;
       var facNames = scenario.openFacilities.map(f => f.name).join(', ');
       var isSelected = (i === selectedIdx);
-      var dp = scenario.dayPct || { d1:0, d2:0, d3:0, d4:0, d5plus:0 };
 
       // Build verdict badges
       var badges = [];
       if (scenario._isBestCost) badges.push('<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:9px;font-weight:700;background:rgba(16,185,129,.12);color:#059669;">BEST COST</span>');
       if (scenario._isBestService) badges.push('<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:9px;font-weight:700;background:rgba(59,130,246,.12);color:#2563eb;">BEST SERVICE</span>');
+      if (scenario.feasibility === 'red') badges.push('<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:9px;font-weight:700;background:rgba(239,68,68,.12);color:#dc2626;">INFEASIBLE</span>');
+      else if (scenario.feasibility === 'yellow') badges.push('<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:9px;font-weight:700;background:rgba(245,158,11,.12);color:#d97706;">AT CAPACITY</span>');
       var verdictHtml = badges.length > 0 ? badges.join(' ') : '<span style="color:var(--ies-gray-400);font-size:10px;">—</span>';
+
+      // B3: Delta from baseline
+      var deltaPct = baseline && baseline.totalCost > 0 ? ((scenario.totalCost - baseline.totalCost) / baseline.totalCost * 100) : 0;
+      var deltaHtml = i === 0 ? '<span style="color:var(--ies-gray-400);">base</span>' :
+        (deltaPct <= 0 ? '<span style="color:#059669;">' + deltaPct.toFixed(1) + '%</span>' :
+         '<span style="color:#dc2626;">+' + deltaPct.toFixed(1) + '%</span>');
+
+      // B1: Feasibility icon
+      var feasIcon = scenario.feasibility === 'green' ? '&#x1f7e2;' : scenario.feasibility === 'yellow' ? '&#x1f7e1;' : scenario.feasibility === 'red' ? '&#x1f534;' : '&#x1f7e2;';
 
       var row = document.createElement('tr');
       row.style.borderBottom = '1px solid var(--ies-gray-200)';
@@ -5343,24 +5489,75 @@ function netoptRenderResults() {
       row.onmouseover = function() { if (!isSelected) this.style.background = 'rgba(0,71,171,.03)'; };
       row.onmouseout = function() { if (!isSelected) this.style.background = ''; };
       row.onclick = (function(idx) { return function() { netoptSelectScenario(idx); }; })(i);
-      row.innerHTML = `
-        <td style="padding:10px 14px;font-weight:600;">${numDCs}</td>
-        <td style="padding:10px 14px;font-size:11px;">${facNames}</td>
-        <td style="padding:10px 14px;text-align:right;font-weight:600;">$${scenario.totalCost.toFixed(2)}M</td>
-        <td style="padding:10px 14px;text-align:right;font-weight:600;">${scenario.avgDeliveryDays ? scenario.avgDeliveryDays.toFixed(1) : '—'}</td>
-        <td style="padding:10px 14px;text-align:right;font-weight:600;color:#10b981;">${dp.d1.toFixed(0)}%</td>
-        <td style="padding:10px 14px;text-align:right;font-weight:600;color:#3b82f6;">${dp.d2.toFixed(0)}%</td>
-        <td style="padding:10px 14px;text-align:right;font-weight:600;color:#f59e0b;">${dp.d3.toFixed(0)}%</td>
-        <td style="padding:10px 14px;text-align:right;font-weight:600;color:#f97316;">${dp.d4.toFixed(0)}%</td>
-        <td style="padding:10px 14px;text-align:right;font-weight:600;color:#ef4444;">${dp.d5plus.toFixed(0)}%</td>
-        <td style="padding:10px 14px;text-align:center;">${verdictHtml}</td>
-      `;
+      row.innerHTML =
+        '<td style="padding:10px 14px;font-weight:600;">' + numDCs + '</td>' +
+        '<td style="padding:10px 14px;font-size:11px;">' + esc(facNames) + '</td>' +
+        '<td style="padding:10px 14px;text-align:right;font-weight:600;">$' + scenario.totalCost.toFixed(2) + 'M</td>' +
+        '<td style="padding:10px 14px;text-align:right;">$' + scenario.fixedCostM.toFixed(2) + 'M</td>' +
+        '<td style="padding:10px 14px;text-align:right;">$' + scenario.transportCostM.toFixed(2) + 'M</td>' +
+        '<td style="padding:10px 14px;text-align:right;">' + (scenario.avgDistance ? scenario.avgDistance.toFixed(0) : '—') + '</td>' +
+        '<td style="padding:10px 14px;text-align:right;">' + (scenario.serviceLevel ? scenario.serviceLevel.toFixed(0) + '%' : '—') + '</td>' +
+        '<td style="padding:10px 14px;text-align:right;font-weight:600;">' + (scenario.avgDeliveryDays ? scenario.avgDeliveryDays.toFixed(1) : '—') + '</td>' +
+        '<td style="padding:10px 14px;text-align:right;font-weight:600;">' + deltaHtml + '</td>' +
+        '<td style="padding:10px 14px;text-align:center;">' + feasIcon + '</td>' +
+        '<td style="padding:10px 14px;text-align:center;">' + verdictHtml + '</td>';
       cBody.appendChild(row);
     });
   }
 
+  // B1: Render capacity utilization card
+  netoptRenderUtilization(r);
+
   // Render new enhancement features
   netoptRenderAllocationTable();
+}
+
+// B1: Render facility utilization bars and feasibility flag
+function netoptRenderUtilization(r) {
+  var container = document.getElementById('netopt-utilization-card');
+  if (!container) {
+    // Create utilization card if it doesn't exist yet — insert before allocation table
+    var allocCard = document.getElementById('netopt-allocation-card');
+    if (!allocCard) return;
+    container = document.createElement('div');
+    container.id = 'netopt-utilization-card';
+    container.style.cssText = 'margin-bottom:16px;';
+    allocCard.parentNode.insertBefore(container, allocCard);
+  }
+
+  if (!r || !r.utilization) { container.innerHTML = ''; return; }
+
+  var feasIcon = r.feasibility === 'green' ? '&#x1f7e2;' : r.feasibility === 'yellow' ? '&#x1f7e1;' : '&#x1f534;';
+  var feasLabel = r.feasibility === 'green' ? 'All facilities within capacity' :
+                  r.feasibility === 'yellow' ? 'Some facilities nearing capacity (80-100%)' :
+                  'Capacity exceeded — network infeasible';
+
+  var html = '<div style="background:#fff;border:1px solid var(--ies-gray-200);border-radius:10px;padding:16px;border-left:3px solid ' +
+    (r.feasibility === 'green' ? '#10b981' : r.feasibility === 'yellow' ? '#f59e0b' : '#ef4444') + ';">';
+  html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">';
+  html += '<div style="font-size:11px;font-weight:700;color:var(--ies-navy);text-transform:uppercase;letter-spacing:.6px;">Facility Utilization</div>';
+  html += '<div style="font-size:12px;">' + feasIcon + ' <span style="font-weight:600;">' + feasLabel + '</span></div>';
+  html += '</div>';
+
+  r.openFacilities.forEach(function(f) {
+    var u = r.utilization[f.id];
+    if (!u) return;
+    var pct = Math.min(u.pct, 120); // cap bar display at 120%
+    var barColor = u.pct <= 80 ? '#10b981' : u.pct <= 100 ? '#f59e0b' : '#ef4444';
+    var capLabel = u.capacity !== Infinity ? u.capacity.toLocaleString() + 'K' : 'No limit';
+
+    html += '<div style="margin-bottom:8px;">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px;">';
+    html += '<span style="font-size:11px;font-weight:600;color:var(--ies-navy);">' + esc(f.name) + '</span>';
+    html += '<span style="font-size:10px;color:var(--ies-gray-500);">' + (u.volume || 0).toLocaleString() + 'K / ' + capLabel + ' (' + u.pct.toFixed(0) + '%)</span>';
+    html += '</div>';
+    html += '<div style="height:10px;background:#f1f3f5;border-radius:5px;overflow:hidden;">';
+    html += '<div style="height:100%;width:' + Math.min(pct, 100) + '%;background:' + barColor + ';border-radius:5px;transition:width .3s;"></div>';
+    html += '</div></div>';
+  });
+
+  html += '</div>';
+  container.innerHTML = html;
 }
 
 // Switch active scenario when user clicks a row in the comparison table
@@ -5447,8 +5644,18 @@ function netoptRenderMap() {
   });
 
   if (showMarkers) {
-    // Draw demand points and assignment lines
-    netoptState.demands.forEach(d => {
+    // B4: Enhanced flow visualization using demandAssignments
+    var facColors = ['#0047ab', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
+    var facColorMap = {};
+    r.openFacilities.forEach(function(f, fi) { facColorMap[f.id] = facColors[fi % facColors.length]; });
+
+    // Find max volume for width scaling
+    var assignments = r.demandAssignments || [];
+    var maxFlowVol = 1;
+    assignments.forEach(function(a) { if (a.volume > maxFlowVol) maxFlowVol = a.volume; });
+
+    // Draw demand points
+    netoptState.demands.forEach(function(d) {
       if (!d.lat || !d.lng) return;
       var marker = L.circleMarker([d.lat, d.lng], {
         radius: 5,
@@ -5458,30 +5665,36 @@ function netoptRenderMap() {
         opacity: 1,
         fillOpacity: 0.7
       }).addTo(netoptState.netoptMap);
-      marker.bindPopup('<strong>' + d.city + '</strong><br>' + d.volume + 'K units');
+      marker.bindPopup('<strong>' + esc(d.city) + '</strong><br>' + d.volume + 'K units');
       netoptState.mapMarkers.push(marker);
-
-      // Find assigned facility
-      if (r.openFacilities.length > 0) {
-        var closest = r.openFacilities[0];
-        var minDist = roadDist(d.lat, d.lng, closest.lat, closest.lng);
-        r.openFacilities.forEach(f => {
-          var dist = roadDist(d.lat, d.lng, f.lat, f.lng);
-          if (dist < minDist) {
-            minDist = dist;
-            closest = f;
-          }
-        });
-
-        // Draw line
-        var polyline = L.polyline([[d.lat, d.lng], [closest.lat, closest.lng]], {
-          color: 'rgba(0,71,171,.3)',
-          weight: 1.5,
-          opacity: 0.6
-        }).addTo(netoptState.netoptMap);
-        netoptState.mapPolylines.push(polyline);
-      }
     });
+
+    // B4: Draw flow lines from demand-to-facility assignments
+    assignments.forEach(function(a) {
+      if (!a.demandLat || !a.demandLng || !a.facilityLat || !a.facilityLng) return;
+      var lineColor = facColorMap[a.facilityId] || 'rgba(0,71,171,.5)';
+      var lineWidth = 1 + (a.volume / maxFlowVol) * 5; // 1px to 6px
+      var isLongDist = a.distance > 500;
+      var dashArray = isLongDist ? '8, 5' : null;
+      var costStr = a.transportCost ? '$' + (a.transportCost * 1000000).toLocaleString('en-US', {maximumFractionDigits:0}) : '—';
+
+      var polyline = L.polyline([[a.demandLat, a.demandLng], [a.facilityLat, a.facilityLng]], {
+        color: lineColor,
+        weight: Math.min(lineWidth, 6),
+        opacity: 0.55,
+        dashArray: dashArray
+      }).addTo(netoptState.netoptMap);
+
+      polyline.bindTooltip(
+        '<strong>' + esc(a.demandCity) + '</strong> → <strong>' + esc(a.facilityName) + '</strong><br>' +
+        a.volume.toLocaleString() + 'K units · ' + Math.round(a.distance) + ' mi · ' + costStr,
+        { sticky: true, className: 'netopt-flow-tooltip' }
+      );
+      netoptState.mapPolylines.push(polyline);
+    });
+
+    // B4: Flow legend
+    netoptRenderFlowLegend(r.openFacilities, facColorMap);
   }
 
   // In zones mode, also show demand dots (small, semi-transparent) for context
@@ -5502,6 +5715,37 @@ function netoptRenderMap() {
 
   // Update heatmap layer
   netoptUpdateHeatLayer();
+}
+
+// B4: Flow legend on the map
+function netoptRenderFlowLegend(facilities, colorMap) {
+  // Remove existing legend if any
+  if (netoptState._flowLegend) {
+    netoptState.netoptMap.removeControl(netoptState._flowLegend);
+    netoptState._flowLegend = null;
+  }
+  if (!facilities || facilities.length === 0) return;
+
+  var legend = L.control({ position: 'bottomleft' });
+  legend.onAdd = function() {
+    var div = L.DomUtil.create('div', 'netopt-flow-legend');
+    div.style.cssText = 'background:rgba(255,255,255,.92);padding:8px 12px;border-radius:8px;font-size:10px;box-shadow:0 2px 8px rgba(0,0,0,.15);max-width:180px;';
+    var html = '<div style="font-weight:700;margin-bottom:4px;color:#1c1c2e;">Facility Flows</div>';
+    facilities.forEach(function(f) {
+      var color = colorMap[f.id] || '#0047ab';
+      html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">' +
+        '<div style="width:16px;height:3px;background:' + color + ';border-radius:2px;"></div>' +
+        '<span>' + esc(f.name) + '</span></div>';
+    });
+    html += '<div style="margin-top:4px;border-top:1px solid #e5e7eb;padding-top:4px;color:#6b7280;">';
+    html += '<div style="display:flex;align-items:center;gap:6px;"><span style="border-bottom:2px solid #999;width:16px;display:inline-block;"></span> &lt;500mi</div>';
+    html += '<div style="display:flex;align-items:center;gap:6px;"><span style="border-bottom:2px dashed #999;width:16px;display:inline-block;"></span> &gt;500mi</div>';
+    html += '</div>';
+    div.innerHTML = html;
+    return div;
+  };
+  legend.addTo(netoptState.netoptMap);
+  netoptState._flowLegend = legend;
 }
 
 // ── SERVICE ZONE CIRCLES ──
@@ -5917,73 +6161,87 @@ function netoptExportResults() {
   var r = netoptState.results;
   if (!r) { alert('Run optimization first'); return; }
 
-  var csv = 'Network Optimization Results Export\n\n';
-  csv += 'SCENARIO COMPARISON\n';
-  csv += 'Num DCs,Total Cost ($M),Avg Days,1-Day %,2-Day %,3-Day %,4-Day %,5+ Day %,Verdict\n';
+  var csv = 'Network Optimization Results Export\n';
+  csv += 'Generated,' + new Date().toISOString().slice(0, 19).replace('T', ' ') + '\n';
+  csv += 'Solver Mode,' + (r.solverMode || 'heuristic') + '\n';
+  csv += 'Solve Time (ms),' + (r.solveTimeMs || '-') + '\n\n';
 
+  // Section 1: Summary
+  csv += '--- SUMMARY ---\n';
+  csv += 'Metric,Value\n';
+  csv += 'Total Annual Cost ($M),' + r.totalCost.toFixed(2) + '\n';
+  csv += 'Facility Count,' + r.openFacilities.length + '\n';
+  csv += 'Service Level (%),' + (r.serviceLevel ? r.serviceLevel.toFixed(1) : '-') + '\n';
+  csv += 'Avg Delivery Days,' + (r.avgDeliveryDays ? r.avgDeliveryDays.toFixed(1) : '-') + '\n';
+  csv += 'Avg Distance (mi),' + (r.avgDistance ? r.avgDistance.toFixed(0) : '-') + '\n';
+  csv += 'Feasibility,' + (r.feasibility || 'green') + '\n\n';
+
+  // Section 2: Scenario Comparison
+  csv += '--- SCENARIO COMPARISON ---\n';
+  csv += 'Num DCs,Total Cost ($M),Fixed ($M),Transport ($M),Avg Distance (mi),Service %,Avg Days,Delta vs 1DC %,Feasibility,Verdict\n';
   if (r.allScenarios) {
+    var baseline = r.allScenarios[0];
     r.allScenarios.forEach(function(s, i) {
-      var dp = s.dayPct || { d1:0, d2:0, d3:0, d4:0, d5plus:0 };
       var verdict = '';
       if (s._isBestCost) verdict = 'BEST COST';
       if (s._isBestService) verdict = (verdict ? verdict + '/' : '') + 'BEST SERVICE';
-      csv += s.openFacilities.length + ',' + s.totalCost.toFixed(2) + ',' + (s.avgDeliveryDays ? s.avgDeliveryDays.toFixed(1) : '-');
-      csv += ',' + dp.d1.toFixed(0) + ',' + dp.d2.toFixed(0) + ',' + dp.d3.toFixed(0) + ',' + dp.d4.toFixed(0) + ',' + dp.d5plus.toFixed(0);
-      csv += ',' + (verdict || '-') + '\n';
+      var delta = baseline && baseline.totalCost > 0 ? ((s.totalCost - baseline.totalCost) / baseline.totalCost * 100).toFixed(1) : '0';
+      csv += s.openFacilities.length + ',' + s.totalCost.toFixed(2) + ',' + s.fixedCostM.toFixed(2) + ',' + s.transportCostM.toFixed(2);
+      csv += ',' + (s.avgDistance ? s.avgDistance.toFixed(0) : '-') + ',' + (s.serviceLevel ? s.serviceLevel.toFixed(1) : '-');
+      csv += ',' + (s.avgDeliveryDays ? s.avgDeliveryDays.toFixed(1) : '-') + ',' + delta + ',' + (s.feasibility || 'green') + ',' + (verdict || '-') + '\n';
     });
   }
 
-  csv += '\nFACILITY DETAILS\n';
-  csv += 'Name,City,Status,Capacity (K units),Annual Fixed Cost ($M),Variable Cost ($/unit),Assigned Volume (K)\n';
+  // Section 3: Facility Detail with utilization
+  csv += '\n--- FACILITY DETAIL ---\n';
+  csv += 'Name,City,Status,Capacity (K),Fixed Cost ($M),Var Cost ($/unit),Assigned Volume (K),Utilization %\n';
   r.openFacilities.forEach(function(f) {
-    var assignedVol = r.assignedVolume && r.assignedVolume[f.id] ? r.assignedVolume[f.id] : 0;
+    var vol = r.assignedVolume && r.assignedVolume[f.id] ? r.assignedVolume[f.id] : 0;
+    var util = r.utilization && r.utilization[f.id] ? r.utilization[f.id].pct : 0;
     csv += f.name + ',' + f.city + ',Open,' + (f.capacity || '-') + ',' + (f.fixedCost || 0).toFixed(2);
-    csv += ',' + (f.varCost || 0).toFixed(3) + ',' + assignedVol.toFixed(0) + '\n';
+    csv += ',' + (f.varCost || 0).toFixed(3) + ',' + vol.toFixed(0) + ',' + util.toFixed(1) + '\n';
   });
 
-  csv += '\nDEMAND POINT ALLOCATIONS\n';
-  csv += 'Demand Point,City,Volume (K),Assigned Facility,Distance (mi),Transport Cost ($),Delivery Days\n';
-  netoptState.demands.forEach(function(d) {
-    if (r.openFacilities.length > 0) {
-      var closest = r.openFacilities[0];
-      var minDist = roadDist(d.lat, d.lng, closest.lat, closest.lng);
-      for (var i = 1; i < r.openFacilities.length; i++) {
-        var dist = roadDist(d.lat, d.lng, r.openFacilities[i].lat, r.openFacilities[i].lng);
-        if (dist < minDist) {
-          minDist = dist;
-          closest = r.openFacilities[i];
-        }
-      }
+  // Section 4: Demand Allocation (from demandAssignments)
+  csv += '\n--- DEMAND ALLOCATION ---\n';
+  csv += 'Demand City,Volume (K),Assigned Facility,Distance (mi),Transport Cost ($),Delivery Days\n';
+  var assignments = r.demandAssignments || [];
+  if (assignments.length > 0) {
+    assignments.forEach(function(a) {
+      csv += a.demandCity + ',' + a.volume.toFixed(0) + ',' + a.facilityName + ',' + Math.round(a.distance);
+      csv += ',' + (a.transportCost ? (a.transportCost * 1000000).toFixed(0) : '0') + ',' + (a.transitDays ? a.transitDays.toFixed(1) : '-') + '\n';
+    });
+  }
 
-      var vol = (d.volume || 0) * 1000;
-      var mix = netoptState.transport.modeMix || { tl: 1, ltl: 0, parcel: 0 };
-      var tlCost = vol * mix.tl * minDist * (netoptState.transport.tlUnitMile || netoptState.transport.outboundPerUnitMile || 0.0025);
-      var ltlCost = vol * mix.ltl * minDist * (netoptState.transport.ltlUnitMile || netoptState.transport.outboundPerUnitMile || 0.0040);
-      var parcelCost = vol * mix.parcel * (netoptState.transport.parcelUnitCost || 8.50);
-      var transportCost = tlCost + ltlCost + parcelCost;
-
-      var truckSpeed = netoptState.transport.truckSpeedMiPerDay || 500;
-      var groundDays = minDist <= 150 ? 1 : Math.ceil(minDist / truckSpeed) + 1;
-      var parcelDays = minDist <= 50 ? 1 : minDist <= 150 ? 2 : minDist <= 400 ? 3 : minDist <= 800 ? 4 : 5;
-      var groundPct = (mix.tl || 0) + (mix.ltl || 0);
-      var parcelPct = mix.parcel || 0;
-      var transitDays = groundPct > 0 || parcelPct > 0
-        ? (groundDays * groundPct + parcelDays * parcelPct) / (groundPct + parcelPct)
-        : groundDays;
-      transitDays = Math.max(1, Math.round(transitDays * 10) / 10);
-
-      csv += d.name + ',' + d.city + ',' + (d.volume || 0).toFixed(0) + ',' + closest.name + ',' + minDist.toFixed(0);
-      csv += ',' + transportCost.toFixed(0) + ',' + transitDays.toFixed(1) + '\n';
-    }
-  });
-
-  csv += '\nCOST BREAKDOWN\n';
+  // Section 5: Cost Breakdown
+  csv += '\n--- COST BREAKDOWN ---\n';
   csv += 'Component,Amount ($M)\n';
   csv += 'Facility Fixed Costs,' + r.fixedCostM.toFixed(2) + '\n';
-  csv += 'Transportation Costs,' + r.transportCostM.toFixed(2) + '\n';
+  csv += 'Outbound Transport,' + r.transportCostM.toFixed(2) + '\n';
+  csv += 'Inbound Transport,' + (r.inboundCostM || 0).toFixed(2) + '\n';
   csv += 'Variable Handling,' + r.varCostM.toFixed(2) + '\n';
   csv += 'Inventory Carrying,' + r.inventoryCostM.toFixed(2) + '\n';
   csv += 'TOTAL ANNUAL COST,' + r.totalCost.toFixed(2) + '\n';
+
+  // Section 6: Service Profile
+  csv += '\n--- SERVICE PROFILE ---\n';
+  csv += 'Delivery Window,Volume %\n';
+  if (r.dayPct) {
+    csv += '1-Day,' + r.dayPct.d1.toFixed(1) + '\n';
+    csv += '2-Day,' + r.dayPct.d2.toFixed(1) + '\n';
+    csv += '3-Day,' + r.dayPct.d3.toFixed(1) + '\n';
+    csv += '4-Day,' + r.dayPct.d4.toFixed(1) + '\n';
+    csv += '5+ Day,' + r.dayPct.d5plus.toFixed(1) + '\n';
+  }
+
+  // Section 7: Sensitivity Data (if available)
+  if (netoptState.sensitivityData) {
+    csv += '\n--- SENSITIVITY ANALYSIS ---\n';
+    csv += 'Parameter,-20%,-10%,Base,+10%,+20%\n';
+    netoptState.sensitivityData.forEach(function(s) {
+      csv += s.label + ',' + s.values.map(function(v) { return v.toFixed(2); }).join(',') + '\n';
+    });
+  }
 
   var blob = new Blob([csv], { type: 'text/csv' });
   var url = URL.createObjectURL(blob);

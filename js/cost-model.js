@@ -785,7 +785,8 @@ const cmApp = {
             vasLines: [],
             startupLines: [],
             pricingBuckets: [],
-            volumeLines: []
+            volumeLines: [],
+            facilityRateOverrides: {}
         };
         this.preseedVolumeLines();
         this.initDefaultBuckets();
@@ -918,6 +919,16 @@ const cmApp = {
             document.getElementById('hoursPerShift').value = p.hours_per_shift || '';
             document.getElementById('daysPerWeek').value = p.days_per_week || '';
             document.getElementById('weeksPerYear').value = p.operating_weeks_per_year || '';
+
+            // Shift premiums & absence
+            document.getElementById('shift2Premium').value = p.shift_2_premium != null ? (p.shift_2_premium * 100) : '';
+            document.getElementById('shift3Premium').value = p.shift_3_premium != null ? (p.shift_3_premium * 100) : '';
+            document.getElementById('absenceAllowance').value = p.absence_allowance_pct != null ? (p.absence_allowance_pct * 100) : '';
+
+            // Facility rate overrides
+            try {
+                this.projectData.facilityRateOverrides = typeof p.facility_rate_overrides === 'string' ? JSON.parse(p.facility_rate_overrides) : (p.facility_rate_overrides || {});
+            } catch(e) { this.projectData.facilityRateOverrides = {}; }
 
             // Financial
             document.getElementById('targetMargin').value = p.target_margin_pct || '';
@@ -1214,6 +1225,126 @@ const cmApp = {
 
         const warehouse = total - staging - office;
         document.getElementById('warehousingSpace').textContent = Math.max(0, warehouse).toFixed(0) + ' sqft';
+        this.renderFacilityCostCard();
+    },
+
+    renderFacilityCostCard() {
+        var card = document.getElementById('facilityCostCard');
+        if (!card) return;
+        var sqft = parseFloat(document.getElementById('totalSqft').value) || 0;
+        if (sqft <= 0) {
+            card.innerHTML = '<div class="cm-card-title">Facility Cost Breakdown</div>' +
+                '<div style="font-size:12px;color:var(--ies-gray-500);padding:8px 0;">Enter square footage above to see cost breakdown.</div>';
+            return;
+        }
+        var marketId = document.getElementById('market').value;
+        var envType = (document.getElementById('environment').value || 'ambient').toLowerCase();
+        var facilityRate = this.refData.facilityRates.find(function(r) { return r.market_id === marketId; }) || {};
+        // Map environment to utility rate key
+        var utilEnv = envType === 'cold' || envType === 'cooler' ? 'cooler' : (envType === 'frozen' || envType === 'freezer' ? 'freezer' : 'ambient');
+        var utilityRate = this.refData.utilityRates.find(function(r) { return r.market_id === marketId; }) || {};
+        // Try environment-specific utility column, fallback to avg
+        var utilPerSfMo = utilityRate['utility_' + utilEnv + '_per_sqft_per_month'] || utilityRate.avg_monthly_per_sqft || utilityRate.utility_cost_per_sqft_per_month || 0;
+
+        // Overrides from projectData (if user has set them)
+        var ov = this.projectData.facilityRateOverrides || {};
+        var leaseRate = ov.lease != null ? ov.lease : (facilityRate.lease_rate_psf_yr || facilityRate.lease_rate_per_sqft || 0);
+        var camRate = ov.cam != null ? ov.cam : (facilityRate.cam_rate_psf_yr || facilityRate.cam_rate_per_sqft || 0);
+        var taxRate = ov.tax != null ? ov.tax : (facilityRate.tax_rate_psf_yr || facilityRate.tax_rate_per_sqft || 0);
+        var insRate = ov.insurance != null ? ov.insurance : (facilityRate.insurance_rate_psf_yr || facilityRate.insurance_rate_per_sqft || 0);
+        var utilRate = ov.utility != null ? ov.utility : utilPerSfMo;
+
+        // Cold storage premium on lease
+        var coldMult = envType === 'cold' || envType === 'cooler' ? 1.25 : (envType === 'frozen' || envType === 'freezer' ? 1.50 : 1.0);
+        var adjLease = leaseRate * coldMult;
+
+        // Maintenance: % of lease or fixed $/SF
+        var maintMode = ov.maint_mode || 'pct';
+        var maintPct = ov.maint_pct != null ? ov.maint_pct : 0.02;
+        var maintFixed = ov.maint_fixed != null ? ov.maint_fixed : 0;
+        var maintPerSf = maintMode === 'fixed' ? maintFixed : (adjLease * maintPct);
+
+        var lease = sqft * adjLease;
+        var cam = sqft * camRate;
+        var tax = sqft * taxRate;
+        var ins = sqft * insRate;
+        var util = sqft * utilRate * 12;
+        var maint = sqft * maintPerSf;
+        var total = lease + cam + tax + ins + util + maint;
+
+        var fmt = function(v) { return '$' + v.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0}); };
+        var fmtRate = function(v) { return '$' + v.toFixed(2); };
+        var line = function(label, rate, unit, annual, overrideKey) {
+            var isOverridden = ov[overrideKey] != null;
+            return '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--ies-gray-100);font-size:12px;">' +
+                '<span style="color:var(--ies-gray-600);">' + esc(label) + (isOverridden ? ' <span style="color:#f59e0b;font-size:10px;">overridden</span>' : '') + '</span>' +
+                '<span style="color:var(--ies-gray-500);font-size:11px;">' + fmtRate(rate) + unit + ' &times; ' + sqft.toLocaleString() + ' SF</span>' +
+                '<span style="font-weight:600;">' + fmt(annual) + '/yr</span>' +
+            '</div>';
+        };
+
+        var coldNote = coldMult > 1 ? ' <span style="font-size:10px;color:#3b82f6;">(' + ((coldMult - 1) * 100).toFixed(0) + '% cold premium)</span>' : '';
+
+        card.innerHTML =
+            '<div class="cm-card-title">Facility Cost Breakdown</div>' +
+            line('Lease' + coldNote, adjLease, '/SF/yr', lease, 'lease') +
+            line('CAM', camRate, '/SF/yr', cam, 'cam') +
+            line('Property Tax', taxRate, '/SF/yr', tax, 'tax') +
+            line('Insurance', insRate, '/SF/yr', ins, 'insurance') +
+            line('Utilities (' + esc(utilEnv) + ')', utilRate, '/SF/mo', util, 'utility') +
+            line('Maintenance (' + (maintMode === 'fixed' ? 'fixed' : (maintPct * 100).toFixed(0) + '% of lease') + ')', maintPerSf, '/SF/yr', maint, 'maint_fixed') +
+            '<div style="display:flex;justify-content:space-between;padding:8px 0;font-size:14px;font-weight:700;border-top:2px solid var(--ies-navy);margin-top:4px;">' +
+                '<span>Total Facility Cost</span><span style="color:var(--ies-navy);">' + fmt(total) + '/yr</span>' +
+            '</div>' +
+            '<div style="margin-top:8px;">' +
+                '<button class="cm-btn-small" onclick="cmApp.toggleFacilityOverrides()" style="font-size:11px;">Edit Rate Overrides</button>' +
+            '</div>' +
+            '<div id="facilityOverridesPanel" style="display:none;margin-top:8px;padding:10px;background:#f8f9fb;border-radius:6px;font-size:12px;">' +
+                '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">' +
+                    this._facilityOverrideField('Lease $/SF/yr', 'lease', leaseRate) +
+                    this._facilityOverrideField('CAM $/SF/yr', 'cam', camRate) +
+                    this._facilityOverrideField('Tax $/SF/yr', 'tax', taxRate) +
+                    this._facilityOverrideField('Insurance $/SF/yr', 'insurance', insRate) +
+                    this._facilityOverrideField('Utility $/SF/mo', 'utility', utilRate) +
+                    this._facilityOverrideField('Maint % of Lease', 'maint_pct', maintPct * 100) +
+                '</div>' +
+                '<div style="margin-top:8px;text-align:right;">' +
+                    '<button class="cm-btn-small cm-btn-small-danger" onclick="cmApp.clearFacilityOverrides()" style="font-size:10px;">Clear All Overrides</button>' +
+                '</div>' +
+            '</div>';
+    },
+
+    _facilityOverrideField(label, key, currentVal) {
+        var ov = this.projectData.facilityRateOverrides || {};
+        var isSet = ov[key] != null;
+        return '<div><label style="font-size:10px;color:var(--ies-gray-500);">' + esc(label) + '</label>' +
+            '<input type="number" step="0.01" value="' + (isSet ? ov[key] : currentVal) + '" ' +
+            'style="width:100%;font-size:12px;padding:4px 6px;border:1px solid ' + (isSet ? '#f59e0b' : 'var(--ies-gray-200)') + ';border-radius:4px;" ' +
+            'onchange="cmApp.updateFacilityOverride(\'' + key + '\',this.value)"></div>';
+    },
+
+    toggleFacilityOverrides() {
+        var panel = document.getElementById('facilityOverridesPanel');
+        if (panel) panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+    },
+
+    updateFacilityOverride(key, value) {
+        if (!this.projectData.facilityRateOverrides) this.projectData.facilityRateOverrides = {};
+        var num = parseFloat(value);
+        if (key === 'maint_pct') {
+            this.projectData.facilityRateOverrides.maint_pct = isNaN(num) ? null : num / 100;
+            this.projectData.facilityRateOverrides.maint_mode = 'pct';
+        } else {
+            this.projectData.facilityRateOverrides[key] = isNaN(num) ? null : num;
+        }
+        this.renderFacilityCostCard();
+        this.markChanged();
+    },
+
+    clearFacilityOverrides() {
+        this.projectData.facilityRateOverrides = {};
+        this.renderFacilityCostCard();
+        this.markChanged();
     },
 
     updateShiftMetrics() {
@@ -2191,14 +2322,23 @@ const cmApp = {
                 this.updateLaborTotals();
             }
             else if (arr === 'equipmentLines') {
-                // Inline update computed cell instead of full re-render
-                const monthlyTotal = ((line.monthly_cost || 0) + (line.monthly_maintenance || 0)) * (line.quantity || 1);
-                const annualCost = monthlyTotal * 12;
+                // Inline update: recompute with lease/buy logic
+                var ownType = line.ownership_type || line.acquisition_type || 'lease';
+                var eqAnnualCost;
+                if (ownType === 'purchase') {
+                    var amYrs = line.amort_years || 5;
+                    var acq = line.acquisition_cost || 0;
+                    var mPct = line.maintenance_pct || 0.10;
+                    eqAnnualCost = ((acq / amYrs) + (acq * mPct)) * (line.quantity || 1);
+                } else {
+                    eqAnnualCost = ((line.monthly_cost || 0) + (line.monthly_maintenance || 0)) * (line.quantity || 1) * 12;
+                }
                 const costCell = document.getElementById('equip-cost-' + idx);
-                if (costCell) costCell.textContent = '$' + annualCost.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                if (costCell) costCell.textContent = '$' + eqAnnualCost.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
                 const eqTotal = this.calculateEquipmentCost();
                 const eqEl = document.getElementById('totalEquipmentCost');
                 if (eqEl) eqEl.textContent = '$' + eqTotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                this.renderEquipmentSummaryCard();
             }
             else if (arr === 'overheadLines') {
                 // Inline update computed cell instead of full re-render
@@ -2210,13 +2350,8 @@ const cmApp = {
                 if (totalEl) totalEl.textContent = '$' + totalAnnual.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
             }
             else if (arr === 'vasLines') {
-                // Inline update computed cell instead of full re-render
-                const annualCost = (line.rate || 0) * (line.volume || 0);
-                const costCell = document.getElementById('vas-cost-' + idx);
-                if (costCell) costCell.textContent = '$' + annualCost.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-                const vasTotal = this.calculateVasCost();
-                const vasEl = document.getElementById('totalVasCost');
-                if (vasEl) vasEl.textContent = '$' + vasTotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                // VAS uses card rendering — re-render full cards on any field change
+                this.renderVasTable();
             }
             else if (arr === 'volumeLines') {
                 // Update daily volume cell inline instead of full re-render (prevents focus loss)
@@ -2480,8 +2615,26 @@ const cmApp = {
         tbody.innerHTML = '';
         const operatingHours = this.getOperatingHours();
 
+        var shiftsPerDay = parseFloat(document.getElementById('shiftsPerDay').value) || 1;
+        var shift2Prem = (parseFloat(document.getElementById('shift2Premium').value) || 0) / 100;
+        var shift3Prem = (parseFloat(document.getElementById('shift3Premium').value) || 0) / 100;
+        var totalLines = this.projectData.laborLines.length;
+
         this.projectData.laborLines.forEach((line, idx) => {
-            const annualCost = (line.annual_hours || 0) * (line.hourly_rate || 0) * (1 + (line.burden_pct || 0) / 100);
+            // Assign shift based on position in line list and shifts per day
+            var shiftNum = 1;
+            if (shiftsPerDay >= 3 && totalLines >= 3) {
+                var third = Math.ceil(totalLines / 3);
+                if (idx >= third * 2) shiftNum = 3;
+                else if (idx >= third) shiftNum = 2;
+            } else if (shiftsPerDay >= 2 && totalLines >= 2) {
+                if (idx >= Math.ceil(totalLines / 2)) shiftNum = 2;
+            }
+            line.shift_num = shiftNum;
+
+            var diffPct = shiftNum === 3 ? shift3Prem : (shiftNum === 2 ? shift2Prem : 0);
+            var adjRate = (line.hourly_rate || 0) * (1 + diffPct);
+            var annualCost = (line.annual_hours || 0) * adjRate * (1 + (line.burden_pct || 0) / 100);
             const fte = operatingHours > 0 ? (line.annual_hours || 0) / operatingHours : 0;
             const uomLabel = line.uom ? '<span style="font-size:11px;color:var(--ies-gray-400);">/' + line.uom + '</span>' : '';
 
@@ -2497,6 +2650,8 @@ const cmApp = {
                 }
             }
 
+            var shiftLabel = shiftNum === 1 ? 'Day' : (shiftNum === 2 ? 'Eve' : 'Night');
+
             const row = document.createElement('tr');
             row.innerHTML =
                 '<td>' + this._cmInp('text', line.activity_name, idx, 'laborLines', 'activity_name', {w:100, ph:'Activity'}) + '</td>' +
@@ -2509,6 +2664,9 @@ const cmApp = {
                 '<td>' + this._complexitySelectHtml(idx, line.complexity_tier) + '</td>' +
                 '<td class="cm-table-number" id="labor-hrs-' + idx + '">' + (line.annual_hours || 0).toLocaleString('en-US', {minimumFractionDigits:1, maximumFractionDigits:1}) + '</td>' +
                 '<td class="cm-table-number" id="labor-fte-' + idx + '">' + fte.toFixed(2) + '</td>' +
+                '<td style="text-align:center;font-size:11px;">' + esc(shiftLabel) + '</td>' +
+                '<td class="cm-table-number" style="font-size:11px;">' + (diffPct * 100).toFixed(0) + '%</td>' +
+                '<td class="cm-table-number" style="font-size:11px;">$' + adjRate.toFixed(2) + '</td>' +
                 '<td>' + this._equipSelectHtml('MHE', idx, line.mhe_equipment_id, 'mhe_equipment_id') + '</td>' +
                 '<td>' + this._equipSelectHtml('Systems', idx, line.it_equipment_id, 'it_equipment_id') + '</td>' +
                 '<td>' + this._cmInp('number', line.hourly_rate, idx, 'laborLines', 'hourly_rate', {w:60, ph:'$/hr'}) + '</td>' +
@@ -2517,6 +2675,12 @@ const cmApp = {
                 '<td class="cm-table-actions"><button class="cm-btn-small cm-btn-small-danger" onclick="cmApp.deleteLaborLine(' + idx + ')">Delete</button></td>';
             tbody.appendChild(row);
         });
+
+        // Update effective hours per FTE after absence allowance
+        var absencePct = (parseFloat(document.getElementById('absenceAllowance').value) || 0) / 100;
+        var effectiveHrs = operatingHours * (1 - absencePct);
+        var effEl = document.getElementById('effectiveHoursPerFte');
+        if (effEl) effEl.textContent = effectiveHrs.toLocaleString('en-US', {maximumFractionDigits: 0});
     },
 
     renderIndirectLaborTable() {
@@ -2544,16 +2708,29 @@ const cmApp = {
         tbody.innerHTML = '';
 
         this.projectData.equipmentLines.forEach((line, idx) => {
-            const monthlyTotal = ((line.monthly_cost || 0) + (line.monthly_maintenance || 0)) * (line.quantity || 1);
-            const annualCost = monthlyTotal * 12;
+            var ownType = line.ownership_type || line.acquisition_type || 'lease';
+            var annualCost;
+            if (ownType === 'purchase') {
+                var amortYrs = line.amort_years || 5;
+                var acqCost = line.acquisition_cost || 0;
+                var maintPct = line.maintenance_pct || 0.10;
+                annualCost = ((acqCost / amortYrs) + (acqCost * maintPct)) * (line.quantity || 1);
+            } else {
+                var monthlyTotal = ((line.monthly_cost || 0) + (line.monthly_maintenance || 0)) * (line.quantity || 1);
+                annualCost = monthlyTotal * 12;
+            }
             const row = document.createElement('tr');
             row.innerHTML =
                 '<td>' + this._cmInp('text', line.equipment_name, idx, 'equipmentLines', 'equipment_name', {w:110, ph:'Equipment'}) + '</td>' +
                 '<td>' + this._cmInp('text', line.category, idx, 'equipmentLines', 'category', {w:80, ph:'Category'}) + '</td>' +
                 '<td>' + this._cmInp('number', line.quantity, idx, 'equipmentLines', 'quantity', {w:45, step:'1', ph:'Qty'}) + '</td>' +
-                '<td>' + this._cmInp('text', line.acquisition_type, idx, 'equipmentLines', 'acquisition_type', {w:65, ph:'Lease'}) + '</td>' +
+                '<td><select class="cm-input" style="width:75px;font-size:12px;" onchange="cmApp._updateField(\'equipmentLines\',' + idx + ',\'ownership_type\',this.value);cmApp.renderEquipmentTable();">' +
+                    '<option value="lease"' + (ownType === 'lease' ? ' selected' : '') + '>Lease</option>' +
+                    '<option value="purchase"' + (ownType === 'purchase' ? ' selected' : '') + '>Purchase</option>' +
+                '</select></td>' +
                 '<td>' + this._cmInp('number', line.monthly_cost, idx, 'equipmentLines', 'monthly_cost', {w:65, ph:'$/mo'}) + '</td>' +
                 '<td>' + this._cmInp('number', line.monthly_maintenance, idx, 'equipmentLines', 'monthly_maintenance', {w:65, ph:'Maint'}) + '</td>' +
+                '<td>' + this._cmInp('number', line.acquisition_cost, idx, 'equipmentLines', 'acquisition_cost', {w:70, ph:'$0'}) + '</td>' +
                 '<td>' + this._cmInp('number', line.amort_years, idx, 'equipmentLines', 'amort_years', {w:45, step:'1', ph:'5'}) + '</td>' +
                 '<td class="cm-table-number" id="equip-cost-' + idx + '" style="font-weight:600;">$' + annualCost.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</td>' +
                 '<td>' + this._cmInp('text', line.driven_by, idx, 'equipmentLines', 'driven_by', {w:80, ph:'Driver'}) + '</td>' +
@@ -2564,6 +2741,55 @@ const cmApp = {
         const eqTotal = this.calculateEquipmentCost();
         const eqEl = document.getElementById('totalEquipmentCost');
         if (eqEl) eqEl.textContent = '$' + eqTotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        this.renderEquipmentSummaryCard();
+    },
+
+    renderEquipmentSummaryCard() {
+        var card = document.getElementById('equipmentSummaryCard');
+        if (!card) return;
+        var lines = this.projectData.equipmentLines;
+        if (!lines || lines.length === 0) {
+            card.innerHTML = '<div class="cm-card-title">Equipment Summary</div>' +
+                '<div style="font-size:12px;color:var(--ies-gray-500);">Add equipment below to see summary.</div>';
+            return;
+        }
+        var totalLease = 0, totalMaint = 0, totalCapital = 0, totalAmort = 0;
+        lines.forEach(function(line) {
+            var ownType = line.ownership_type || line.acquisition_type || 'lease';
+            var qty = line.quantity || 1;
+            if (ownType === 'purchase') {
+                var acq = (line.acquisition_cost || 0) * qty;
+                var amYrs = line.amort_years || 5;
+                var mPct = line.maintenance_pct || 0.10;
+                totalCapital += acq;
+                totalAmort += acq / amYrs;
+                totalMaint += acq * mPct;
+            } else {
+                totalLease += (line.monthly_cost || 0) * qty;
+                totalMaint += (line.monthly_maintenance || 0) * qty * 12;
+            }
+        });
+        var fmt = function(v) { return '$' + v.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0}); };
+        card.innerHTML =
+            '<div class="cm-card-title">Equipment Summary</div>' +
+            '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px;">' +
+                '<div style="padding:8px 12px;background:#f0f9ff;border-radius:6px;">' +
+                    '<div style="font-size:10px;color:var(--ies-gray-500);text-transform:uppercase;">Monthly Lease</div>' +
+                    '<div style="font-size:16px;font-weight:700;color:var(--ies-navy);">' + fmt(totalLease) + '/mo</div>' +
+                '</div>' +
+                '<div style="padding:8px 12px;background:#f0fdf4;border-radius:6px;">' +
+                    '<div style="font-size:10px;color:var(--ies-gray-500);text-transform:uppercase;">Annual Maintenance</div>' +
+                    '<div style="font-size:16px;font-weight:700;color:#059669;">' + fmt(totalMaint) + '/yr</div>' +
+                '</div>' +
+                '<div style="padding:8px 12px;background:#fefce8;border-radius:6px;">' +
+                    '<div style="font-size:10px;color:var(--ies-gray-500);text-transform:uppercase;">Total Capital (Purchases)</div>' +
+                    '<div style="font-size:16px;font-weight:700;color:#b45309;">' + fmt(totalCapital) + '</div>' +
+                '</div>' +
+                '<div style="padding:8px 12px;background:#faf5ff;border-radius:6px;">' +
+                    '<div style="font-size:10px;color:var(--ies-gray-500);text-transform:uppercase;">Amortized Annual Capital</div>' +
+                    '<div style="font-size:16px;font-weight:700;color:#7c3aed;">' + fmt(totalAmort) + '/yr</div>' +
+                '</div>' +
+            '</div>';
     },
 
     renderOverheadTable() {
@@ -2591,27 +2817,124 @@ const cmApp = {
     },
 
     renderVasTable() {
-        const tbody = document.getElementById('vasTable');
-        tbody.innerHTML = '';
-        const hint = document.getElementById('vasEmptyHint');
-        if (hint) hint.style.display = this.projectData.vasLines.length === 0 ? 'block' : 'none';
+        const container = document.getElementById('vasCardsContainer');
+        if (!container) return;
+        // Clear all children except the empty hint
+        var hint = document.getElementById('vasEmptyHint');
+        container.innerHTML = '';
+        if (hint) container.appendChild(hint);
 
-        this.projectData.vasLines.forEach((line, idx) => {
-            const annualCost = (line.rate || 0) * (line.volume || 0);
-            const row = document.createElement('tr');
-            row.innerHTML =
-                '<td>' + this._cmInp('text', line.service_name, idx, 'vasLines', 'service_name', {w:120, ph:'Service'}) + '</td>' +
-                '<td>' + this._cmInp('number', line.rate, idx, 'vasLines', 'rate', {w:65, ph:'$/unit'}) + '</td>' +
-                '<td>' + this._cmInp('text', line.uom, idx, 'vasLines', 'uom', {w:65, ph:'UOM'}) + '</td>' +
-                '<td>' + this._cmInp('number', line.volume, idx, 'vasLines', 'volume', {w:70, step:'1', ph:'Volume'}) + '</td>' +
-                '<td class="cm-table-number" id="vas-cost-' + idx + '" style="font-weight:600;">$' + annualCost.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</td>' +
-                '<td>' + this.bucketSelectHtml('vas', idx, line.pricing_bucket) + '</td>' +
-                '<td class="cm-table-actions"><button class="cm-btn-small cm-btn-small-danger" onclick="cmApp.deleteVasLine(' + idx + ')">Delete</button></td>';
-            tbody.appendChild(row);
-        });
-        const vasTotal = this.calculateVasCost();
-        const vasEl = document.getElementById('totalVasCost');
+        if (this.projectData.vasLines.length === 0) {
+            if (hint) hint.style.display = 'block';
+        } else {
+            if (hint) hint.style.display = 'none';
+            var self = this;
+            this.projectData.vasLines.forEach(function(line, idx) {
+                var laborCost = 0, materialCost = 0, spaceCost = 0;
+                var vol = line.volume || 0;
+                // Labor: volume / UPH * rate * (1 + burden)
+                if (line.uph && line.uph > 0 && line.labor_rate) {
+                    var burden = (line.burden_pct || 35) / 100;
+                    laborCost = (vol / line.uph) * line.labor_rate * (1 + burden);
+                }
+                // Material
+                if (line.material_cost) materialCost = vol * line.material_cost;
+                // Space: allocated SF * facility cost per SF
+                if (line.space_sf && line.space_sf > 0) {
+                    var totalSqft = parseFloat(document.getElementById('totalSqft').value) || 1;
+                    var facCost = self.calculateFacilityCost();
+                    spaceCost = line.space_sf * (facCost / Math.max(1, totalSqft));
+                }
+                var totalLineCost = laborCost + materialCost + spaceCost;
+                // Fallback: if no breakdown fields, use simple rate * volume
+                if (totalLineCost === 0) totalLineCost = (line.rate || 0) * vol;
+                line.labor_cost = laborCost;
+                line.total_cost = totalLineCost;
+
+                var isExpanded = line._expanded ? true : false;
+                var card = document.createElement('div');
+                card.className = 'cm-card';
+                card.style.cssText = 'margin-bottom:8px;border-left:3px solid var(--ies-blue);';
+                card.innerHTML =
+                    '<div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="cmApp.toggleVasCard(' + idx + ')">' +
+                        '<div style="display:flex;align-items:center;gap:12px;">' +
+                            '<span style="font-size:10px;color:var(--ies-gray-400);">' + (isExpanded ? '&#9660;' : '&#9654;') + '</span>' +
+                            '<strong style="font-size:13px;">' + esc(line.service_name || 'New Service') + '</strong>' +
+                            '<span style="font-size:11px;color:var(--ies-gray-500);">' + esc(line.service_type || 'custom') + '</span>' +
+                        '</div>' +
+                        '<div style="display:flex;align-items:center;gap:16px;">' +
+                            '<span id="vas-cost-' + idx + '" style="font-weight:700;font-size:13px;color:var(--ies-navy);">$' + totalLineCost.toLocaleString('en-US', {minimumFractionDigits:0, maximumFractionDigits:0}) + '/yr</span>' +
+                            '<button class="cm-btn-small cm-btn-small-danger" onclick="event.stopPropagation();cmApp.deleteVasLine(' + idx + ')">Delete</button>' +
+                        '</div>' +
+                    '</div>';
+                if (isExpanded) {
+                    card.innerHTML +=
+                        '<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--ies-gray-100);display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;font-size:12px;">' +
+                            '<div class="cm-field-group"><label class="cm-field-label">Service Name</label>' + self._cmInp('text', line.service_name, idx, 'vasLines', 'service_name', {w:'100%', ph:'Service Name'}) + '</div>' +
+                            '<div class="cm-field-group"><label class="cm-field-label">Service Type</label><select class="cm-input" style="width:100%;font-size:12px;" onchange="cmApp._updateField(\'vasLines\',' + idx + ',\'service_type\',this.value)">' +
+                                '<option value="custom"' + (line.service_type === 'custom' ? ' selected' : '') + '>Custom</option>' +
+                                '<option value="copacking"' + (line.service_type === 'copacking' ? ' selected' : '') + '>Co-packing / Kitting</option>' +
+                                '<option value="labeling"' + (line.service_type === 'labeling' ? ' selected' : '') + '>Labeling / Ticketing</option>' +
+                                '<option value="giftwrap"' + (line.service_type === 'giftwrap' ? ' selected' : '') + '>Gift Wrap / Packaging</option>' +
+                                '<option value="returns"' + (line.service_type === 'returns' ? ' selected' : '') + '>Returns Processing</option>' +
+                                '<option value="qc"' + (line.service_type === 'qc' ? ' selected' : '') + '>Quality Inspection</option>' +
+                                '<option value="lottrack"' + (line.service_type === 'lottrack' ? ' selected' : '') + '>Lot Tracking</option>' +
+                                '<option value="tempmon"' + (line.service_type === 'tempmon' ? ' selected' : '') + '>Temp Monitoring</option>' +
+                                '<option value="datecode"' + (line.service_type === 'datecode' ? ' selected' : '') + '>Date Coding</option>' +
+                            '</select></div>' +
+                            '<div class="cm-field-group"><label class="cm-field-label">Rate ($/unit)</label>' + self._cmInp('number', line.rate, idx, 'vasLines', 'rate', {w:'100%', ph:'$/unit'}) + '</div>' +
+                            '<div class="cm-field-group"><label class="cm-field-label">UOM</label>' + self._cmInp('text', line.uom, idx, 'vasLines', 'uom', {w:'100%', ph:'UOM'}) + '</div>' +
+                            '<div class="cm-field-group"><label class="cm-field-label">Volume</label>' + self._cmInp('number', line.volume, idx, 'vasLines', 'volume', {w:'100%', step:'1', ph:'Volume'}) + '</div>' +
+                            '<div class="cm-field-group"><label class="cm-field-label">UPH</label>' + self._cmInp('number', line.uph, idx, 'vasLines', 'uph', {w:'100%', step:'1', ph:'Units/hour'}) + '</div>' +
+                            '<div class="cm-field-group"><label class="cm-field-label">Labor Rate ($/hr)</label>' + self._cmInp('number', line.labor_rate, idx, 'vasLines', 'labor_rate', {w:'100%', ph:'$/hr'}) + '</div>' +
+                            '<div class="cm-field-group"><label class="cm-field-label">Material ($/unit)</label>' + self._cmInp('number', line.material_cost, idx, 'vasLines', 'material_cost', {w:'100%', ph:'$/unit'}) + '</div>' +
+                            '<div class="cm-field-group"><label class="cm-field-label">Space (SF)</label>' + self._cmInp('number', line.space_sf, idx, 'vasLines', 'space_sf', {w:'100%', step:'1', ph:'SF'}) + '</div>' +
+                            '<div class="cm-field-group"><label class="cm-field-label">Bucket</label>' + self.bucketSelectHtml('vas', idx, line.pricing_bucket) + '</div>' +
+                        '</div>' +
+                        '<div style="margin-top:10px;padding:8px 12px;background:#f8f9fb;border-radius:6px;font-size:11px;display:flex;gap:20px;color:var(--ies-gray-600);">' +
+                            '<span>Labor: $' + laborCost.toLocaleString('en-US', {maximumFractionDigits:0}) + '</span>' +
+                            '<span>Material: $' + materialCost.toLocaleString('en-US', {maximumFractionDigits:0}) + '</span>' +
+                            '<span>Space: $' + spaceCost.toLocaleString('en-US', {maximumFractionDigits:0}) + '</span>' +
+                            '<span style="font-weight:700;">Total: $' + totalLineCost.toLocaleString('en-US', {maximumFractionDigits:0}) + '/yr</span>' +
+                        '</div>';
+                }
+                container.appendChild(card);
+            });
+        }
+        var vasTotal = this.calculateVasCost();
+        var vasEl = document.getElementById('totalVasCost');
         if (vasEl) vasEl.textContent = '$' + vasTotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    },
+
+    toggleVasCard(idx) {
+        var line = this.projectData.vasLines[idx];
+        if (line) { line._expanded = !line._expanded; }
+        this.renderVasTable();
+    },
+
+    autoGenerateVas() {
+        var env = (document.getElementById('environment').value || 'ambient').toLowerCase();
+        var lines = [];
+        if (env === 'cold' || env === 'frozen' || env === 'cooler' || env === 'freezer') {
+            lines = [
+                { service_name: 'Lot Tracking', service_type: 'lottrack', rate: 0.05, uom: 'each', volume: 0, uph: 120, labor_rate: 18, material_cost: 0, space_sf: 0 },
+                { service_name: 'Temp Monitoring', service_type: 'tempmon', rate: 0.08, uom: 'pallet', volume: 0, uph: 60, labor_rate: 18, material_cost: 0.02, space_sf: 0 },
+                { service_name: 'Date Coding', service_type: 'datecode', rate: 0.04, uom: 'each', volume: 0, uph: 200, labor_rate: 17, material_cost: 0.01, space_sf: 0 }
+            ];
+        } else {
+            lines = [
+                { service_name: 'Labeling / Relabeling', service_type: 'labeling', rate: 0.12, uom: 'each', volume: 0, uph: 150, labor_rate: 17, material_cost: 0.03, space_sf: 200 },
+                { service_name: 'Quality Inspection', service_type: 'qc', rate: 0.25, uom: 'each', volume: 0, uph: 80, labor_rate: 19, material_cost: 0, space_sf: 100 },
+                { service_name: 'Returns Processing', service_type: 'returns', rate: 1.50, uom: 'each', volume: 0, uph: 20, labor_rate: 18, material_cost: 0.10, space_sf: 300 },
+                { service_name: 'Gift Wrap', service_type: 'giftwrap', rate: 2.00, uom: 'each', volume: 0, uph: 30, labor_rate: 17, material_cost: 0.75, space_sf: 150 }
+            ];
+        }
+        // Don't overwrite manual lines
+        if (this.projectData.vasLines.some(function(l) { return l.source === 'manual'; })) return;
+        lines.forEach(function(l) { l.source = 'auto'; l._expanded = false; });
+        this.projectData.vasLines = lines;
+        this.renderVasTable();
+        this.markChanged();
     },
 
     // =====================================================================
@@ -3851,12 +4174,15 @@ const cmApp = {
         const otPct = this.getOvertimePct();
         const benefitLoad = this.getBenefitLoadPct();
         const bonusPct = this.getBonusPct();
+        var shift2Prem = (parseFloat(document.getElementById('shift2Premium').value) || 0) / 100;
+        var shift3Prem = (parseFloat(document.getElementById('shift3Premium').value) || 0) / 100;
         let cost = 0;
         this.projectData.laborLines.forEach(line => {
             const hours = line.annual_hours || 0;
             const rate = line.hourly_rate || 0;
             const burden = line.burden_pct != null ? (line.burden_pct / 100) : benefitLoad;
-            const effectiveRate = rate * (1 + burden) * (1 + otPct * 0.5);
+            var shiftPrem = line.shift_num === 3 ? shift3Prem : (line.shift_num === 2 ? shift2Prem : 0);
+            const effectiveRate = rate * (1 + shiftPrem) * (1 + burden) * (1 + otPct * 0.5);
             cost += hours * effectiveRate;
         });
         this.projectData.indirectLaborLines.forEach(line => {
@@ -3889,8 +4215,16 @@ const cmApp = {
     calculateEquipmentCost() {
         let cost = 0;
         this.projectData.equipmentLines.forEach(line => {
-            const monthly = (line.monthly_cost || 0) + (line.monthly_maintenance || 0);
-            cost += (monthly * 12) + (line.acquisition_cost || 0);
+            var ownType = line.ownership_type || line.acquisition_type || 'lease';
+            if (ownType === 'purchase') {
+                var amortYrs = line.amort_years || 5;
+                var acqCost = line.acquisition_cost || 0;
+                var maintPct = line.maintenance_pct || 0.10;
+                cost += ((acqCost / amortYrs) + (acqCost * maintPct)) * (line.quantity || 1);
+            } else {
+                var monthly = ((line.monthly_cost || 0) + (line.monthly_maintenance || 0)) * (line.quantity || 1);
+                cost += monthly * 12;
+            }
         });
         return cost;
     },
@@ -3910,7 +4244,8 @@ const cmApp = {
     calculateVasCost() {
         let cost = 0;
         this.projectData.vasLines.forEach(line => {
-            cost += (line.rate || 0) * (line.volume || 0);
+            // Use computed total_cost if available (from renderVasTable breakdown), else fallback
+            cost += line.total_cost || ((line.rate || 0) * (line.volume || 0));
         });
         return cost;
     },
@@ -4153,9 +4488,16 @@ const cmApp = {
     addVasRow() {
         this.projectData.vasLines.push({
             service_name: '',
+            service_type: 'custom',
             rate: 0,
-            uom: '',
-            volume: 0
+            uom: 'each',
+            volume: 0,
+            uph: 0,
+            labor_rate: 0,
+            material_cost: 0,
+            space_sf: 0,
+            source: 'manual',
+            _expanded: true
         });
         this.renderVasTable();
     },
@@ -4559,6 +4901,9 @@ const cmApp = {
                 hours_per_shift: parseFloat(document.getElementById('hoursPerShift').value) || 8,
                 days_per_week: parseFloat(document.getElementById('daysPerWeek').value) || 5,
                 operating_weeks_per_year: parseFloat(document.getElementById('weeksPerYear').value) || 52,
+                shift_2_premium: (parseFloat(document.getElementById('shift2Premium').value) || 0) / 100,
+                shift_3_premium: (parseFloat(document.getElementById('shift3Premium').value) || 0) / 100,
+                absence_allowance_pct: (parseFloat(document.getElementById('absenceAllowance').value) || 0) / 100,
                 target_margin_pct: parseFloat(document.getElementById('targetMargin').value) || 0,
                 contract_term_years: parseFloat(document.getElementById('contractTerm').value) || 1,
                 annual_volume_growth_pct: parseFloat(document.getElementById('volumeGrowth').value) || 0,
@@ -4571,6 +4916,7 @@ const cmApp = {
                 ramp_weeks_low: parseInt(document.getElementById('rampWeeksLow').value) || 2,
                 ramp_weeks_med: parseInt(document.getElementById('rampWeeksMed').value) || 4,
                 ramp_weeks_high: parseInt(document.getElementById('rampWeeksHigh').value) || 8,
+                facility_rate_overrides: JSON.stringify(this.projectData.facilityRateOverrides || {}),
                 seasonality_profile: JSON.stringify(this.getSeasonalityProfile()),
                 total_annual_cost: this.calculateLaborCost() + this.calculateFacilityCost() +
                                   this.calculateEquipmentCost() + this.calculateOverheadCost() +

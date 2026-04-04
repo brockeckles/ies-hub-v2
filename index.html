@@ -7138,6 +7138,31 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
           </div>
         </div>
 
+        <!-- B5: Supplier/Origin Points -->
+        <div style="margin-top:20px;">
+          <div style="margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;">
+            <label class="wsc-input-label" style="margin:0;">Supplier / Origin Points (Inbound)</label>
+            <button onclick="netoptAddSupplier()" style="padding:8px 14px;border:1.5px solid #10b981;border-radius:6px;background:rgba(16,185,129,.06);color:#059669;font-weight:600;font-size:12px;cursor:pointer;">+ Add Supplier</button>
+          </div>
+          <div style="overflow-x:auto;background:#fff;border-radius:8px;border:1px solid var(--ies-gray-200);">
+            <table style="width:100%;border-collapse:collapse;font-size:12px;">
+              <thead style="background:#f0fdf4;border-bottom:1px solid var(--ies-gray-200);">
+                <tr>
+                  <th style="padding:12px 16px;text-align:left;font-weight:700;color:var(--ies-navy);">Supplier / Port City</th>
+                  <th style="padding:12px 16px;text-align:right;font-weight:700;color:var(--ies-navy);">Inbound Volume (K units/yr)</th>
+                  <th style="padding:12px 16px;text-align:center;font-weight:700;color:var(--ies-navy);">Mode</th>
+                  <th style="padding:12px 16px;text-align:center;font-weight:700;color:var(--ies-navy);">Action</th>
+                </tr>
+              </thead>
+              <tbody id="netopt-suppliers-tbody">
+                <!-- Populated by JS -->
+              </tbody>
+            </table>
+          </div>
+          <div style="font-size:10px;color:var(--ies-gray-400);margin-top:4px;">Inbound transport shifts optimal DC locations toward suppliers. Leave empty for outbound-only optimization.</div>
+        </div>
+        </div>
+
         <!-- TAB: TRANSPORTATION -->
         <div id="netopt-tab-transportation" class="netopt-tab-content" style="display:none;">
 
@@ -7580,24 +7605,27 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
               </div>
             </div>
 
-            <!-- Scenario Comparison -->
+            <!-- B3: Enhanced Multi-Scenario Comparison Table -->
             <div style="background:#fff;border-radius:12px;border:1px solid var(--ies-gray-200);box-shadow:var(--shadow-md);overflow:hidden;">
               <div style="padding:12px 16px 8px;border-bottom:1px solid var(--ies-gray-100);">
-                <div style="font-size:11px;font-weight:700;color:var(--ies-navy);text-transform:uppercase;letter-spacing:.6px;">Scenario Comparison (1 through N DCs)</div>
+                <div style="font-size:11px;font-weight:700;color:var(--ies-navy);text-transform:uppercase;letter-spacing:.6px;">Multi-Scenario Comparison</div>
+                <div style="font-size:10px;color:var(--ies-gray-500);margin-top:2px;">Click any column to load that scenario's full results</div>
               </div>
-              <div style="overflow-x:auto;">
+              <div style="overflow-x:auto;" id="netopt-comparison-container">
+                <!-- B3: Side-by-side comparison table populated by JS -->
                 <table style="width:100%;border-collapse:collapse;font-size:11px;">
                   <thead style="background:#f8f9fb;border-bottom:1px solid var(--ies-gray-200);">
                     <tr>
                       <th style="padding:10px 14px;text-align:left;font-weight:700;color:var(--ies-navy);"># DCs</th>
                       <th style="padding:10px 14px;text-align:left;font-weight:700;color:var(--ies-navy);">Facilities</th>
                       <th style="padding:10px 14px;text-align:right;font-weight:700;color:var(--ies-navy);">Total Cost ($M)</th>
+                      <th style="padding:10px 14px;text-align:right;font-weight:700;color:var(--ies-navy);">Fixed ($M)</th>
+                      <th style="padding:10px 14px;text-align:right;font-weight:700;color:var(--ies-navy);">Transport ($M)</th>
+                      <th style="padding:10px 14px;text-align:right;font-weight:700;color:var(--ies-navy);">Avg Dist (mi)</th>
+                      <th style="padding:10px 14px;text-align:right;font-weight:700;color:var(--ies-navy);">Service %</th>
                       <th style="padding:10px 14px;text-align:right;font-weight:700;color:var(--ies-navy);">Avg Days</th>
-                      <th style="padding:10px 14px;text-align:right;font-weight:700;color:var(--ies-navy);">1-Day %</th>
-                      <th style="padding:10px 14px;text-align:right;font-weight:700;color:var(--ies-navy);">2-Day %</th>
-                      <th style="padding:10px 14px;text-align:right;font-weight:700;color:var(--ies-navy);">3-Day %</th>
-                      <th style="padding:10px 14px;text-align:right;font-weight:700;color:var(--ies-navy);">4-Day %</th>
-                      <th style="padding:10px 14px;text-align:right;font-weight:700;color:var(--ies-navy);">5+ Day %</th>
+                      <th style="padding:10px 14px;text-align:right;font-weight:700;color:var(--ies-navy);">&#916; Cost</th>
+                      <th style="padding:10px 14px;text-align:center;font-weight:700;color:var(--ies-navy);">Feasible</th>
                       <th style="padding:10px 14px;text-align:center;font-weight:700;color:var(--ies-navy);">Verdict</th>
                     </tr>
                   </thead>
@@ -8331,6 +8359,12 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
                     <span class="cm-text-orange" id="warehousingSpace">0</span>
                 </div>
             </div>
+
+            <!-- A1: Facility Cost Breakdown Card -->
+            <div class="cm-card" id="facilityCostCard" style="border-left:3px solid #10b981;">
+                <div class="cm-card-title">Facility Cost Breakdown</div>
+                <div style="font-size:12px;color:var(--ies-gray-500);padding:8px 0;">Enter square footage above to see cost breakdown.</div>
+            </div>
         </div>
 
         <!-- Shift Structure Section -->
@@ -8357,6 +8391,28 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
                 </div>
             </div>
 
+            <!-- A2: Shift Differentials & Absence -->
+            <div class="cm-card">
+                <div class="cm-card-title">Shift Premiums &amp; Absence</div>
+                <div class="cm-input-grid cols-3">
+                    <div class="cm-field-group">
+                        <label class="cm-field-label">2nd Shift Premium (%)</label>
+                        <input type="number" id="shift2Premium" class="cm-input" placeholder="10" min="0" max="100" step="1" style="max-width:100px;">
+                        <span class="cm-field-help">Added to base rate for evening shift</span>
+                    </div>
+                    <div class="cm-field-group">
+                        <label class="cm-field-label">3rd Shift Premium (%)</label>
+                        <input type="number" id="shift3Premium" class="cm-input" placeholder="15" min="0" max="100" step="1" style="max-width:100px;">
+                        <span class="cm-field-help">Added to base rate for night shift</span>
+                    </div>
+                    <div class="cm-field-group">
+                        <label class="cm-field-label">Absence Allowance (%)</label>
+                        <input type="number" id="absenceAllowance" class="cm-input" placeholder="12" min="0" max="50" step="1" style="max-width:100px;">
+                        <span class="cm-field-help">PTO, sick, training — increases FTE need</span>
+                    </div>
+                </div>
+            </div>
+
             <div class="cm-card">
                 <div class="cm-card-title">Calculated</div>
                 <div class="cm-field-group cm-flex-between">
@@ -8370,6 +8426,10 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
                 <div class="cm-field-group cm-flex-between">
                     <span>Total Available Labor Hours</span>
                     <span class="cm-text-orange" id="totalAvailableHours">0</span>
+                </div>
+                <div class="cm-field-group cm-flex-between">
+                    <span>Effective Hours per FTE (after absence)</span>
+                    <span class="cm-text-orange" id="effectiveHoursPerFte">0</span>
                 </div>
             </div>
         </div>
@@ -8401,6 +8461,9 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
                             <th>Complexity</th>
                             <th style="text-align:right;">Annual Hours</th>
                             <th style="text-align:right;">FTEs</th>
+                            <th style="text-align:center;">Shift</th>
+                            <th style="text-align:right;">Diff %</th>
+                            <th style="text-align:right;">Adj Rate</th>
                             <th>MHE</th>
                             <th>IT Equipment</th>
                             <th style="text-align:right;">Hourly Rate</th>
@@ -8468,6 +8531,13 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
         <!-- Equipment Section -->
         <div class="cm-section" id="equipmentSection">
             <h2 class="cm-section-title">Equipment</h2>
+
+            <!-- A3: Equipment Summary Card -->
+            <div class="cm-card" id="equipmentSummaryCard" style="border-left:3px solid var(--ies-blue);">
+                <div class="cm-card-title">Equipment Summary</div>
+                <div style="font-size:12px;color:var(--ies-gray-500);">Add equipment below to see summary.</div>
+            </div>
+
             <div class="cm-card">
                 <table class="cm-table">
                     <thead>
@@ -8475,9 +8545,10 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
                             <th>Equipment</th>
                             <th>Category</th>
                             <th style="text-align:right;">Qty</th>
-                            <th>Acquisition</th>
+                            <th>Ownership</th>
                             <th style="text-align:right;">Monthly/Unit</th>
                             <th style="text-align:right;">Maint/Unit</th>
+                            <th style="text-align:right;">Acq Cost</th>
                             <th style="text-align:right;">Amort (yrs)</th>
                             <th style="text-align:right;">Annual Cost</th>
                             <th>Driven By</th>
@@ -8494,10 +8565,9 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
             </div>
 
             <div class="cm-card">
-                <div class="cm-card-title">Equipment Summary</div>
-                <div class="cm-field-group cm-flex-between" style="padding-top: 12px; border-top: 1px solid var(--gray-100);">
-                    <span style="font-weight: 700;">Total Equipment Cost</span>
-                    <span class="cm-text-orange" id="totalEquipmentCost">$0.00</span>
+                <div class="cm-field-group cm-flex-between">
+                    <span style="font-weight: 700;">Total Annual Equipment Cost</span>
+                    <span class="cm-text-orange" id="totalEquipmentCost" style="font-size:16px;font-weight:700;">$0.00</span>
                 </div>
             </div>
         </div>
@@ -8536,38 +8606,25 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
             </div>
         </div>
 
-        <!-- VAS Section -->
+        <!-- A4: VAS Full Costing Section -->
         <div class="cm-section" id="vasSection">
             <h2 class="cm-section-title">Value-Added Services (VAS)</h2>
-            <div class="cm-card">
-                <table class="cm-table">
-                    <thead>
-                        <tr>
-                            <th>Service</th>
-                            <th style="text-align:right;">Rate/Unit</th>
-                            <th>UOM</th>
-                            <th style="text-align:right;">Volume</th>
-                            <th style="text-align:right;">Annual Cost</th>
-                            <th>Bucket</th>
-                            <th style="text-align:center;">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody id="vasTable">
-                    </tbody>
-                </table>
-                <div id="vasEmptyHint" style="padding:16px;text-align:center;color:var(--ies-gray-400);font-size:12px;line-height:1.6;">
-                    Common 3PL VAS items: kitting/assembly, labeling/relabeling, gift wrapping, shrink wrapping, quality inspection, serial number capture, returns processing, custom packaging, embroidery/monogramming, product testing.
-                </div>
-                <div class="cm-mt-16">
+
+            <!-- VAS Actions Bar -->
+            <div class="cm-card" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+                <div style="display:flex;gap:8px;">
                     <button class="cm-btn cm-btn-secondary" onclick="cmApp.addVasRow()">+ Add Service</button>
+                    <button class="cm-btn cm-btn-secondary" onclick="cmApp.autoGenerateVas()" style="border-color:#10b981;color:#059669;">Auto-Generate Common VAS</button>
+                </div>
+                <div style="font-size:12px;color:var(--ies-gray-500);">
+                    Total: <span id="totalVasCost" style="font-weight:700;color:var(--ies-navy);font-size:14px;">$0.00</span>/yr
                 </div>
             </div>
 
-            <div class="cm-card">
-                <div class="cm-card-title">VAS Summary</div>
-                <div class="cm-field-group cm-flex-between" style="padding-top: 12px; border-top: 1px solid var(--gray-100);">
-                    <span style="font-weight: 700;">Total VAS Cost</span>
-                    <span class="cm-text-orange" id="totalVasCost">$0.00</span>
+            <!-- VAS Cards Container -->
+            <div id="vasCardsContainer">
+                <div id="vasEmptyHint" style="padding:24px;text-align:center;color:var(--ies-gray-400);font-size:12px;line-height:1.6;">
+                    Add VAS services above or use Auto-Generate to seed common services for your environment type.
                 </div>
             </div>
         </div>
@@ -10617,7 +10674,7 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
 <!-- Design Tools: landing pages, scenario management, section tours -->
 <script src="js/design-tools.js"></script>
 <!-- Network Optimization: COG, enterprise optimizer, warehouse sizing -->
-<script src="js/network-opt.js?v=20260403"></script>
+<script src="js/network-opt.js?v=20260403p1"></script>
 <!-- Change Management: ADKAR initiatives, activities, flowcharts -->
 <script src="js/change-management.js"></script>
 <!-- Analytics: session tracking, dashboard -->
@@ -10625,7 +10682,7 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
 <!-- Feedback: idea submission, voting -->
 <script src="js/feedback.js"></script>
 <!-- Cost Model Builder: cmApp, dealApp, financial modeling -->
-<script src="js/cost-model.js?v=20260403b"></script>
+<script src="js/cost-model.js?v=20260403p1"></script>
 <!-- Fleet Modeler: fmApp, lane optimization -->
 <script src="js/fleet-modeler.js"></script>
 <!-- MOST Labor Standards: template library, analysis -->
