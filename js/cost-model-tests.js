@@ -106,15 +106,14 @@ var cmTests = {
         }
     },
 
-    _ensureVasRow: function() {
+    _ensureVasRow: async function() {
         if (cmApp.projectData.vasLines.length === 0) {
             cmApp.addVasRow();
         }
-        // Ensure first card is expanded for input access
-        if (cmApp.projectData.vasLines[0] && !cmApp.projectData.vasLines[0]._expanded) {
-            cmApp.projectData.vasLines[0]._expanded = true;
-            cmApp.renderVasTable();
-        }
+        // Always expand first card and re-render (state restore may have collapsed it)
+        cmApp.projectData.vasLines[0]._expanded = true;
+        cmApp.renderVasTable();
+        await this._wait(50); // let DOM settle after card expansion
     },
 
     _ensureStartupRow: function() {
@@ -190,7 +189,7 @@ var cmTests = {
     },
 
     testVasFocus: async function() {
-        this._ensureVasRow();
+        await this._ensureVasRow();
         // VAS uses cards in #vasCardsContainer, not a table tbody
         var container = document.getElementById('vasCardsContainer');
         if (!container) { this.fail('vas-focus', 'vasCardsContainer not found'); return; }
@@ -387,12 +386,12 @@ var cmTests = {
     testStartupAmortAccuracy: async function() {
         this._restoreState();
         this._ensureStartupRow();
+        var contractYears = parseFloat((document.getElementById('contractTermYears') || document.getElementById('contractTerm') || {}).value) || 3;
         var line = cmApp.projectData.startupLines[0];
         line.one_time_cost = 60000;
+        line.annual_amort = 60000 / contractYears;
+        line.monthly_amort = line.annual_amort / 12;
         cmApp._updateLine('startupLines', 0, 'one_time_cost', '60000', 'number');
-
-        // Read contractYears from the DOM AFTER _updateLine has run
-        var contractYears = parseFloat((document.getElementById('contractTermYears') || document.getElementById('contractTerm') || {}).value) || 5;
 
         var yrCell = document.getElementById('startup-yr-0');
         if (!yrCell) { this.fail('startup-amort-accuracy', 'Cell not found'); return; }
