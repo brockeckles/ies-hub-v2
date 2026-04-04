@@ -1231,6 +1231,11 @@ const cmApp = {
     renderFacilityCostCard() {
         var card = document.getElementById('facilityCostCard');
         if (!card) return;
+        // Preserve overrides panel open state across re-renders
+        var panelWasOpen = false;
+        var existingPanel = document.getElementById('facilityOverridesPanel');
+        if (existingPanel && existingPanel.style.display !== 'none') panelWasOpen = true;
+
         var sqft = parseFloat(document.getElementById('totalSqft').value) || 0;
         if (sqft <= 0) {
             card.innerHTML = '<div class="cm-card-title">Facility Cost Breakdown</div>' +
@@ -1299,7 +1304,7 @@ const cmApp = {
             '<div style="margin-top:8px;">' +
                 '<button class="cm-btn-small" onclick="cmApp.toggleFacilityOverrides()" style="font-size:11px;">Edit Rate Overrides</button>' +
             '</div>' +
-            '<div id="facilityOverridesPanel" style="display:none;margin-top:8px;padding:10px;background:#f8f9fb;border-radius:6px;font-size:12px;">' +
+            '<div id="facilityOverridesPanel" style="display:' + (panelWasOpen ? 'block' : 'none') + ';margin-top:8px;padding:10px;background:#f8f9fb;border-radius:6px;font-size:12px;">' +
                 '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">' +
                     this._facilityOverrideField('Lease $/SF/yr', 'lease', leaseRate) +
                     this._facilityOverrideField('CAM $/SF/yr', 'cam', camRate) +
@@ -1318,9 +1323,9 @@ const cmApp = {
         var ov = this.projectData.facilityRateOverrides || {};
         var isSet = ov[key] != null;
         return '<div><label style="font-size:10px;color:var(--ies-gray-500);">' + esc(label) + '</label>' +
-            '<input type="number" step="0.01" value="' + (isSet ? ov[key] : currentVal) + '" ' +
+            '<input type="number" step="0.01" id="facilityOverride_' + key + '" value="' + (isSet ? ov[key] : currentVal) + '" ' +
             'style="width:100%;font-size:12px;padding:4px 6px;border:1px solid ' + (isSet ? '#f59e0b' : 'var(--ies-gray-200)') + ';border-radius:4px;" ' +
-            'onchange="cmApp.updateFacilityOverride(\'' + key + '\',this.value)"></div>';
+            'oninput="cmApp.updateFacilityOverride(\'' + key + '\',this.value)"></div>';
     },
 
     toggleFacilityOverrides() {
@@ -1338,6 +1343,9 @@ const cmApp = {
             this.projectData.facilityRateOverrides[key] = isNaN(num) ? null : num;
         }
         this.renderFacilityCostCard();
+        // Restore focus to the input that was just edited
+        var inp = document.getElementById('facilityOverride_' + key);
+        if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
         this.markChanged();
     },
 
