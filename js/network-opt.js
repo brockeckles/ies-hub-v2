@@ -6604,16 +6604,16 @@ function wscUseInCostModel() {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// WAREHOUSE SIZING — 3D VIEW (Three.js r128)
+// WAREHOUSE SIZING — 3D VIEW (Three.js r128) + ELEVATION VIEW
 // ═══════════════════════════════════════════════════════════════════
 
-var wsc3dMode = false;
+var wscViewMode = '2d'; // '2d', '3d', 'elevation'
 var wsc3dScene = null;
 var wsc3dCamera = null;
 var wsc3dRenderer = null;
 var wsc3dAnimationId = null;
-var wsc3dCameraTheta = Math.PI / 4;   // horizontal orbit angle
-var wsc3dCameraPhi = Math.PI / 5;     // vertical tilt
+var wsc3dCameraTheta = Math.PI / 4;
+var wsc3dCameraPhi = Math.PI / 5;
 var wsc3dCameraDist = 600;
 var wsc3dCameraTarget = null;
 var wsc3dMouseDown = false;
@@ -6626,26 +6626,46 @@ function _initWsc3dTarget() {
   }
 }
 
-function toggleWsc3DView() {
-  wsc3dMode = !wsc3dMode;
+// ── 3-way view switcher ──
+function wscSetView(mode) {
+  wscViewMode = mode;
   var svgEl = document.getElementById('wsc-layout-svg');
-  var container = document.getElementById('wsc-3d-container');
-  var btn = document.getElementById('wsc-3d-toggle');
-  if (!svgEl || !container) return;
+  var container3d = document.getElementById('wsc-3d-container');
+  var containerElev = document.getElementById('wsc-elevation-container');
+  var btn2d = document.getElementById('wsc-view-2d');
+  var btn3d = document.getElementById('wsc-view-3d');
+  var btnElev = document.getElementById('wsc-view-elev');
+  if (!svgEl || !container3d) return;
 
-  if (wsc3dMode) {
-    svgEl.style.display = 'none';
-    container.style.display = 'block';
-    if (btn) { btn.textContent = '2D View'; btn.style.background = 'rgba(59,130,246,.3)'; btn.style.borderColor = 'rgba(59,130,246,.5)'; }
+  // Hide all
+  svgEl.style.display = 'none';
+  container3d.style.display = 'none';
+  if (containerElev) containerElev.style.display = 'none';
+  dispose3DView();
+
+  // Reset button styles
+  var activeStyle = 'background:rgba(59,130,246,.3);color:#93c5fd;font-weight:600;';
+  var inactiveStyle = 'background:rgba(255,255,255,.06);color:rgba(255,255,255,.5);font-weight:400;';
+  [btn2d, btn3d, btnElev].forEach(function(b) { if (b) b.style.cssText += inactiveStyle; });
+
+  if (mode === '3d') {
+    container3d.style.display = 'block';
+    if (btn3d) btn3d.style.cssText += activeStyle;
     var p = wscLastLayoutParams;
     if (p) render3DLayout(p);
+  } else if (mode === 'elevation') {
+    if (containerElev) containerElev.style.display = 'block';
+    if (btnElev) btnElev.style.cssText += activeStyle;
+    var p = wscLastLayoutParams;
+    if (p) renderElevationView(p);
   } else {
-    container.style.display = 'none';
     svgEl.style.display = 'block';
-    if (btn) { btn.textContent = '3D View'; btn.style.background = 'rgba(255,255,255,.1)'; btn.style.borderColor = 'rgba(255,255,255,.15)'; }
-    dispose3DView();
+    if (btn2d) btn2d.style.cssText += activeStyle;
   }
 }
+
+// Keep legacy toggle working
+function toggleWsc3DView() { wscSetView(wscViewMode === '3d' ? '2d' : '3d'); }
 
 function dispose3DView() {
   if (wsc3dAnimationId) { cancelAnimationFrame(wsc3dAnimationId); wsc3dAnimationId = null; }
@@ -6659,6 +6679,270 @@ function dispose3DView() {
   wsc3dCamera = null;
 }
 
+// ── Helper: create positioned mesh ──
+function _wsc3dMakeMesh(geo, mat, pos) {
+  var m = new THREE.Mesh(geo, mat);
+  if (pos) m.position.set(pos[0], pos[1], pos[2]);
+  m.castShadow = true;
+  m.receiveShadow = true;
+  return m;
+}
+
+// ── Pallet color picker ──
+function _wscPickPalletColor() {
+  var colors = [0xDEB887, 0xD2B48C, 0xF5DEB3, 0xFFE4C4, 0xC8A882, 0xE8D5B7];
+  return colors[Math.floor(Math.random() * colors.length)];
+}
+
+// ── Seeded random for deterministic pallet placement ──
+var _wsc3dSeed = 42;
+function _wsc3dRand() {
+  _wsc3dSeed = (_wsc3dSeed * 16807 + 0) % 2147483647;
+  return (_wsc3dSeed & 0x7fffffff) / 2147483647;
+}
+
+// ── Build rack row with uprights, beams, pallets ──
+function _wsc3dBuildRackRow(scene, x, z, length, rackLevels, clearHeight, direction, rackDepth) {
+  var bayWidth = 8;
+  var beamH = clearHeight / Math.max(rackLevels, 1);
+  var depth = rackDepth || 4;
+  var numBays = Math.max(1, Math.floor(length / bayWidth));
+
+  var uprightMat = new THREE.MeshStandardMaterial({ color: 0x4444cc, roughness: 0.5 });
+  var beamMat = new THREE.MeshStandardMaterial({ color: 0xff8800, roughness: 0.5 });
+
+  for (var bay = 0; bay < numBays; bay++) {
+    var bx = bay * bayWidth;
+    var uprightGeo = new THREE.BoxGeometry(0.3, clearHeight, 0.3);
+
+    // Two uprights per bay
+    for (var side = 0; side < 2; side++) {
+      var upright = new THREE.Mesh(uprightGeo, uprightMat);
+      if (direction === 'vertical') {
+        upright.position.set(x + side * depth, clearHeight / 2, z + bx);
+      } else {
+        upright.position.set(x + bx, clearHeight / 2, z + side * depth);
+      }
+      upright.castShadow = true;
+      scene.add(upright);
+    }
+
+    // Beams per level
+    for (var lvl = 1; lvl <= rackLevels; lvl++) {
+      var beamY = lvl * beamH;
+      var beamGeo;
+      if (direction === 'vertical') {
+        beamGeo = new THREE.BoxGeometry(depth, 0.2, 0.2);
+      } else {
+        beamGeo = new THREE.BoxGeometry(0.2, 0.2, depth);
+      }
+      // Front beam
+      var beam1 = new THREE.Mesh(beamGeo, beamMat);
+      if (direction === 'vertical') {
+        beam1.position.set(x + depth / 2, beamY, z + bx);
+      } else {
+        beam1.position.set(x + bx, beamY, z + depth / 2);
+      }
+      scene.add(beam1);
+      // Back beam
+      var beam2 = new THREE.Mesh(beamGeo, beamMat);
+      if (direction === 'vertical') {
+        beam2.position.set(x + depth / 2, beamY, z + bx + bayWidth);
+      } else {
+        beam2.position.set(x + bx + bayWidth, beamY, z + depth / 2);
+      }
+      scene.add(beam2);
+
+      // Pallets on this level (3 per bay)
+      var palletBottom = (lvl - 1) * beamH + 0.5;
+      for (var pp = 0; pp < 3; pp++) {
+        if (_wsc3dRand() < 0.85) {
+          var pColor = _wscPickPalletColor();
+          var pMat = new THREE.MeshStandardMaterial({ color: pColor, roughness: 0.7 });
+          var pH = beamH * 0.65;
+          var pGeo = new THREE.BoxGeometry(2.2, pH, Math.min(depth - 0.5, 3.2));
+          var pallet = new THREE.Mesh(pGeo, pMat);
+          if (direction === 'vertical') {
+            pallet.position.set(x + depth / 2, palletBottom + pH / 2, z + bx + 1.3 + pp * 2.5);
+          } else {
+            pallet.position.set(x + bx + 1.3 + pp * 2.5, palletBottom + pH / 2, z + depth / 2);
+          }
+          pallet.castShadow = true;
+          scene.add(pallet);
+        }
+      }
+    }
+  }
+}
+
+// ── Build dock door with frame, leveler, bumpers ──
+function _wsc3dBuildDockDoor(scene, x, z, facing) {
+  var frameMat = new THREE.MeshStandardMaterial({ color: 0x666666, roughness: 0.5 });
+  var levelerMat = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.3, roughness: 0.4 });
+  var bumperMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.8 });
+  var zDir = facing === 'top' ? -1 : 1;
+
+  // Top beam
+  scene.add(_wsc3dMakeMesh(new THREE.BoxGeometry(12, 1, 1), frameMat, [x, 14, z]));
+  // Side posts
+  scene.add(_wsc3dMakeMesh(new THREE.BoxGeometry(1, 14, 1), frameMat, [x - 5.5, 7, z]));
+  scene.add(_wsc3dMakeMesh(new THREE.BoxGeometry(1, 14, 1), frameMat, [x + 5.5, 7, z]));
+  // Dock leveler
+  scene.add(_wsc3dMakeMesh(new THREE.BoxGeometry(10, 0.3, 6), levelerMat, [x, 3.5, z + 3 * zDir]));
+  // Bumpers
+  scene.add(_wsc3dMakeMesh(new THREE.BoxGeometry(1, 2, 0.5), bumperMat, [x - 4, 3.5, z + 0.3 * zDir]));
+  scene.add(_wsc3dMakeMesh(new THREE.BoxGeometry(1, 2, 0.5), bumperMat, [x + 4, 3.5, z + 0.3 * zDir]));
+}
+
+// ── Build truck trailer ──
+function _wsc3dBuildTrailer(scene, x, z, facing) {
+  var bodyMat = new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.4 });
+  var wheelMat = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.8 });
+  var zDir = facing === 'top' ? 1 : -1;
+
+  var body = _wsc3dMakeMesh(new THREE.BoxGeometry(8, 12, 40), bodyMat, [x, 9, z + 25 * zDir]);
+  scene.add(body);
+
+  // Rear wheels
+  var wGeo = new THREE.CylinderGeometry(1.5, 1.5, 0.8, 8);
+  var w1 = new THREE.Mesh(wGeo, wheelMat);
+  w1.rotation.z = Math.PI / 2;
+  w1.position.set(x - 4.5, 1.5, z + 35 * zDir);
+  scene.add(w1);
+  var w2 = new THREE.Mesh(wGeo, wheelMat);
+  w2.rotation.z = Math.PI / 2;
+  w2.position.set(x + 4.5, 1.5, z + 35 * zDir);
+  scene.add(w2);
+}
+
+// ── Build forklift ──
+function _wsc3dBuildForklift(scene, x, z, rotation) {
+  var bodyMat = new THREE.MeshStandardMaterial({ color: 0xFFCC00, roughness: 0.4 });
+  var mastMat = new THREE.MeshStandardMaterial({ color: 0x444444, metalness: 0.4, roughness: 0.5 });
+  var forkMat = new THREE.MeshStandardMaterial({ color: 0x666666, metalness: 0.5, roughness: 0.4 });
+  var wheelMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.9 });
+
+  var group = new THREE.Group();
+  // Body
+  group.add(_wsc3dMakeMesh(new THREE.BoxGeometry(4, 3, 6), bodyMat, [0, 2.5, 0]));
+  // Mast
+  group.add(_wsc3dMakeMesh(new THREE.BoxGeometry(0.5, 10, 0.5), mastMat, [-1.5, 5, 3.5]));
+  group.add(_wsc3dMakeMesh(new THREE.BoxGeometry(0.5, 10, 0.5), mastMat, [1.5, 5, 3.5]));
+  // Forks
+  group.add(_wsc3dMakeMesh(new THREE.BoxGeometry(0.3, 0.2, 4), forkMat, [-0.8, 0.5, 5]));
+  group.add(_wsc3dMakeMesh(new THREE.BoxGeometry(0.3, 0.2, 4), forkMat, [0.8, 0.5, 5]));
+  // Counterweight
+  group.add(_wsc3dMakeMesh(new THREE.BoxGeometry(3.5, 2, 1.5), bodyMat, [0, 2, -3.5]));
+  // Wheels
+  var wGeo = new THREE.CylinderGeometry(0.8, 0.8, 0.5, 8);
+  var positions = [[-1.5, -2.5], [1.5, -2.5], [-1.5, 2], [1.5, 2]];
+  for (var wi = 0; wi < positions.length; wi++) {
+    var wheel = new THREE.Mesh(wGeo, wheelMat);
+    wheel.rotation.z = Math.PI / 2;
+    wheel.position.set(positions[wi][0], 0.8, positions[wi][1]);
+    group.add(wheel);
+  }
+
+  group.position.set(x, 0, z);
+  group.rotation.y = rotation || 0;
+  group.scale.set(0.8, 0.8, 0.8);
+  scene.add(group);
+}
+
+// ── Build staging area with floor pallets and safety lines ──
+function _wsc3dBuildStaging(scene, zoneX, zoneZ, zoneW, zoneH) {
+  // Safety lines (yellow perimeter)
+  var lineMat = new THREE.MeshStandardMaterial({ color: 0xFFCC00, roughness: 0.5 });
+  // Top line
+  scene.add(_wsc3dMakeMesh(new THREE.BoxGeometry(zoneW, 0.05, 0.3), lineMat, [zoneX + zoneW / 2, 0.15, zoneZ + 0.15]));
+  // Bottom line
+  scene.add(_wsc3dMakeMesh(new THREE.BoxGeometry(zoneW, 0.05, 0.3), lineMat, [zoneX + zoneW / 2, 0.15, zoneZ + zoneH - 0.15]));
+  // Left line
+  scene.add(_wsc3dMakeMesh(new THREE.BoxGeometry(0.3, 0.05, zoneH), lineMat, [zoneX + 0.15, 0.15, zoneZ + zoneH / 2]));
+  // Right line
+  scene.add(_wsc3dMakeMesh(new THREE.BoxGeometry(0.3, 0.05, zoneH), lineMat, [zoneX + zoneW - 0.15, 0.15, zoneZ + zoneH / 2]));
+
+  // Floor pallets
+  var palletGeo = new THREE.BoxGeometry(3.5, 3, 3.5);
+  var rows = Math.max(1, Math.floor(zoneH / 5));
+  var cols = Math.max(1, Math.floor(zoneW / 5));
+  for (var row = 0; row < rows; row++) {
+    for (var col = 0; col < cols; col++) {
+      if (_wsc3dRand() < 0.7) {
+        var pMat = new THREE.MeshStandardMaterial({ color: _wscPickPalletColor(), roughness: 0.7 });
+        var pallet = new THREE.Mesh(palletGeo, pMat);
+        pallet.position.set(zoneX + col * 5 + 2.5, 1.5, zoneZ + row * 5 + 2.5);
+        pallet.castShadow = true;
+        scene.add(pallet);
+      }
+    }
+  }
+}
+
+// ── Build office mezzanine ──
+function _wsc3dBuildOffice(scene, zoneX, zoneZ, zoneW, zoneH) {
+  var officeH = 10;
+  var officeMat = new THREE.MeshStandardMaterial({ color: 0xd0d0d8, roughness: 0.6 });
+  var glassMat = new THREE.MeshStandardMaterial({ color: 0x88ccee, transparent: true, opacity: 0.4, metalness: 0.1, roughness: 0.3 });
+  var roofMat = new THREE.MeshStandardMaterial({ color: 0xbbbbbb, roughness: 0.5 });
+
+  // 4 walls
+  scene.add(_wsc3dMakeMesh(new THREE.BoxGeometry(zoneW, officeH, 0.5), officeMat, [zoneX + zoneW / 2, officeH / 2, zoneZ]));
+  scene.add(_wsc3dMakeMesh(new THREE.BoxGeometry(zoneW, officeH, 0.5), officeMat, [zoneX + zoneW / 2, officeH / 2, zoneZ + zoneH]));
+  scene.add(_wsc3dMakeMesh(new THREE.BoxGeometry(0.5, officeH, zoneH), officeMat, [zoneX, officeH / 2, zoneZ + zoneH / 2]));
+  scene.add(_wsc3dMakeMesh(new THREE.BoxGeometry(0.5, officeH, zoneH), officeMat, [zoneX + zoneW, officeH / 2, zoneZ + zoneH / 2]));
+
+  // Windows along one wall (front)
+  var numWindows = Math.max(1, Math.floor(zoneW / 8));
+  var winSpacing = zoneW / (numWindows + 1);
+  for (var wi = 0; wi < numWindows; wi++) {
+    var wx = zoneX + winSpacing * (wi + 1);
+    scene.add(_wsc3dMakeMesh(new THREE.BoxGeometry(4, 4, 0.2), glassMat, [wx, 6, zoneZ - 0.3]));
+  }
+
+  // Roof
+  scene.add(_wsc3dMakeMesh(new THREE.BoxGeometry(zoneW, 0.5, zoneH), roofMat, [zoneX + zoneW / 2, officeH, zoneZ + zoneH / 2]));
+}
+
+// ── Build zone sign post ──
+function _wsc3dBuildSign(scene, text, x, z, color) {
+  var postMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.5 });
+  scene.add(_wsc3dMakeMesh(new THREE.CylinderGeometry(0.15, 0.15, 8, 6), postMat, [x, 4, z]));
+  var signColor = color || 0x333333;
+  var signMat = new THREE.MeshStandardMaterial({ color: signColor, roughness: 0.4 });
+  scene.add(_wsc3dMakeMesh(new THREE.BoxGeometry(6, 2, 0.2), signMat, [x, 8.5, z]));
+
+  // Text sprite on the sign
+  var sprite = wsc3dMakeTextSprite(text, 0xffffff);
+  sprite.position.set(x, 8.5, z + 0.2);
+  sprite.scale.set(8, 4, 1);
+  scene.add(sprite);
+}
+
+// ── Text sprite helper ──
+function wsc3dMakeTextSprite(text, color) {
+  var canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 128;
+  var ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, 256, 128);
+  ctx.font = 'bold 22px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#' + ('000000' + (color || 0xffffff).toString(16)).slice(-6);
+  var lines = text.split('\n');
+  for (var i = 0; i < lines.length; i++) {
+    ctx.fillText(lines[i], 128, 40 + i * 28);
+  }
+  var tex = new THREE.CanvasTexture(canvas);
+  tex.needsUpdate = true;
+  var mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
+  return new THREE.Sprite(mat);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// MAIN 3D RENDER FUNCTION
+// ═══════════════════════════════════════════════════════════════════
+
 function render3DLayout(p) {
   if (typeof THREE === 'undefined') { console.warn('Three.js not loaded'); return; }
   var container = document.getElementById('wsc-3d-container');
@@ -6666,6 +6950,7 @@ function render3DLayout(p) {
 
   dispose3DView();
   _initWsc3dTarget();
+  _wsc3dSeed = 42; // Reset deterministic random
 
   var cW = container.clientWidth || 800;
   var cH = container.clientHeight || 480;
@@ -6676,20 +6961,25 @@ function render3DLayout(p) {
   var bW = Math.max(dockFaceW, Math.ceil(Math.sqrt(p.totalSF * 2.2)));
   var bD = Math.max(100, Math.ceil(p.totalSF / bW));
   var clearH = p.clearHeightFt || 32;
-  var pad = 60; // SVG padding — zone coords offset by this
+  var pad = 60;
 
-  // ── Scene, camera, renderer ──
+  // ── Scene ──
   var scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x0f1623);
-  scene.fog = new THREE.Fog(0x0f1623, bW * 2, bW * 4);
+  scene.background = new THREE.Color(0x87CEEB); // Sky blue
 
+  // ── Camera ──
   var camera = new THREE.PerspectiveCamera(45, cW / cH, 1, bW * 10);
   wsc3dCameraDist = Math.max(bW, bD) * 1.4;
   wsc3dCameraTarget.set(bW / 2, clearH / 4, bD / 2);
 
-  var renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+  // ── Renderer with shadows ──
+  var renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
   renderer.setSize(cW, cH);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.2;
   container.appendChild(renderer.domElement);
 
   wsc3dScene = scene;
@@ -6697,51 +6987,60 @@ function render3DLayout(p) {
   wsc3dRenderer = renderer;
 
   // ── Lighting ──
-  var ambient = new THREE.AmbientLight(0xffffff, 0.5);
+  var ambient = new THREE.AmbientLight(0xffffff, 0.4);
   scene.add(ambient);
-  var dirLight = new THREE.DirectionalLight(0xffffff, 0.7);
-  dirLight.position.set(bW * 0.8, clearH * 3, -bD * 0.3);
+
+  var dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+  dirLight.position.set(bW * 0.6, clearH * 4, bD * 0.3);
+  dirLight.castShadow = true;
+  dirLight.shadow.mapSize.width = 2048;
+  dirLight.shadow.mapSize.height = 2048;
+  dirLight.shadow.camera.near = 1;
+  dirLight.shadow.camera.far = Math.max(bW, bD) * 6;
+  dirLight.shadow.camera.left = -bW;
+  dirLight.shadow.camera.right = bW;
+  dirLight.shadow.camera.top = bD;
+  dirLight.shadow.camera.bottom = -bD;
   scene.add(dirLight);
 
-  // ── Floor ──
-  var floorGeo = new THREE.BoxGeometry(bW, 0.5, bD);
-  var floorMat = new THREE.MeshLambertMaterial({ color: 0x1a2233 });
+  var fillLight = new THREE.DirectionalLight(0xffffff, 0.3);
+  fillLight.position.set(-bW * 0.5, clearH * 2, -bD * 0.3);
+  scene.add(fillLight);
+
+  // ── Floor (concrete) ──
+  var floorGeo = new THREE.PlaneGeometry(bW + 100, bD + 100);
+  var floorMat = new THREE.MeshStandardMaterial({ color: 0xd0d0d0, roughness: 0.8, metalness: 0.1 });
   var floor = new THREE.Mesh(floorGeo, floorMat);
-  floor.position.set(bW / 2, -0.25, bD / 2);
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.set(bW / 2, 0, bD / 2);
+  floor.receiveShadow = true;
   scene.add(floor);
 
-  // Floor grid
-  var gridHelper = new THREE.GridHelper(Math.max(bW, bD) * 1.2, Math.floor(Math.max(bW, bD) / 50), 0x2a3a4a, 0x1a2a3a);
-  gridHelper.position.set(bW / 2, 0.01, bD / 2);
+  // Grid
+  var gridHelper = new THREE.GridHelper(Math.max(bW, bD) + 100, 40, 0xbbbbbb, 0xcccccc);
+  gridHelper.position.set(bW / 2, 0.1, bD / 2);
   scene.add(gridHelper);
 
-  // ── Walls (semi-transparent) ──
-  var wallMat = new THREE.MeshLambertMaterial({ color: 0x3a4a5a, transparent: true, opacity: 0.15, side: THREE.DoubleSide });
-  var wallThick = 1;
-  // Front wall (z=0)
-  var wFront = new THREE.Mesh(new THREE.BoxGeometry(bW, clearH, wallThick), wallMat);
-  wFront.position.set(bW / 2, clearH / 2, 0); scene.add(wFront);
-  // Back wall (z=bD)
-  var wBack = new THREE.Mesh(new THREE.BoxGeometry(bW, clearH, wallThick), wallMat);
-  wBack.position.set(bW / 2, clearH / 2, bD); scene.add(wBack);
-  // Left wall (x=0)
-  var wLeft = new THREE.Mesh(new THREE.BoxGeometry(wallThick, clearH, bD), wallMat);
-  wLeft.position.set(0, clearH / 2, bD / 2); scene.add(wLeft);
-  // Right wall (x=bW)
-  var wRight = new THREE.Mesh(new THREE.BoxGeometry(wallThick, clearH, bD), wallMat);
-  wRight.position.set(bW, clearH / 2, bD / 2); scene.add(wRight);
+  // ── Walls (solid, light gray) ──
+  var wallMat = new THREE.MeshStandardMaterial({ color: 0xe8e8e8, roughness: 0.6, metalness: 0.05 });
+  var wallT = 2;
+  // Back wall
+  var wBack = _wsc3dMakeMesh(new THREE.BoxGeometry(bW, clearH, wallT), wallMat, [bW / 2, clearH / 2, 0]);
+  scene.add(wBack);
+  // Left wall
+  scene.add(_wsc3dMakeMesh(new THREE.BoxGeometry(wallT, clearH, bD), wallMat, [0, clearH / 2, bD / 2]));
+  // Right wall
+  scene.add(_wsc3dMakeMesh(new THREE.BoxGeometry(wallT, clearH, bD), wallMat, [bW, clearH / 2, bD / 2]));
+  // Front wall — full for now (dock door frames provide visual openings)
+  var wFront = _wsc3dMakeMesh(new THREE.BoxGeometry(bW, clearH, wallT), wallMat, [bW / 2, clearH / 2, bD]);
+  wFront.material = new THREE.MeshStandardMaterial({ color: 0xe8e8e8, roughness: 0.6, metalness: 0.05, transparent: true, opacity: 0.35 });
+  scene.add(wFront);
 
-  // ── Zone colors (3D hex values) ──
-  var zoneColors = {
-    'storage': 0x2563EB, 'recv': 0x10B981, 'ship': 0xF97316,
-    'office': 0x8B5CF6, 'dock-top': 0x0EA5E3, 'dock-bot': 0x0EA5E3, 'opt': 0xEC4899
-  };
-  var zoneHeights = {
-    'storage': clearH * 0.7, 'recv': 3, 'ship': 3,
-    'office': 10, 'dock-top': 4, 'dock-bot': 4, 'opt': 5
-  };
+  // ── Roof (subtle, semi-transparent) ──
+  var roofMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, transparent: true, opacity: 0.15, roughness: 0.5 });
+  scene.add(_wsc3dMakeMesh(new THREE.BoxGeometry(bW, 0.5, bD), roofMat, [bW / 2, clearH, bD / 2]));
 
-  // ── Read zone positions from SVG rects ──
+  // ── Read zone positions ──
   var zones = wscManualMode ? wscManualZones : wscAutoZones;
   if (!zones || Object.keys(zones).length === 0) {
     zones = {};
@@ -6760,12 +7059,22 @@ function render3DLayout(p) {
     }
   }
 
-  // ── Render zone blocks ──
+  // ── Zone colors for signs ──
+  var zoneSignColors = {
+    'storage': 0x2563EB, 'recv': 0x10B981, 'ship': 0xF97316,
+    'office': 0x8B5CF6, 'dock-top': 0x0EA5E3, 'dock-bot': 0x0EA5E3, 'opt': 0xEC4899
+  };
+
+  // ── Floor tinting for non-storage zones ──
+  var zoneTintColors = {
+    'recv': 0xd1fae5, 'ship': 0xffedd5, 'dock-top': 0xe0f2fe, 'dock-bot': 0xe0f2fe, 'opt': 0xfce7f3
+  };
+
+  // ── Render each zone ──
   Object.keys(zones).forEach(function(name) {
     var z = zones[name];
     if (!z || !z.w || !z.h) return;
 
-    // Convert SVG coords to 3D: SVG origin is top-left with pad offset
     var x3d = z.x - pad;
     var z3d = z.y - pad;
     var w3d = z.w;
@@ -6773,104 +7082,140 @@ function render3DLayout(p) {
 
     var colorKey = name;
     if (name.indexOf('opt') === 0) colorKey = 'opt';
-    var color = zoneColors[colorKey] || 0x888888;
-    var height = zoneHeights[colorKey] || 5;
 
-    var mat = new THREE.MeshLambertMaterial({ color: color, transparent: true, opacity: 0.65 });
-    var geo = new THREE.BoxGeometry(w3d, height, d3d);
-    var mesh = new THREE.Mesh(geo, mat);
-    mesh.position.set(x3d + w3d / 2, height / 2, z3d + d3d / 2);
-    scene.add(mesh);
-
-    // Edge wireframe
-    var edgeMat = new THREE.LineBasicMaterial({ color: color, transparent: true, opacity: 0.9 });
-    var edgeGeo = new THREE.EdgesGeometry(geo);
-    var edges = new THREE.LineSegments(edgeGeo, edgeMat);
-    edges.position.copy(mesh.position);
-    scene.add(edges);
-
-    // Sprite label
+    // Zone sign
     var label = name.replace('dock-top', 'DOCK (IN)').replace('dock-bot', 'DOCK (OUT)')
       .replace('recv', 'RECEIVING').replace('ship', 'SHIPPING').replace(/opt-\d/, 'OPTIONAL').toUpperCase();
     if (name === 'storage') label = 'STORAGE';
     if (name === 'office') label = 'OFFICE';
     var sf = Math.round(w3d * d3d);
-    var sprite = wsc3dMakeTextSprite(label + '\n' + sf.toLocaleString() + ' SF', color);
-    sprite.position.set(x3d + w3d / 2, height + 4, z3d + d3d / 2);
-    sprite.scale.set(Math.max(w3d * 0.6, 30), Math.max(w3d * 0.3, 15), 1);
-    scene.add(sprite);
+    _wsc3dBuildSign(scene, label + '\n' + sf.toLocaleString() + ' SF', x3d + w3d / 2, z3d + 2, zoneSignColors[colorKey] || 0x888888);
+
+    // Storage zone → rack structures
+    if (name === 'storage') {
+      var aisleW = p.aisleW || 10;
+      var rackDepth = (p.storeType === 'double') ? 8 : 4;
+      var rackLevels = p.rackLevels || 4;
+      var isVert = p.rackDir === 'vertical';
+
+      if (p.storeType === 'bulk') {
+        // Bulk storage — stacked pallets, no racks
+        var palletGeo = new THREE.BoxGeometry(3.5, 4, 3.5);
+        var stackHi = p.stackHi || 3;
+        var cols = Math.max(1, Math.floor(w3d / 5));
+        var rows = Math.max(1, Math.floor(d3d / 5));
+        for (var sr = 0; sr < rows; sr++) {
+          for (var sc = 0; sc < cols; sc++) {
+            if (_wsc3dRand() < 0.8) {
+              var layers = Math.ceil(_wsc3dRand() * stackHi);
+              for (var sl = 0; sl < layers; sl++) {
+                var pMat = new THREE.MeshStandardMaterial({ color: _wscPickPalletColor(), roughness: 0.7 });
+                var pal = new THREE.Mesh(palletGeo, pMat);
+                pal.position.set(x3d + sc * 5 + 2.5, sl * 4.5 + 2, z3d + sr * 5 + 2.5);
+                pal.castShadow = true;
+                scene.add(pal);
+              }
+            }
+          }
+        }
+      } else {
+        // Rack storage (single, double, mix, carton)
+        if (isVert) {
+          var step = aisleW + rackDepth;
+          var numRows = Math.max(1, Math.floor((w3d - aisleW) / step));
+          for (var rv = 0; rv < numRows; rv++) {
+            var rx = x3d + aisleW + rv * step;
+            _wsc3dBuildRackRow(scene, rx, z3d + 4, d3d - 8, rackLevels, clearH * 0.9, 'vertical', rackDepth);
+          }
+        } else {
+          var step = aisleW + rackDepth;
+          var numRows = Math.max(1, Math.floor((d3d - aisleW) / step));
+          for (var rh = 0; rh < numRows; rh++) {
+            var rz = z3d + aisleW + rh * step;
+            _wsc3dBuildRackRow(scene, x3d + 4, rz, w3d - 8, rackLevels, clearH * 0.9, 'horizontal', rackDepth);
+          }
+        }
+      }
+      return; // Skip generic floor tint for storage
+    }
+
+    // Recv/Ship staging zones → floor pallets + safety lines
+    if (name === 'recv' || name === 'ship') {
+      _wsc3dBuildStaging(scene, x3d, z3d, w3d, d3d);
+      return;
+    }
+
+    // Office → mezzanine with windows
+    if (name === 'office') {
+      _wsc3dBuildOffice(scene, x3d, z3d, w3d, d3d);
+      return;
+    }
+
+    // Dock and optional zones → floor tint
+    var tintColor = zoneTintColors[colorKey];
+    if (tintColor) {
+      var tintGeo = new THREE.PlaneGeometry(w3d, d3d);
+      var tintMat = new THREE.MeshStandardMaterial({ color: tintColor, roughness: 0.9, transparent: true, opacity: 0.5 });
+      var tint = new THREE.Mesh(tintGeo, tintMat);
+      tint.rotation.x = -Math.PI / 2;
+      tint.position.set(x3d + w3d / 2, 0.15, z3d + d3d / 2);
+      scene.add(tint);
+    }
   });
 
-  // ── Dock doors ──
+  // ── Dock doors with trucks ──
   var dockZone = zones['dock-bot'];
   if (dockZone) {
     var dX = dockZone.x - pad;
     var dZ = dockZone.y - pad;
     var dW = dockZone.w;
-    var doorW = 10, doorH = 12;
     var totalDoors = p.totalDoors || 10;
-    var spacing = dW / (totalDoors + 1);
-    var doorMat = new THREE.MeshLambertMaterial({ color: 0xF59E0B, transparent: true, opacity: 0.85 });
-    for (var d = 0; d < totalDoors; d++) {
-      var dx = dX + spacing * (d + 1);
-      var dGeo = new THREE.BoxGeometry(doorW, doorH, 2);
-      var door = new THREE.Mesh(dGeo, doorMat);
-      door.position.set(dx, doorH / 2, dZ + dockZone.h);
-      scene.add(door);
+    var doorCount = p.dockConfig === 'two' ? (p.outDoors || Math.ceil(totalDoors / 2)) : totalDoors;
+    var spacing = dW / (doorCount + 1);
+    for (var di = 0; di < doorCount; di++) {
+      var dx = dX + spacing * (di + 1);
+      _wsc3dBuildDockDoor(scene, dx, dZ + dockZone.h, 'bottom');
+      if (_wsc3dRand() < 0.6) {
+        _wsc3dBuildTrailer(scene, dx, dZ + dockZone.h, 'bottom');
+      }
     }
   }
-  // Top dock doors
+
   var dockTop = zones['dock-top'];
   if (dockTop) {
     var dtX = dockTop.x - pad;
     var dtZ = dockTop.y - pad;
     var dtW = dockTop.w;
-    var doors2 = p.inDoors || Math.ceil(p.totalDoors / 2);
+    var doors2 = p.inDoors || Math.ceil((p.totalDoors || 10) / 2);
     var spacing2 = dtW / (doors2 + 1);
-    var doorMat2 = new THREE.MeshLambertMaterial({ color: 0xF59E0B, transparent: true, opacity: 0.85 });
     for (var d2 = 0; d2 < doors2; d2++) {
       var dx2 = dtX + spacing2 * (d2 + 1);
-      var dGeo2 = new THREE.BoxGeometry(10, 12, 2);
-      var door2 = new THREE.Mesh(dGeo2, doorMat2);
-      door2.position.set(dx2, 6, dtZ);
-      scene.add(door2);
+      _wsc3dBuildDockDoor(scene, dx2, dtZ, 'top');
+      if (_wsc3dRand() < 0.6) {
+        _wsc3dBuildTrailer(scene, dx2, dtZ, 'top');
+      }
     }
   }
 
-  // ── Racking rows (inside storage zone) ──
-  var storageZone = zones['storage'];
-  if (storageZone && (p.storeType === 'single' || p.storeType === 'double' || p.storeType === 'mix')) {
-    var sX = storageZone.x - pad;
-    var sZ = storageZone.y - pad;
-    var sW = storageZone.w;
-    var sD = storageZone.h;
-    var rackH = clearH * 0.65;
-    var aisleW = p.aisleW || 10;
-    var rackDepth = p.storeType === 'double' ? 8 : 4;
-    var rackMat = new THREE.MeshLambertMaterial({ color: 0x3B82F6, transparent: true, opacity: 0.4 });
-    var isVert = p.rackDir === 'vertical';
-
-    if (isVert) {
-      var step = aisleW + rackDepth;
-      var numRows = Math.floor((sW - aisleW) / step);
-      for (var rv = 0; rv < numRows; rv++) {
-        var rx = sX + aisleW + rv * step;
-        var rGeo = new THREE.BoxGeometry(rackDepth, rackH, sD - 8);
-        var rack = new THREE.Mesh(rGeo, rackMat);
-        rack.position.set(rx + rackDepth / 2, rackH / 2, sZ + sD / 2);
-        scene.add(rack);
-      }
-    } else {
-      var step = aisleW + rackDepth;
-      var numRows = Math.floor((sD - aisleW) / step);
-      for (var rh = 0; rh < numRows; rh++) {
-        var rz = sZ + aisleW + rh * step;
-        var rGeo = new THREE.BoxGeometry(sW - 8, rackH, rackDepth);
-        var rack = new THREE.Mesh(rGeo, rackMat);
-        rack.position.set(sX + sW / 2, rackH / 2, rz + rackDepth / 2);
-        scene.add(rack);
-      }
-    }
+  // ── Forklifts (1–3 in staging/aisle areas) ──
+  var recvZone = zones['recv'];
+  var shipZone = zones['ship'];
+  if (recvZone) {
+    var rx = recvZone.x - pad + recvZone.w / 2;
+    var rz = recvZone.y - pad + recvZone.h / 2;
+    _wsc3dBuildForklift(scene, rx + 8, rz, Math.PI * 0.3);
+  }
+  if (shipZone) {
+    var sx = shipZone.x - pad + shipZone.w / 2;
+    var sz = shipZone.y - pad + shipZone.h / 2;
+    _wsc3dBuildForklift(scene, sx - 6, sz, -Math.PI * 0.4);
+  }
+  // One in storage aisle
+  var storZ = zones['storage'];
+  if (storZ) {
+    var aX = storZ.x - pad + (p.aisleW || 10) / 2;
+    var aZ = storZ.y - pad + storZ.h / 2;
+    _wsc3dBuildForklift(scene, aX, aZ, 0);
   }
 
   // ── Camera position ──
@@ -6895,7 +7240,7 @@ function render3DLayout(p) {
   // ── Resize handler ──
   if (!window._wsc3dResizeHandler) {
     window._wsc3dResizeHandler = function() {
-      if (!wsc3dMode || !wsc3dRenderer) return;
+      if (wscViewMode !== '3d' || !wsc3dRenderer) return;
       var c = document.getElementById('wsc-3d-container');
       if (!c) return;
       var w = c.clientWidth;
@@ -6906,26 +7251,6 @@ function render3DLayout(p) {
     };
     window.addEventListener('resize', window._wsc3dResizeHandler);
   }
-}
-
-// ── Text sprite helper ──
-function wsc3dMakeTextSprite(text, color) {
-  var canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 128;
-  var ctx = canvas.getContext('2d');
-  ctx.clearRect(0, 0, 256, 128);
-  ctx.font = 'bold 22px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillStyle = '#' + ('000000' + (color || 0xffffff).toString(16)).slice(-6);
-  var lines = text.split('\n');
-  for (var i = 0; i < lines.length; i++) {
-    ctx.fillText(lines[i], 128, 40 + i * 28);
-  }
-  var tex = new THREE.CanvasTexture(canvas);
-  tex.needsUpdate = true;
-  var mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
-  return new THREE.Sprite(mat);
 }
 
 // ── Camera update ──
@@ -6959,12 +7284,10 @@ function wsc3dOnMouseMove(e) {
   wsc3dLastMouse.y = e.clientY;
 
   if (wsc3dMouseBtn === 0 && !e.shiftKey) {
-    // Left drag: orbit
     wsc3dCameraTheta -= dx * 0.005;
     wsc3dCameraPhi += dy * 0.005;
     updateWsc3dCamera();
   } else {
-    // Right drag or shift+left: pan
     var panScale = wsc3dCameraDist * 0.002;
     var right = new THREE.Vector3();
     var up = new THREE.Vector3(0, 1, 0);
@@ -6979,5 +7302,560 @@ function wsc3dOnWheel(e) {
   wsc3dCameraDist *= (1 + e.deltaY * 0.001);
   wsc3dCameraDist = Math.max(50, Math.min(5000, wsc3dCameraDist));
   updateWsc3dCamera();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// CROSS-SECTION ELEVATION VIEW (2D Canvas)
+// ═══════════════════════════════════════════════════════════════════
+
+function renderElevationView(p) {
+  var container = document.getElementById('wsc-elevation-container');
+  if (!container) return;
+  container.innerHTML = '';
+  container.style.display = 'block';
+
+  var canvas = document.createElement('canvas');
+  var W = container.clientWidth || 800;
+  var H = 400;
+  canvas.width = W * 2;
+  canvas.height = H * 2;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  var ctx = canvas.getContext('2d');
+  ctx.scale(2, 2);
+  container.appendChild(canvas);
+
+  var clearH = p.clearHeightFt || 32;
+  var rackLevels = p.rackLevels || 4;
+  var aisleW = p.aisleW || 10;
+  var rackDepth = (p.storeType === 'double') ? 8 : 4;
+  var storeType = p.storeType || 'single';
+
+  // Building dimensions
+  var twoDock = p.dockConfig === 'two';
+  var dockFaceW = Math.max((twoDock ? Math.max(p.inDoors || 0, p.outDoors || 0) : (p.totalDoors || 10)) * 14, 120);
+  var bldgW = Math.max(dockFaceW, Math.ceil(Math.sqrt((p.totalSF || 50000) * 2.2)));
+  var maxHeight = clearH + 4;
+
+  // Zone widths (approximate proportions from SF)
+  var officeSF = p.officeSF || 0;
+  var bldgD = Math.max(100, Math.ceil((p.totalSF || 50000) / bldgW));
+  var officeW = officeSF > 0 ? Math.ceil(officeSF / bldgD) : 0;
+  var dockDepth = 40;
+  var stagingW = 30;
+  var storageW = bldgW - officeW - dockDepth - stagingW * 2;
+  if (storageW < 50) storageW = 50;
+
+  // Drawing area
+  var padL = 60, padR = 80, padT = 40, padB = 55;
+  var drawW = W - padL - padR;
+  var drawH = H - padT - padB;
+  var scaleX = drawW / bldgW;
+  var scaleY = drawH / maxHeight;
+
+  function toX(ft) { return padL + ft * scaleX; }
+  function toY(ft) { return padT + drawH - ft * scaleY; }
+
+  // ── Background ──
+  ctx.fillStyle = '#fafafa';
+  ctx.fillRect(0, 0, W, H);
+
+  // ── Title ──
+  ctx.fillStyle = '#333';
+  ctx.font = 'bold 13px system-ui';
+  ctx.textAlign = 'left';
+  ctx.fillText('Cross-Section Elevation View', padL, 20);
+
+  // ── Roof structure ──
+  ctx.fillStyle = '#e0e0e0';
+  ctx.beginPath();
+  ctx.moveTo(toX(0), toY(clearH));
+  ctx.lineTo(toX(bldgW / 2), toY(clearH + 3));
+  ctx.lineTo(toX(bldgW), toY(clearH));
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = '#999';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // ── Clear height line ──
+  ctx.strokeStyle = '#1a73e8';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(toX(0), toY(clearH));
+  ctx.lineTo(toX(bldgW), toY(clearH));
+  ctx.stroke();
+  ctx.fillStyle = '#1a73e8';
+  ctx.font = 'bold 10px system-ui';
+  ctx.textAlign = 'center';
+  ctx.fillText('Clear Height: ' + clearH + ' ft', toX(bldgW / 2), toY(clearH) - 6);
+
+  // ── Walls ──
+  ctx.strokeStyle = '#555';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(toX(0), toY(0));
+  ctx.lineTo(toX(0), toY(clearH + 3));
+  ctx.moveTo(toX(bldgW), toY(0));
+  ctx.lineTo(toX(bldgW), toY(clearH + 3));
+  ctx.stroke();
+
+  // ── Floor slab ──
+  ctx.fillStyle = '#e0e0e0';
+  ctx.fillRect(toX(0), toY(0), bldgW * scaleX, 12);
+  // Hatching
+  ctx.strokeStyle = '#ccc';
+  ctx.lineWidth = 0.5;
+  var floorTop = toY(0);
+  for (var hx = 0; hx < bldgW * scaleX; hx += 6) {
+    ctx.beginPath();
+    ctx.moveTo(toX(0) + hx, floorTop);
+    ctx.lineTo(toX(0) + hx + 6, floorTop + 12);
+    ctx.stroke();
+  }
+
+  // ── Zone layout (left to right): Office | Staging | Storage | Staging | Dock ──
+  var cursor = 0;
+
+  // Office mezzanine
+  if (officeW > 0) {
+    var offH = 10;
+    ctx.fillStyle = '#e8e0f0';
+    ctx.fillRect(toX(cursor), toY(offH), officeW * scaleX, offH * scaleY);
+    ctx.strokeStyle = '#8b5cf6';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(toX(cursor), toY(offH), officeW * scaleX, offH * scaleY);
+    // Windows
+    ctx.fillStyle = 'rgba(136,204,238,0.4)';
+    var numWin = Math.max(1, Math.floor(officeW / 10));
+    var winSpace = officeW / (numWin + 1);
+    for (var ow = 0; ow < numWin; ow++) {
+      var wx = cursor + winSpace * (ow + 1);
+      ctx.fillRect(toX(wx - 2), toY(7), 4 * scaleX, 4 * scaleY);
+    }
+    // Label
+    ctx.fillStyle = '#8b5cf6';
+    ctx.font = 'bold 10px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillText('Office', toX(cursor + officeW / 2), toY(offH / 2) + 4);
+    cursor += officeW;
+
+    // Divider
+    ctx.strokeStyle = '#aaa';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.moveTo(toX(cursor), toY(0));
+    ctx.lineTo(toX(cursor), toY(clearH));
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // Receiving staging
+  ctx.fillStyle = 'rgba(16,185,129,0.08)';
+  ctx.fillRect(toX(cursor), toY(clearH), stagingW * scaleX, clearH * scaleY);
+  // Floor pallets
+  var numPallets = Math.max(1, Math.floor(stagingW / 5));
+  for (var sp = 0; sp < numPallets; sp++) {
+    if (sp % 2 === 0) {
+      ctx.fillStyle = '#DEB887';
+      ctx.fillRect(toX(cursor + sp * 5 + 0.5), toY(3.5), 4 * scaleX, 3.5 * scaleY);
+      ctx.strokeStyle = '#C8A882';
+      ctx.lineWidth = 0.5;
+      ctx.strokeRect(toX(cursor + sp * 5 + 0.5), toY(3.5), 4 * scaleX, 3.5 * scaleY);
+    }
+  }
+  ctx.fillStyle = '#10b981';
+  ctx.font = '9px system-ui';
+  ctx.textAlign = 'center';
+  ctx.fillText('Recv Staging', toX(cursor + stagingW / 2), toY(0) - 8);
+  cursor += stagingW;
+
+  // ── Storage section (the main event) ──
+  var storageStart = cursor;
+  var storageEnd = cursor + storageW;
+  var beamH = clearH / Math.max(rackLevels, 1);
+
+  if (storeType === 'bulk') {
+    // Bulk storage — stacked pallets
+    var stackHi = p.stackHi || 3;
+    var numStacks = Math.max(1, Math.floor(storageW / 5));
+    for (var bs = 0; bs < numStacks; bs++) {
+      var stackX = storageStart + bs * 5 + 0.5;
+      var layers = Math.ceil((bs % 3 + 1) * stackHi / 3);
+      for (var bl = 0; bl < layers; bl++) {
+        var bBot = bl * 5;
+        ctx.fillStyle = '#DEB887';
+        ctx.fillRect(toX(stackX), toY(bBot + 4.5), 4 * scaleX, 4.5 * scaleY);
+        ctx.strokeStyle = '#C8A882';
+        ctx.lineWidth = 0.5;
+        ctx.strokeRect(toX(stackX), toY(bBot + 4.5), 4 * scaleX, 4.5 * scaleY);
+      }
+    }
+    // Stack height dim
+    _elevDimV(ctx, toX(storageEnd) + 15, toY(0), toY(stackHi * 5), 'Stack ' + stackHi + ' Hi');
+  } else if (storeType === 'carton') {
+    // Carton flow — shorter shelves
+    var shelfH = 7;
+    var shelfLevels = 4;
+    var shelfBeamH = shelfH / shelfLevels;
+    var rackSpacing = aisleW + rackDepth;
+    var numRacks = Math.max(1, Math.floor(storageW / rackSpacing));
+    for (var cr = 0; cr < numRacks; cr++) {
+      var rackX = storageStart + cr * rackSpacing;
+      // Uprights
+      ctx.strokeStyle = '#4444cc';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(toX(rackX), toY(0)); ctx.lineTo(toX(rackX), toY(shelfH));
+      ctx.moveTo(toX(rackX + rackDepth), toY(0)); ctx.lineTo(toX(rackX + rackDepth), toY(shelfH));
+      ctx.stroke();
+      // Beams and cartons
+      for (var cl = 1; cl <= shelfLevels; cl++) {
+        var cBeamY = cl * shelfBeamH;
+        ctx.strokeStyle = '#ff8800';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(toX(rackX), toY(cBeamY));
+        ctx.lineTo(toX(rackX + rackDepth), toY(cBeamY));
+        ctx.stroke();
+        var cBot = (cl - 1) * shelfBeamH + 0.2;
+        ctx.fillStyle = '#e8d5b7';
+        ctx.fillRect(toX(rackX + 0.3), toY(cBot + shelfBeamH * 0.8), (rackDepth - 0.6) * scaleX, shelfBeamH * 0.7 * scaleY);
+      }
+      // Aisle label
+      if (cr < numRacks - 1) {
+        ctx.fillStyle = '#888';
+        ctx.font = '8px system-ui';
+        ctx.textAlign = 'center';
+        ctx.fillText('Aisle', toX(rackX + rackDepth + aisleW / 2), toY(0) - 5);
+      }
+    }
+    ctx.fillStyle = '#2563eb';
+    ctx.font = '9px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillText('Carton Flow', toX(storageStart + storageW / 2), toY(shelfH) - 8);
+  } else if (storeType === 'mix') {
+    // Mixed — rack left, bulk right
+    var mixPct = (p.mixRackPct || 70) / 100;
+    var rackW = storageW * mixPct;
+    var bulkW = storageW - rackW;
+
+    // Rack section
+    var rackSpacing = aisleW + rackDepth;
+    var numRacks = Math.max(1, Math.floor(rackW / rackSpacing));
+    for (var mr = 0; mr < numRacks; mr++) {
+      var rackX = storageStart + mr * rackSpacing;
+      _elevDrawRack(ctx, toX, toY, rackX, rackDepth, rackLevels, beamH, clearH);
+      if (mr < numRacks - 1) {
+        ctx.fillStyle = '#888';
+        ctx.font = '8px system-ui';
+        ctx.textAlign = 'center';
+        ctx.fillText('Aisle', toX(rackX + rackDepth + aisleW / 2), toY(0) - 5);
+      }
+    }
+
+    // Divider
+    var divX = storageStart + rackW;
+    ctx.strokeStyle = '#666';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(toX(divX), toY(0)); ctx.lineTo(toX(divX), toY(clearH * 0.5));
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#666';
+    ctx.font = '8px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillText('Rack ←→ Bulk', toX(divX), toY(clearH * 0.5) - 8);
+
+    // Bulk section
+    var stackHi = p.stackHi || 3;
+    var numStacks = Math.max(1, Math.floor(bulkW / 5));
+    for (var mb = 0; mb < numStacks; mb++) {
+      var stackX = divX + mb * 5 + 0.5;
+      var layers = Math.ceil((mb % 3 + 1) * stackHi / 3);
+      for (var ml = 0; ml < layers; ml++) {
+        ctx.fillStyle = '#DEB887';
+        ctx.fillRect(toX(stackX), toY(ml * 5 + 4.5), 4 * scaleX, 4.5 * scaleY);
+        ctx.strokeStyle = '#C8A882';
+        ctx.lineWidth = 0.5;
+        ctx.strokeRect(toX(stackX), toY(ml * 5 + 4.5), 4 * scaleX, 4.5 * scaleY);
+      }
+    }
+  } else {
+    // Standard rack (single or double)
+    var rackSpacing = aisleW + rackDepth;
+    var numRacks = Math.max(1, Math.floor(storageW / rackSpacing));
+    for (var ri = 0; ri < numRacks; ri++) {
+      var rackX = storageStart + ri * rackSpacing;
+      _elevDrawRack(ctx, toX, toY, rackX, rackDepth, rackLevels, beamH, clearH);
+      if (ri < numRacks - 1) {
+        ctx.fillStyle = '#888';
+        ctx.font = '8px system-ui';
+        ctx.textAlign = 'center';
+        ctx.fillText('Aisle', toX(rackX + rackDepth + aisleW / 2), toY(0) - 5);
+      }
+    }
+  }
+
+  // Storage label
+  ctx.fillStyle = '#2563eb';
+  ctx.font = '9px system-ui';
+  ctx.textAlign = 'center';
+  ctx.fillText('Storage', toX(storageStart + storageW / 2), toY(0) - 8);
+  cursor = storageEnd;
+
+  // Sprinkler clearance line
+  if (storeType !== 'bulk') {
+    var topOfLoad = (rackLevels - 1) * beamH + beamH * 0.8;
+    var sprinklerY = topOfLoad + 3;
+    if (sprinklerY < clearH) {
+      ctx.setLineDash([6, 4]);
+      ctx.strokeStyle = '#e53935';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(toX(storageStart), toY(sprinklerY));
+      ctx.lineTo(toX(storageEnd), toY(sprinklerY));
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#e53935';
+      ctx.font = '9px system-ui';
+      ctx.textAlign = 'left';
+      ctx.fillText('Sprinkler clearance', toX(storageEnd) + 5, toY(sprinklerY) + 3);
+    }
+  }
+
+  // Shipping staging
+  ctx.fillStyle = 'rgba(249,115,22,0.08)';
+  ctx.fillRect(toX(cursor), toY(clearH), stagingW * scaleX, clearH * scaleY);
+  for (var sp2 = 0; sp2 < numPallets; sp2++) {
+    if (sp2 % 2 === 0) {
+      ctx.fillStyle = '#DEB887';
+      ctx.fillRect(toX(cursor + sp2 * 5 + 0.5), toY(3.5), 4 * scaleX, 3.5 * scaleY);
+      ctx.strokeStyle = '#C8A882';
+      ctx.lineWidth = 0.5;
+      ctx.strokeRect(toX(cursor + sp2 * 5 + 0.5), toY(3.5), 4 * scaleX, 3.5 * scaleY);
+    }
+  }
+  ctx.fillStyle = '#f97316';
+  ctx.font = '9px system-ui';
+  ctx.textAlign = 'center';
+  ctx.fillText('Ship Staging', toX(cursor + stagingW / 2), toY(0) - 8);
+  cursor += stagingW;
+
+  // ── Dock area with truck trailer profile ──
+  var dockStart = cursor;
+  // Dock platform (elevated ~4ft)
+  ctx.fillStyle = '#d0d0d0';
+  ctx.fillRect(toX(dockStart), toY(4), dockDepth * scaleX, 4 * scaleY);
+  ctx.strokeStyle = '#999';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(toX(dockStart), toY(4), dockDepth * scaleX, 4 * scaleY);
+
+  // Dock door opening
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(toX(dockStart + dockDepth - 2), toY(14), 2 * scaleX, 14 * scaleY);
+  ctx.strokeStyle = '#666';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(toX(dockStart + dockDepth - 2), toY(14), 2 * scaleX, 14 * scaleY);
+
+  // Truck trailer profile (outside, backed up to dock)
+  var truckX = dockStart + dockDepth;
+  ctx.fillStyle = '#f0f0f0';
+  ctx.fillRect(toX(truckX), toY(13.5), 20 * scaleX, 9.5 * scaleY);
+  ctx.strokeStyle = '#888';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(toX(truckX), toY(13.5), 20 * scaleX, 9.5 * scaleY);
+  // Wheels
+  ctx.fillStyle = '#333';
+  ctx.beginPath();
+  ctx.arc(toX(truckX + 15), toY(0) - 3, 4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(toX(truckX + 18), toY(0) - 3, 4, 0, Math.PI * 2);
+  ctx.fill();
+  // Label
+  ctx.fillStyle = '#888';
+  ctx.font = '9px system-ui';
+  ctx.textAlign = 'center';
+  ctx.fillText('Trailer', toX(truckX + 10), toY(7));
+
+  // Dock label
+  ctx.fillStyle = '#0ea5e9';
+  ctx.font = '9px system-ui';
+  ctx.textAlign = 'center';
+  ctx.fillText('Dock', toX(dockStart + dockDepth / 2), toY(0) - 8);
+
+  // Dock height dimension
+  _elevDimV(ctx, toX(dockStart) - 10, toY(0), toY(4), '48"');
+
+  // ── Dimension lines ──
+  // Clear height (right side)
+  _elevDimV(ctx, toX(bldgW) + 20, toY(0), toY(clearH), clearH + "'");
+  // Rack level height
+  if (storeType !== 'bulk') {
+    _elevDimV(ctx, toX(bldgW) + 50, toY(0), toY(beamH), beamH.toFixed(1) + "' / level");
+  }
+  // Building width (bottom)
+  _elevDimH(ctx, toX(0), toX(bldgW), toY(0) + 35, 'Building Width: ' + Math.round(bldgW) + ' ft');
+
+  // ── Legend ──
+  _elevDrawLegend(ctx, W - 200, 10);
+
+  // Store resize handler
+  if (!window._wscElevResizeHandler) {
+    window._wscElevResizeHandler = function() {
+      if (wscViewMode !== 'elevation') return;
+      var p2 = wscLastLayoutParams;
+      if (p2) renderElevationView(p2);
+    };
+    window.addEventListener('resize', window._wscElevResizeHandler);
+  }
+}
+
+// ── Elevation helper: draw rack cross-section ──
+function _elevDrawRack(ctx, toX, toY, rackX, rackDepth, rackLevels, beamH, clearH) {
+  // Uprights (blue)
+  ctx.strokeStyle = '#4444cc';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(toX(rackX), toY(0)); ctx.lineTo(toX(rackX), toY(clearH * 0.95));
+  ctx.moveTo(toX(rackX + rackDepth), toY(0)); ctx.lineTo(toX(rackX + rackDepth), toY(clearH * 0.95));
+  ctx.stroke();
+
+  // Beams and pallets per level
+  for (var lvl = 1; lvl <= rackLevels; lvl++) {
+    var beamY = lvl * beamH;
+    // Beams (orange)
+    ctx.strokeStyle = '#ff8800';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(toX(rackX), toY(beamY));
+    ctx.lineTo(toX(rackX + rackDepth), toY(beamY));
+    ctx.stroke();
+
+    // Pallet load
+    var loadBot = (lvl - 1) * beamH + 0.3;
+    var loadH = beamH * 0.75;
+    ctx.fillStyle = '#DEB887';
+    ctx.fillRect(toX(rackX + 0.3), toY(loadBot + loadH), (rackDepth - 0.6) * (toX(1) - toX(0)), loadH * (toY(0) - toY(1)));
+    ctx.strokeStyle = '#C8A882';
+    ctx.lineWidth = 0.5;
+    ctx.strokeRect(toX(rackX + 0.3), toY(loadBot + loadH), (rackDepth - 0.6) * (toX(1) - toX(0)), loadH * (toY(0) - toY(1)));
+  }
+}
+
+// ── Elevation helper: vertical dimension line ──
+function _elevDimV(ctx, x, y1, y2, label) {
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 0.8;
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(x, y1); ctx.lineTo(x, y2);
+  ctx.stroke();
+  // Tick marks
+  ctx.beginPath();
+  ctx.moveTo(x - 4, y1); ctx.lineTo(x + 4, y1);
+  ctx.moveTo(x - 4, y2); ctx.lineTo(x + 4, y2);
+  ctx.stroke();
+  // Arrows
+  ctx.beginPath();
+  ctx.moveTo(x, y1); ctx.lineTo(x - 3, y1 - 5); ctx.moveTo(x, y1); ctx.lineTo(x + 3, y1 - 5);
+  ctx.moveTo(x, y2); ctx.lineTo(x - 3, y2 + 5); ctx.moveTo(x, y2); ctx.lineTo(x + 3, y2 + 5);
+  ctx.stroke();
+  // Label (rotated)
+  ctx.save();
+  ctx.translate(x + 12, (y1 + y2) / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillStyle = '#333';
+  ctx.font = '10px system-ui';
+  ctx.textAlign = 'center';
+  ctx.fillText(label, 0, 0);
+  ctx.restore();
+}
+
+// ── Elevation helper: horizontal dimension line ──
+function _elevDimH(ctx, x1, x2, y, label, color) {
+  ctx.strokeStyle = color || '#333';
+  ctx.lineWidth = 0.8;
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(x1, y); ctx.lineTo(x2, y);
+  ctx.stroke();
+  // Arrows
+  ctx.beginPath();
+  ctx.moveTo(x1, y); ctx.lineTo(x1 + 5, y - 3); ctx.moveTo(x1, y); ctx.lineTo(x1 + 5, y + 3);
+  ctx.moveTo(x2, y); ctx.lineTo(x2 - 5, y - 3); ctx.moveTo(x2, y); ctx.lineTo(x2 - 5, y + 3);
+  ctx.stroke();
+  // Ticks
+  ctx.beginPath();
+  ctx.moveTo(x1, y - 4); ctx.lineTo(x1, y + 4);
+  ctx.moveTo(x2, y - 4); ctx.lineTo(x2, y + 4);
+  ctx.stroke();
+  ctx.fillStyle = color || '#333';
+  ctx.font = '10px system-ui';
+  ctx.textAlign = 'center';
+  ctx.fillText(label, (x1 + x2) / 2, y - 6);
+}
+
+// ── Elevation legend ──
+function _elevDrawLegend(ctx, x, y) {
+  ctx.fillStyle = '#f8f8f8';
+  ctx.fillRect(x, y, 190, 80);
+  ctx.strokeStyle = '#ddd';
+  ctx.lineWidth = 0.5;
+  ctx.strokeRect(x, y, 190, 80);
+
+  ctx.font = '9px system-ui';
+  ctx.textAlign = 'left';
+  var lx = x + 8;
+  var ly = y + 14;
+  var gap = 14;
+
+  // Clear height line
+  ctx.strokeStyle = '#1a73e8';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(lx, ly); ctx.lineTo(lx + 16, ly); ctx.stroke();
+  ctx.fillStyle = '#333';
+  ctx.fillText('Clear Height', lx + 20, ly + 3);
+
+  // Sprinkler
+  ctx.strokeStyle = '#e53935';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 3]);
+  ctx.beginPath(); ctx.moveTo(lx, ly + gap); ctx.lineTo(lx + 16, ly + gap); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillText('Sprinkler Clearance', lx + 20, ly + gap + 3);
+
+  // Pallet load
+  ctx.fillStyle = '#DEB887';
+  ctx.fillRect(lx, ly + gap * 2 - 4, 12, 8);
+  ctx.strokeStyle = '#C8A882';
+  ctx.strokeRect(lx, ly + gap * 2 - 4, 12, 8);
+  ctx.fillStyle = '#333';
+  ctx.fillText('Pallet Load', lx + 20, ly + gap * 2 + 3);
+
+  // Rack uprights
+  ctx.strokeStyle = '#4444cc';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(lx + 100, ly); ctx.lineTo(lx + 100, ly + 10); ctx.stroke();
+  ctx.fillStyle = '#333';
+  ctx.fillText('Rack Upright', lx + 106, ly + 8);
+
+  // Beams
+  ctx.strokeStyle = '#ff8800';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(lx + 100, ly + gap); ctx.lineTo(lx + 116, ly + gap); ctx.stroke();
+  ctx.fillStyle = '#333';
+  ctx.fillText('Rack Beam', lx + 120, ly + gap + 3);
+
+  // Floor
+  ctx.fillStyle = '#e0e0e0';
+  ctx.fillRect(lx + 100, ly + gap * 2 - 4, 12, 8);
+  ctx.fillStyle = '#333';
+  ctx.fillText('Floor Slab', lx + 120, ly + gap * 2 + 3);
 }
 

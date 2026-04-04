@@ -6614,12 +6614,17 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
         </div>
         <div style="display:flex;align-items:center;gap:12px;">
           <div id="wsc-layout-dims" style="font-size:12px;font-weight:600;color:rgba(255,255,255,.5);"></div>
-          <button id="wsc-3d-toggle" class="hub-btn" onclick="toggleWsc3DView()" style="font-size:11px;padding:4px 12px;border-radius:6px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.7);border:1px solid rgba(255,255,255,.15);cursor:pointer;transition:.2s;">3D View</button>
+          <div class="hub-btn-group" style="display:inline-flex;border-radius:6px;overflow:hidden;border:1px solid rgba(255,255,255,.15);">
+            <button id="wsc-view-2d" onclick="wscSetView('2d')" style="font-size:11px;padding:4px 12px;background:rgba(59,130,246,.3);color:#93c5fd;border:none;cursor:pointer;transition:.2s;font-weight:600;">2D Layout</button>
+            <button id="wsc-view-3d" onclick="wscSetView('3d')" style="font-size:11px;padding:4px 12px;background:rgba(255,255,255,.06);color:rgba(255,255,255,.5);border:none;border-left:1px solid rgba(255,255,255,.1);cursor:pointer;transition:.2s;">3D View</button>
+            <button id="wsc-view-elev" onclick="wscSetView('elevation')" style="font-size:11px;padding:4px 12px;background:rgba(255,255,255,.06);color:rgba(255,255,255,.5);border:none;border-left:1px solid rgba(255,255,255,.1);cursor:pointer;transition:.2s;">Elevation</button>
+          </div>
         </div>
       </div>
       <div style="position:relative;width:100%;min-height:480px;margin-bottom:12px;">
         <svg id="wsc-layout-svg" width="100%" height="480" preserveAspectRatio="xMidYMid meet" style="display:block;"></svg>
         <div id="wsc-3d-container" style="display:none;width:100%;height:480px;border-radius:8px;overflow:hidden;"></div>
+        <div id="wsc-elevation-container" style="display:none;width:100%;height:400px;background:#fff;border:1px solid rgba(255,255,255,.12);border-radius:8px;overflow:hidden;"></div>
       </div>
       <div style="display:flex;gap:16px;flex-wrap:wrap;padding-top:12px;border-top:1px solid rgba(255,255,255,.06);">
         <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:rgba(255,255,255,.6);"><span style="width:10px;height:10px;border-radius:2px;background:#2563eb;"></span>Storage</div>
@@ -10715,7 +10720,7 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
 <!-- Design Tools: landing pages, scenario management, section tours -->
 <script src="js/design-tools.js"></script>
 <!-- Network Optimization: COG, enterprise optimizer, warehouse sizing -->
-<script src="js/network-opt.js?v=20260404-netopt-sla"></script>
+<script src="js/network-opt.js?v=20260404-3dupgrade"></script>
 <!-- Change Management: ADKAR initiatives, activities, flowcharts -->
 <script src="js/change-management.js"></script>
 <!-- Analytics: session tracking, dashboard -->
@@ -10723,7 +10728,7 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
 <!-- Feedback: idea submission, voting -->
 <script src="js/feedback.js"></script>
 <!-- Cost Model Builder: cmApp, dealApp, financial modeling -->
-<script src="js/cost-model.js?v=20260404-cm-wsc"></script>
+<script src="js/cost-model.js?v=20260403a1fix"></script>
 <!-- Cost Model Interaction Tests (gated behind __CM_TEST_MODE__) -->
 <script src="js/cost-model-tests.js?v=20260404v5"></script>
 <!-- Fleet Modeler: fmApp, lane optimization -->
