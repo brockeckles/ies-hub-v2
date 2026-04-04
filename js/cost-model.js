@@ -1131,9 +1131,9 @@ const cmApp = {
 
             card.innerHTML = `
                 <div class="cm-info-card-title">${displayName}${region ? ' — ' + region : ''}</div>
-                ${hasRates ? `<div>Avg Labor Rate: $${avgRate.toFixed(2)}/hr (${marketLabor.length} roles)</div>
-                <div>Occupancy Cost: $${totalOccupancy.toFixed(2)}/sqft/yr</div>
-                <div>Default OT: ${defaultOT}% · Benefit Load: ${avgBenefitLoad.toFixed(1)}%</div>` :
+                ${hasRates ? `<div>Avg Labor Rate: ${fmtNum(avgRate, 2, '$')}/hr (${marketLabor.length} roles)</div>
+                <div>Occupancy Cost: ${fmtNum(totalOccupancy, 2, '$')}/sqft/yr</div>
+                <div>Default OT: ${defaultOT}% · Benefit Load: ${fmtNum(avgBenefitLoad, 1)}%</div>` :
                 `<div style="color:var(--ies-gray-500);font-style:italic;">No rate data yet — add rates in Admin &gt; Reference Data</div>`}
             `;
             card.style.display = 'block';
@@ -1151,7 +1151,7 @@ const cmApp = {
             const totalPfd = (info.total_pfd_pct || 0) + (info.ergonomic_adjustment_pct || 0);
             card.innerHTML = `
                 <div class="cm-info-card-title">${info.profile_name}</div>
-                <div>Total PFD: ${totalPfd.toFixed(1)}%</div>
+                <div>Total PFD: ${fmtNum(totalPfd, 1)}%</div>
                 <div>Base PFD: ${info.total_pfd_pct || 0}% + Ergonomic: ${info.ergonomic_adjustment_pct || 0}%</div>
             `;
             card.style.display = 'block';
@@ -1179,7 +1179,7 @@ const cmApp = {
 
         Object.entries(volumes).forEach(([inputId, outputId]) => {
             const val = parseFloat(document.getElementById(inputId).value) || 0;
-            const daily = operatingDays > 0 ? (val / operatingDays).toFixed(0) : 0;
+            const daily = operatingDays > 0 ? fmtNum(val / operatingDays, 0) : 0;
             document.getElementById(outputId).textContent = daily + '/day';
         });
     },
@@ -1214,8 +1214,8 @@ const cmApp = {
         const totalOrders = orders;
         const totalPicks = totalOrders * lines * units;
 
-        document.getElementById('totalOrders').textContent = totalOrders.toFixed(0);
-        document.getElementById('totalPicks').textContent = totalPicks.toFixed(0);
+        document.getElementById('totalOrders').textContent = fmtNum(totalOrders, 0);
+        document.getElementById('totalPicks').textContent = fmtNum(totalPicks, 0);
     },
 
     updateFacilityMetrics() {
@@ -1224,7 +1224,7 @@ const cmApp = {
         const office = parseFloat(document.getElementById('officeSqft').value) || 0;
 
         const warehouse = total - staging - office;
-        document.getElementById('warehousingSpace').textContent = Math.max(0, warehouse).toFixed(0) + ' sqft';
+        document.getElementById('warehousingSpace').textContent = fmtNum(Math.max(0, warehouse), 0) + ' sqft';
         this.renderFacilityCostCard();
     },
 
@@ -1292,7 +1292,7 @@ const cmApp = {
         var total = lease + cam + tax + ins + util + maint;
 
         var fmt = function(v) { return '$' + v.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0}); };
-        var fmtRate = function(v) { return '$' + v.toFixed(2); };
+        var fmtRate = function(v) { return fmtNum(v, 2, '$'); };
         var line = function(label, rate, unit, annual, overrideKey) {
             var isOverridden = ov[overrideKey] != null;
             return '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--ies-gray-100);font-size:12px;">' +
@@ -1302,7 +1302,7 @@ const cmApp = {
             '</div>';
         };
 
-        var coldNote = coldMult > 1 ? ' <span style="font-size:10px;color:#3b82f6;">(' + ((coldMult - 1) * 100).toFixed(0) + '% cold premium)</span>' : '';
+        var coldNote = coldMult > 1 ? ' <span style="font-size:10px;color:#3b82f6;">(' + fmtNum((coldMult - 1) * 100, 0) + '% cold premium)</span>' : '';
 
         card.innerHTML =
             '<div class="cm-card-title">Facility Cost Breakdown</div>' +
@@ -1311,7 +1311,7 @@ const cmApp = {
             line('Property Tax', taxRate, '/SF/yr', tax, 'tax') +
             line('Insurance', insRate, '/SF/yr', ins, 'insurance') +
             line('Utilities (' + esc(utilEnv) + ')', utilRate, '/SF/mo', util, 'utility') +
-            line('Maintenance (' + (maintMode === 'fixed' ? 'fixed' : (maintPct * 100).toFixed(0) + '% of lease') + ')', maintPerSf, '/SF/yr', maint, 'maint_fixed') +
+            line('Maintenance (' + (maintMode === 'fixed' ? 'fixed' : fmtNum(maintPct * 100, 0) + '% of lease') + ')', maintPerSf, '/SF/yr', maint, 'maint_fixed') +
             '<div style="display:flex;justify-content:space-between;padding:8px 0;font-size:14px;font-weight:700;border-top:2px solid var(--ies-navy);margin-top:4px;">' +
                 '<span>Total Facility Cost</span><span style="color:var(--ies-navy);">' + fmt(total) + '/yr</span>' +
             '</div>' +
@@ -1379,9 +1379,9 @@ const cmApp = {
         const operatingHours = operatingDays * hours;
         const totalAvailable = operatingHours * shifts;
 
-        document.getElementById('operatingDays').textContent = operatingDays.toFixed(0);
-        document.getElementById('annualHours').textContent = operatingHours.toFixed(0);
-        document.getElementById('totalAvailableHours').textContent = totalAvailable.toFixed(0);
+        document.getElementById('operatingDays').textContent = fmtNum(operatingDays, 0);
+        document.getElementById('annualHours').textContent = fmtNum(operatingHours, 0);
+        document.getElementById('totalAvailableHours').textContent = fmtNum(totalAvailable, 0);
     },
 
     getOperatingDays() {
@@ -1615,7 +1615,7 @@ const cmApp = {
             const outboundDoors = dockDoors - inboundDoors;
             const levelerItem = findCatalog('dock leveler');
             addEquip('Dock Leveler (Hydraulic)', 'MHE', dockDoors, levelerItem,
-                dailyPalletsTotal.toFixed(0) + ' daily pallets / 90 per door = ' + dockDoors + ' doors (' + inboundDoors + ' in/' + outboundDoors + ' out)');
+                fmtNum(dailyPalletsTotal, 0) + ' daily pallets / 90 per door = ' + dockDoors + ' doors (' + inboundDoors + ' in/' + outboundDoors + ' out)');
         }
 
         // =====================================================================
@@ -2183,7 +2183,7 @@ const cmApp = {
         var peak = Math.max.apply(null, profile);
         var avg = profile.reduce(function(s,v){return s+v;},0) / 12;
         var el = document.getElementById('seasonalitySummary');
-        if (el) el.textContent = 'Peak: ' + peak.toFixed(2) + 'x | Avg: ' + avg.toFixed(2) + 'x';
+        if (el) el.textContent = 'Peak: ' + fmtNum(peak, 2) + 'x | Avg: ' + fmtNum(avg, 2) + 'x';
     },
     applySeasonalityPreset(preset) {
         var profiles = {
@@ -2248,7 +2248,7 @@ const cmApp = {
 
         // Update total FTEs (avg and peak)
         const ftesElement = document.getElementById('laborTotalFtes');
-        if (ftesElement) ftesElement.textContent = this.getTotalFtes().toFixed(0);
+        if (ftesElement) ftesElement.textContent = fmtNum(this.getTotalFtes(), 0);
 
         // Update card-level summary elements
         const opHours = this.getOperatingHours();
@@ -2262,10 +2262,10 @@ const cmApp = {
         const peakTotal = peakDirectFtes + indirectFtes;
 
         const el = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
-        el('totalDirectFtes', directFtes.toFixed(1));
-        el('totalIndirectFtes', indirectFtes.toFixed(1));
-        el('totalHeadcount', (directFtes + indirectFtes).toFixed(0));
-        el('peakHeadcount', peakTotal.toFixed(0));
+        el('totalDirectFtes', fmtNum(directFtes, 1));
+        el('totalIndirectFtes', fmtNum(indirectFtes, 1));
+        el('totalHeadcount', fmtNum(directFtes + indirectFtes, 0));
+        el('peakHeadcount', fmtNum(peakTotal, 0));
         el('totalLaborCost', '$' + totalLaborCost.toLocaleString('en-US', {maximumFractionDigits: 0}));
     },
 
@@ -2330,7 +2330,7 @@ const cmApp = {
                 if (volCell) volCell.textContent = Math.round(line.volume || 0).toLocaleString('en-US');
                 if (auphCell) auphCell.textContent = Math.round(line.adjusted_uph || 0).toLocaleString('en-US');
                 if (hrsCell) hrsCell.textContent = (line.annual_hours || 0).toLocaleString('en-US', {minimumFractionDigits:1, maximumFractionDigits:1});
-                if (fteCell) fteCell.textContent = fte.toFixed(2);
+                if (fteCell) fteCell.textContent = fmtNum(fte, 2);
                 if (costCell) costCell.textContent = '$' + annualCost.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0});
                 this.updateLaborTotals();
             }
@@ -2685,10 +2685,10 @@ const cmApp = {
                 '<td class="cm-table-number" id="labor-auph-' + idx + '">' + Math.round(line.adjusted_uph || 0).toLocaleString('en-US') + '</td>' +
                 '<td>' + this._complexitySelectHtml(idx, line.complexity_tier) + '</td>' +
                 '<td class="cm-table-number" id="labor-hrs-' + idx + '">' + (line.annual_hours || 0).toLocaleString('en-US', {minimumFractionDigits:1, maximumFractionDigits:1}) + '</td>' +
-                '<td class="cm-table-number" id="labor-fte-' + idx + '">' + fte.toFixed(2) + '</td>' +
+                '<td class="cm-table-number" id="labor-fte-' + idx + '">' + fmtNum(fte, 2) + '</td>' +
                 '<td style="text-align:center;font-size:11px;">' + esc(shiftLabel) + '</td>' +
-                '<td class="cm-table-number" style="font-size:11px;">' + (diffPct * 100).toFixed(0) + '%</td>' +
-                '<td class="cm-table-number" style="font-size:11px;">$' + adjRate.toFixed(2) + '</td>' +
+                '<td class="cm-table-number" style="font-size:11px;">' + fmtNum(diffPct * 100, 0) + '%</td>' +
+                '<td class="cm-table-number" style="font-size:11px;">' + fmtNum(adjRate, 2, '$') + '</td>' +
                 '<td>' + this._equipSelectHtml('MHE', idx, line.mhe_equipment_id, 'mhe_equipment_id') + '</td>' +
                 '<td>' + this._equipSelectHtml('Systems', idx, line.it_equipment_id, 'it_equipment_id') + '</td>' +
                 '<td>' + this._cmInp('number', line.hourly_rate, idx, 'laborLines', 'hourly_rate', {w:60, ph:'$/hr'}) + '</td>' +
@@ -3110,7 +3110,7 @@ const cmApp = {
             const rampPremium = Math.ceil(totalDirectFte * rampHours * avgRate * 0.30);
             lines.push({
                 category: 'Ramp-Up',
-                description: 'Training premium — ' + rampWeeks + ' wks x ' + totalDirectFte.toFixed(0) + ' FTEs x 30% inefficiency',
+                description: 'Training premium — ' + rampWeeks + ' wks x ' + fmtNum(totalDirectFte, 0) + ' FTEs x 30% inefficiency',
                 one_time_cost: rampPremium,
                 monthly_amort: rampPremium / contractMonths,
                 annual_amort: rampPremium / contractYears,
@@ -3206,7 +3206,7 @@ const cmApp = {
                 <span style="font-weight:600;">Wk 2</span><span>Stabilization — ${allowance.learning_curve_wk2 || 75}% productivity</span>
                 <span style="font-weight:600;">Wk 4</span><span>Ramp — ${allowance.learning_curve_wk4 || 85}% productivity</span>
                 <span style="font-weight:600;">Wk 8</span><span>Near-standard — ${allowance.learning_curve_wk8 || 95}% productivity</span>
-                <span style="font-weight:600;">Wk 12</span><span>Full standard — 100% productivity, ${totalDirectFte.toFixed(0)} FTEs at rate</span>
+                <span style="font-weight:600;">Wk 12</span><span>Full standard — 100% productivity, ${fmtNum(totalDirectFte, 0)} FTEs at rate</span>
                 <span style="font-weight:600;">Year 1+</span><span>Steady-state operations, ${(parseFloat(document.getElementById('annualEscalation').value) || 3)}% annual escalation</span>
             </div>
         `;
@@ -3253,11 +3253,11 @@ const cmApp = {
         // Update metric cards
         document.getElementById('summaryTotalCost').textContent = '$' + totalCost.toLocaleString('en-US', {maximumFractionDigits: 0});
         document.getElementById('summaryTotalRevenue').textContent = '$' + totalRevenue.toLocaleString('en-US', {maximumFractionDigits: 0});
-        document.getElementById('summaryTotalFtes').textContent = this.getTotalFtes().toFixed(0);
+        document.getElementById('summaryTotalFtes').textContent = fmtNum(this.getTotalFtes(), 0);
 
         const ordersPerYear = parseFloat(document.getElementById('ordersPacked').value) || 1;
         const costPerOrder = totalCost / ordersPerYear;
-        document.getElementById('summaryCostPerOrder').textContent = '$' + costPerOrder.toFixed(2);
+        document.getElementById('summaryCostPerOrder').textContent = fmtNum(costPerOrder, 2, '$');
 
         // Cost breakdown
         const costBreakdown = [
@@ -3271,9 +3271,9 @@ const cmApp = {
 
         costBreakdown.forEach(item => {
             const pct = totalCost > 0 ? (item.value / totalCost * 100) : 0;
-            document.getElementById(item.label).textContent = pct.toFixed(0) + '%';
+            document.getElementById(item.label).textContent = fmtNum(pct, 0) + '%';
             document.getElementById(item.segment).style.width = pct + '%';
-            if (pct > 0) document.getElementById(item.segment).textContent = pct.toFixed(0) + '%';
+            if (pct > 0) document.getElementById(item.segment).textContent = fmtNum(pct, 0) + '%';
         });
 
         // Unit metrics
@@ -3284,7 +3284,7 @@ const cmApp = {
         const eachesPerYear = parseFloat(document.getElementById('eachesPicked').value) || 0;
         const sqftYear = parseFloat(document.getElementById('totalSqft').value) || 1;
 
-        document.getElementById('unitCostPerOrder').textContent = '$' + costPerOrder.toFixed(2);
+        document.getElementById('unitCostPerOrder').textContent = fmtNum(costPerOrder, 2, '$');
 
         // Fixed vs Variable breakdown
         this.initDefaultBuckets();
@@ -3293,13 +3293,13 @@ const cmApp = {
         const fixedAnnual = bucketCosts['mgmt_fee'] || 0;
         const variableAnnual = totalCost - fixedAnnual;
         const variableCostPerOrder = ordersPerYear > 0 ? variableAnnual / ordersPerYear : 0;
-        document.getElementById('unitVarCostPerOrder').textContent = '$' + variableCostPerOrder.toFixed(2);
+        document.getElementById('unitVarCostPerOrder').textContent = fmtNum(variableCostPerOrder, 2, '$');
 
-        document.getElementById('unitCostPerPallet').textContent = '$' + (palletsPerYear > 0 ? totalCost / palletsPerYear : 0).toFixed(2);
-        document.getElementById('unitCostPerCase').textContent = '$' + (casesPerYear > 0 ? totalCost / casesPerYear : 0).toFixed(2);
-        document.getElementById('unitCostPerEach').textContent = '$' + (eachesPerYear > 0 ? totalCost / eachesPerYear : 0).toFixed(4);
-        document.getElementById('unitCostPerSqft').textContent = '$' + (totalCost / sqftYear).toFixed(2);
-        document.getElementById('unitRevenuePerOrder').textContent = '$' + (totalRevenue / ordersPerYear).toFixed(2);
+        document.getElementById('unitCostPerPallet').textContent = fmtNum(palletsPerYear > 0 ? totalCost / palletsPerYear : 0, 2, '$');
+        document.getElementById('unitCostPerCase').textContent = fmtNum(casesPerYear > 0 ? totalCost / casesPerYear : 0, 2, '$');
+        document.getElementById('unitCostPerEach').textContent = fmtNum(eachesPerYear > 0 ? totalCost / eachesPerYear : 0, 4, '$');
+        document.getElementById('unitCostPerSqft').textContent = fmtNum(totalCost / sqftYear, 2, '$');
+        document.getElementById('unitRevenuePerOrder').textContent = fmtNum(totalRevenue / ordersPerYear, 2, '$');
 
         const fixedMonthly = fixedAnnual / 12;
         const varPerOrder = variableCostPerOrder;
@@ -3309,9 +3309,9 @@ const cmApp = {
         const fpEl = document.getElementById('summaryFixedPct');
         const vPctEl = document.getElementById('summaryVarPct');
         if (fmEl) fmEl.textContent = '$' + fixedMonthly.toLocaleString('en-US', {maximumFractionDigits:0});
-        if (vpEl) vpEl.textContent = '$' + varPerOrder.toFixed(2);
-        if (fpEl) fpEl.textContent = totalCost > 0 ? (fixedAnnual / totalCost * 100).toFixed(0) + '%' : '0%';
-        if (vPctEl) vPctEl.textContent = totalCost > 0 ? (variableAnnual / totalCost * 100).toFixed(0) + '%' : '0%';
+        if (vpEl) vpEl.textContent = fmtNum(varPerOrder, 2, '$');
+        if (fpEl) fpEl.textContent = totalCost > 0 ? fmtNum(fixedAnnual / totalCost * 100, 0) + '%' : '0%';
+        if (vPctEl) vPctEl.textContent = totalCost > 0 ? fmtNum(variableAnnual / totalCost * 100, 0) + '%' : '0%';
 
         // Generate decision support heuristics
         this.generateHeuristics({
@@ -3406,10 +3406,10 @@ const cmApp = {
 
             html += '<tr>' +
                 '<td>' + v.name + '</td>' +
-                '<td style="text-align:right;">$' + negResult.costPerOrder.toFixed(2) + '</td>' +
-                '<td style="text-align:right;">$' + baseResult.costPerOrder.toFixed(2) + '</td>' +
-                '<td style="text-align:right;">$' + posResult.costPerOrder.toFixed(2) + '</td>' +
-                '<td style="text-align:right;font-weight:600;color:' + (impactRange > 1 ? '#ef4444' : '#10b981') + ';">$' + impactRange.toFixed(2) + '</td>' +
+                '<td style="text-align:right;">' + fmtNum(negResult.costPerOrder, 2, '$') + '</td>' +
+                '<td style="text-align:right;">' + fmtNum(baseResult.costPerOrder, 2, '$') + '</td>' +
+                '<td style="text-align:right;">' + fmtNum(posResult.costPerOrder, 2, '$') + '</td>' +
+                '<td style="text-align:right;font-weight:600;color:' + (impactRange > 1 ? '#ef4444' : '#10b981') + ';">' + fmtNum(impactRange, 2, '$') + '</td>' +
             '</tr>';
         });
 
@@ -3715,16 +3715,16 @@ const cmApp = {
         };
 
         panel.innerHTML = [
-            mc('Gross Margin', avgGrossMargin, avgGrossMargin.toFixed(1) + '%', th.grossMargin, true, 'Target: \u2265' + th.grossMargin + '%'),
-            mc('EBITDA Margin', avgEbitdaMargin, avgEbitdaMargin.toFixed(1) + '%', th.ebitda, true, 'Target: \u2265' + th.ebitda + '%'),
-            mc('EBIT Margin', avgEbitMargin, avgEbitMargin.toFixed(1) + '%', th.ebit, true, 'Target: \u2265' + th.ebit + '%'),
-            mc('ROIC', roic, roic.toFixed(1) + '%', th.roic, true, 'Target: \u2265' + th.roic + '%'),
-            mc('MIRR', startupCapital > 0 ? mirr : th.mirr, startupCapital > 0 ? mirr.toFixed(1) + '%' : 'N/A', th.mirr, true, startupCapital > 0 ? 'Target: \u2265' + th.mirr + '%' : 'No start-up capital'),
+            mc('Gross Margin', avgGrossMargin, fmtNum(avgGrossMargin, 1) + '%', th.grossMargin, true, 'Target: \u2265' + th.grossMargin + '%'),
+            mc('EBITDA Margin', avgEbitdaMargin, fmtNum(avgEbitdaMargin, 1) + '%', th.ebitda, true, 'Target: \u2265' + th.ebitda + '%'),
+            mc('EBIT Margin', avgEbitMargin, fmtNum(avgEbitMargin, 1) + '%', th.ebit, true, 'Target: \u2265' + th.ebit + '%'),
+            mc('ROIC', roic, fmtNum(roic, 1) + '%', th.roic, true, 'Target: \u2265' + th.roic + '%'),
+            mc('MIRR', startupCapital > 0 ? mirr : th.mirr, startupCapital > 0 ? fmtNum(mirr, 1) + '%' : 'N/A', th.mirr, true, startupCapital > 0 ? 'Target: \u2265' + th.mirr + '%' : 'No start-up capital'),
             mc('Payback Period', paybackMonths, paybackMonths + ' mo', th.payback, false, 'Target: \u2264' + th.payback + ' mo'),
             mc('NPV', npv, '$' + Math.round(npv).toLocaleString('en-US'), 0, true, 'At ' + (discountRate * 100) + '% discount'),
             mc('Revenue / FTE', revenuePerFte, '$' + Math.round(revenuePerFte).toLocaleString('en-US'), null, true, 'Year 1'),
-            mc('Contribution / Order', contribPerOrder, '$' + contribPerOrder.toFixed(2), null, true, 'Year 1 gross'),
-            mc('Operating Leverage', opLeverage, opLeverage.toFixed(0) + '%', null, null, 'Fixed cost % of total'),
+            mc('Contribution / Order', contribPerOrder, fmtNum(contribPerOrder, 2, '$'), null, true, 'Year 1 gross'),
+            mc('Operating Leverage', opLeverage, fmtNum(opLeverage, 0) + '%', null, null, 'Fixed cost % of total'),
             mc('Contract Value', totalRevenue, '$' + Math.round(totalRevenue).toLocaleString('en-US'), null, null, years + '-year total revenue'),
             mc('Total Investment', startupCapital, '$' + Math.round(startupCapital).toLocaleString('en-US'), null, null, 'Start-up capital')
         ].join('');

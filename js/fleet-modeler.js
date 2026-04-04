@@ -611,7 +611,7 @@ const fmApp = {
     document.getElementById('fm-res-total-vehicles').textContent = this.results.totalVehicles;
     document.getElementById('fm-res-total-drivers').textContent = this.results.totalDrivers;
     document.getElementById('fm-res-utilization').textContent = this.results.utilization.toFixed(0) + '%';
-    document.getElementById('fm-res-cost-per-mile').textContent = '$' + this.results.costPerMile.toFixed(2);
+    document.getElementById('fm-res-cost-per-mile').textContent = fmtNum(this.results.costPerMile, 2, '$');
 
     const tbody = document.getElementById('fm-fleet-mix-tbody');
     const vcd = this.results.vehicleCostDetail || {};
@@ -629,7 +629,7 @@ const fmApp = {
           <td style="padding:12px;text-align:right;font-size:11px;">${spec.mpg} MPG</td>
           <td style="padding:12px;text-align:right;font-size:11px;">$${fuelPerMi.toFixed(3)}/mi</td>
           <td style="padding:12px;text-align:right;font-size:11px;">${(annualMilesType / 1000).toFixed(0)}K mi</td>
-          <td style="padding:12px;text-align:center;font-weight:600;">$${(typeTotalCost / 1000).toFixed(0)}K</td>
+          <td style="padding:12px;text-align:center;font-weight:600;">${fmtNum(typeTotalCost / 1000, 0, '$')}K</td>
         </tr>
       `;
     }).join('');
@@ -646,7 +646,7 @@ const fmApp = {
     const dedicatedIsLowest = dedicatedFleetCost === cheapest;
     const carrierIsLowest = commonCarrierCost === cheapest;
 
-    const fmtM = (v) => '$' + (v / 1000000).toFixed(2) + 'M';
+    const fmtM = (v) => fmtNum(v / 1000000, 2, '$') + 'M';
     const fmtPct = (a, b) => b > 0 ? ((a - b) / b * 100).toFixed(1) + '%' : '—';
     const vehicleCostLabel = r.financingMode === 'lease' ? 'Lease' : 'Depreciation';
 
@@ -662,7 +662,7 @@ const fmApp = {
           Insurance: ${fmtM(bd.insurance)}<br>
           Overhead: ${fmtM(bd.adminOverhead)}
         </div>
-        <div style="margin-top:6px;font-size:11px;color:var(--ies-gray-400);">All-in cost/mi: $${r.costPerMile.toFixed(2)}</div>
+        <div style="margin-top:6px;font-size:11px;color:var(--ies-gray-400);">All-in cost/mi: ${fmtNum(r.costPerMile, 2, '$')}</div>
       </div>
       <div class="fm-cost-card" ${dedicatedIsLowest ? 'style="border-color:var(--ies-green);background:linear-gradient(135deg,rgba(0,200,83,.04),rgba(0,200,83,.01));"' : 'style="border-color:var(--ies-blue);background:linear-gradient(135deg, rgba(0,71,171,.05), rgba(0,71,171,.02));"'}>
         <div class="fm-cost-card-title">Dedicated Fleet (GXO) ${dedicatedIsLowest ? '<span style="color:var(--ies-green);font-size:10px;">✓ LOWEST</span>' : ''}</div>
@@ -679,7 +679,7 @@ const fmApp = {
         <div class="fm-cost-card-value" style="color:${carrierIsLowest ? 'var(--ies-green)' : 'var(--ies-red)'};">${fmtM(commonCarrierCost)}</div>
         <div style="font-size:11px;color:var(--ies-gray-500);line-height:1.6;">
           Spot/contract market rates.<br>
-          Avg rate: $${r.avgCarrierRate.toFixed(2)}/mi<br>
+          Avg rate: ${fmtNum(r.avgCarrierRate, 2, '$')}/mi<br>
           No asset ownership or driver management.
         </div>
         ${commonCarrierCost > privateFleetCost ? '<div style="margin-top:6px;font-size:11px;color:var(--ies-red);">' + fmtPct(commonCarrierCost, privateFleetCost) + ' more than private</div>' : '<div class="fm-cost-card-savings">Saves ' + fmtM(privateFleetCost - commonCarrierCost) + ' vs private</div>'}
@@ -697,11 +697,11 @@ const fmApp = {
     document.getElementById('fm-metrics-grid').innerHTML = `
       <div class="fm-metric-card">
         <div class="fm-metric-label">Cost per Shipment</div>
-        <div class="fm-metric-value">$${costPerShipment.toFixed(0)}</div>
+        <div class="fm-metric-value">${fmtNum(costPerShipment, 0, '$')}</div>
       </div>
       <div class="fm-metric-card">
         <div class="fm-metric-label">Cost per 1000 lbs</div>
-        <div class="fm-metric-value">$${(costPerPound * 1000).toFixed(0)}</div>
+        <div class="fm-metric-value">${fmtNum(costPerPound * 1000, 0, '$')}</div>
       </div>
       <div class="fm-metric-card">
         <div class="fm-metric-label">Weekly Miles</div>
@@ -798,7 +798,7 @@ const fmApp = {
       const pct = maxVal > 0 ? (item.value / maxVal * 100) : 0;
       const totalPct = this.results.privateFleetCost > 0 ? (item.value / this.results.privateFleetCost * 100) : 0;
       return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;">
-        <div style="font-size:10px;font-weight:700;color:var(--ies-navy);margin-bottom:2px;">$${(item.value/1000).toFixed(0)}K</div>
+        <div style="font-size:10px;font-weight:700;color:var(--ies-navy);margin-bottom:2px;">${fmtNum(item.value/1000, 0, '$')}K</div>
         <div style="font-size:9px;color:var(--ies-gray-400);margin-bottom:4px;">${totalPct.toFixed(0)}%</div>
         <div style="width:100%;max-width:50px;height:${Math.max(pct, 3)}%;background:${item.color};border-radius:6px 6px 0 0;transition:height 0.3s;"></div>
         <div style="font-size:10px;color:var(--ies-gray-500);margin-top:6px;text-align:center;">${item.label}</div>
@@ -863,8 +863,8 @@ const fmApp = {
               return `
               <tr style="border-bottom:1px solid var(--ies-gray-200);">
                 <td style="padding:12px;font-weight:500;color:var(--ies-navy);">${row.category}</td>
-                <td style="padding:12px;text-align:right;font-weight:600;">$${row.actual.toFixed(3)}/mi</td>
-                <td style="padding:12px;text-align:right;">$${row.benchmark.toFixed(3)}/mi</td>
+                <td style="padding:12px;text-align:right;font-weight:600;">${fmtNum(row.actual, 3, '$')}/mi</td>
+                <td style="padding:12px;text-align:right;">${fmtNum(row.benchmark, 3, '$')}/mi</td>
                 <td style="padding:12px;text-align:right;font-weight:600;color:${varianceColor};">${variance > 0 ? '+' : ''}${variance.toFixed(1)}%</td>
                 <td style="padding:12px;text-align:center;">
                   <span style="padding:4px 10px;border-radius:4px;font-size:11px;font-weight:600;background:${varianceColor}20;color:${varianceColor};">
@@ -971,7 +971,7 @@ const fmApp = {
           <th style="padding:8px;text-align:center;font-weight:600;border:1px solid var(--ies-gray-300);background:var(--ies-gray-150);">Driver Rate ($/hr)</th>`;
 
     dieselPrices.forEach(price => {
-      html += `<th style="padding:8px;text-align:center;font-weight:600;border:1px solid var(--ies-gray-300);background:var(--ies-gray-150);">$${price.toFixed(2)}</th>`;
+      html += `<th style="padding:8px;text-align:center;font-weight:600;border:1px solid var(--ies-gray-300);background:var(--ies-gray-150);">${fmtNum(price, 2, '$')}</th>`;
     });
     html += `</tr></thead><tbody>`;
 
@@ -983,7 +983,7 @@ const fmApp = {
         const bgColor = getCellColor(cell.costPerMile);
         const borderStyle = cell.isCurrentCell ? '2px solid var(--ies-navy)' : '1px solid var(--ies-gray-300)';
         const fontWeight = cell.isCurrentCell ? '700' : '500';
-        html += `<td style="padding:8px;text-align:center;border:${borderStyle};background:${bgColor}20;font-weight:${fontWeight};">$${cell.costPerMile.toFixed(2)}</td>`;
+        html += `<td style="padding:8px;text-align:center;border:${borderStyle};background:${bgColor}20;font-weight:${fontWeight};">${fmtNum(cell.costPerMile, 2, '$')}</td>`;
       });
       html += `</tr>`;
     });

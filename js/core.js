@@ -28,6 +28,18 @@ var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm
 var sb = null;
 try { sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); } catch(e) { console.warn('Supabase init failed:', e); setTimeout(function(){ showSectionError('sec-welcome', 'Database connection failed. Some features may be unavailable. Try refreshing the page.'); }, 500); }
 
+// ── Number formatting utility ──
+// fmtNum(12500)         → "12,500"
+// fmtNum(12500.5, 1)    → "12,500.5"
+// fmtNum(12500, 0, '$') → "$12,500"
+function fmtNum(val, decimals, prefix) {
+  if (val == null || isNaN(val)) return '—';
+  var n = typeof decimals === 'number' ? Number(val).toFixed(decimals) : String(Math.round(Number(val)));
+  var parts = n.split('.');
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return (prefix || '') + parts.join('.');
+}
+
 // ── User-facing error banner utility ──
 function showSectionError(containerId, message) {
   var container = document.getElementById(containerId);
@@ -729,3 +741,18 @@ function stripHtml(str) {
     .trim();
 }
 var LINK_SVG = '<svg class="link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>';
+
+// ── Sidebar scroll-leak guard ──
+// Prevents wheel events on the fixed sidebar from leaking into panels behind it
+(function() {
+  var sb = document.querySelector('.sidebar');
+  if (!sb) return;
+  sb.addEventListener('wheel', function(e) {
+    var atTop = sb.scrollTop === 0;
+    var atBottom = sb.scrollTop + sb.clientHeight >= sb.scrollHeight - 1;
+    if ((e.deltaY < 0 && atTop) || (e.deltaY > 0 && atBottom)) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }, { passive: false });
+})();

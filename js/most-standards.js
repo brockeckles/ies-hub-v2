@@ -996,7 +996,7 @@ const mostApp = {
         '<td><input type="number" class="cm-input" value="' + (vol || '') + '" min="0" step="1" style="width:90px;font-size:12px;padding:4px 8px;text-align:right;" onchange="mostApp.updateAnalysisLine(' + idx + ',\'volume\',this.value)" placeholder="0"></td>' +
         '<td style="text-align:right;">' + (hours > 0 ? hours.toFixed(1) : '—') + '</td>' +
         '<td style="text-align:right;font-weight:600;color:var(--ies-orange);">' + (ftes > 0 ? ftes.toFixed(2) : '—') + '</td>' +
-        '<td style="text-align:right;">' + (cost > 0 ? '$' + cost.toFixed(0) : '—') + '</td>' +
+        '<td style="text-align:right;">' + (cost > 0 ? fmtNum(cost, 0, '$') : '—') + '</td>' +
         '<td style="text-align:center;"><button onclick="mostApp.removeAnalysisLine(' + idx + ')" style="background:none;border:none;cursor:pointer;color:#dc2626;font-size:16px;" title="Remove">&times;</button></td>' +
       '</tr>';
     }).join('');
@@ -1029,7 +1029,7 @@ const mostApp = {
     el('qlaTotalVolume', totVol.toLocaleString());
     el('qlaTotalHours', totHrs.toFixed(1));
     el('qlaTotalFTEs', totFtes.toFixed(2));
-    el('qlaTotalCost', '$' + totCost.toFixed(0));
+    el('qlaTotalCost', fmtNum(totCost, 0, '$'));
 
     // Update summary cards
     el('qlaResFTEs', totFtes.toFixed(1));

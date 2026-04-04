@@ -1052,13 +1052,13 @@ function pmRenderTimesheet() {
         html += '<tr>';
         html += '<td style="font-weight:600;">' + oppName + '</td>';
         html += '<td style="text-transform:capitalize;">' + (h.hours_type||'').replace(/_/g,' ') + '</td>';
-        html += '<td style="text-align:right;font-weight:600;">' + Number(h.hours).toFixed(1) + '</td>';
+        html += '<td style="text-align:right;font-weight:600;">' + fmtNum(Number(h.hours), 1) + '</td>';
         html += '<td style="font-size:12px;color:var(--ies-gray-400);">' + (h.notes || '—') + '</td>';
         html += '<td style="text-align:right;"><button class="pm-btn pm-btn-outline pm-btn-sm" onclick="pmDeleteProjectHoursRow('+h.id+')" style="padding:4px 8px;font-size:11px;color:var(--ies-red);border-color:var(--ies-red);">×</button></td>';
         html += '</tr>';
       });
       body.innerHTML = html;
-      foot.innerHTML = '<tr style="background:var(--ies-gray-50);font-weight:700;"><td colspan="2">Total</td><td style="text-align:right;">' + total.toFixed(1) + '</td><td></td><td></td></tr>';
+      foot.innerHTML = '<tr style="background:var(--ies-gray-50);font-weight:700;"><td colspan="2">Total</td><td style="text-align:right;">' + fmtNum(total, 1) + '</td><td></td><td></td></tr>';
     }
   }
 
@@ -1078,13 +1078,13 @@ function pmRenderTimesheet() {
         total += Number(h.hours || 0);
         html += '<tr>';
         html += '<td style="font-weight:600;text-transform:capitalize;">' + (PM_GENERAL_CAT_LABELS[h.category] || h.category) + '</td>';
-        html += '<td style="text-align:right;font-weight:600;">' + Number(h.hours).toFixed(1) + '</td>';
+        html += '<td style="text-align:right;font-weight:600;">' + fmtNum(Number(h.hours), 1) + '</td>';
         html += '<td style="font-size:12px;color:var(--ies-gray-400);">' + (h.notes || '—') + '</td>';
         html += '<td style="text-align:right;"><button class="pm-btn pm-btn-outline pm-btn-sm" onclick="pmDeleteGeneralHours('+h.id+')" style="padding:4px 8px;font-size:11px;color:var(--ies-red);border-color:var(--ies-red);">×</button></td>';
         html += '</tr>';
       });
       body.innerHTML = html;
-      foot.innerHTML = '<tr style="background:var(--ies-gray-50);font-weight:700;"><td>Total</td><td style="text-align:right;">' + total.toFixed(1) + '</td><td></td><td></td></tr>';
+      foot.innerHTML = '<tr style="background:var(--ies-gray-50);font-weight:700;"><td>Total</td><td style="text-align:right;">' + fmtNum(total, 1) + '</td><td></td><td></td></tr>';
     }
   }
 
@@ -1100,9 +1100,9 @@ function pmRenderTimesheet() {
   var genActTotal = genActual.reduce(function(s,h){ return s + Number(h.hours||0); }, 0);
   var totalFc = projFcTotal + genFcTotal;
   var totalAct = projActTotal + genActTotal;
-  document.getElementById('pm-ts-project-hrs').innerHTML = projActTotal.toFixed(1) + '<span style="font-size:11px;color:var(--ies-gray-400);font-weight:400;"> / ' + projFcTotal.toFixed(1) + ' fc</span>';
-  document.getElementById('pm-ts-general-hrs').innerHTML = genActTotal.toFixed(1) + '<span style="font-size:11px;color:var(--ies-gray-400);font-weight:400;"> / ' + genFcTotal.toFixed(1) + ' fc</span>';
-  document.getElementById('pm-ts-total-hrs').innerHTML = totalAct.toFixed(1) + '<span style="font-size:11px;color:var(--ies-gray-400);font-weight:400;"> / ' + totalFc.toFixed(1) + ' fc</span>';
+  document.getElementById('pm-ts-project-hrs').innerHTML = fmtNum(projActTotal, 1) + '<span style="font-size:11px;color:var(--ies-gray-400);font-weight:400;"> / ' + fmtNum(projFcTotal, 1) + ' fc</span>';
+  document.getElementById('pm-ts-general-hrs').innerHTML = fmtNum(genActTotal, 1) + '<span style="font-size:11px;color:var(--ies-gray-400);font-weight:400;"> / ' + fmtNum(genFcTotal, 1) + ' fc</span>';
+  document.getElementById('pm-ts-total-hrs').innerHTML = fmtNum(totalAct, 1) + '<span style="font-size:11px;color:var(--ies-gray-400);font-weight:400;"> / ' + fmtNum(totalFc, 1) + ' fc</span>';
   document.getElementById('pm-ts-util').textContent = Math.round((totalAct / 40) * 100) + '%';
   document.getElementById('pm-ts-proj-pct').textContent = totalAct > 0 ? Math.round((projActTotal / totalAct) * 100) + '%' : '—';
 
@@ -1139,8 +1139,8 @@ function pmRender4WeekSummary(resource) {
     // Actual bar
     html += '<div style="width:24px;height:'+actPct+'%;background:var(--ies-green);border-radius:4px 4px 0 0;position:relative;z-index:2;min-height:'+(w.actual>0?'4px':'0')+';"></div>';
     html += '</div>';
-    html += '<div style="font-size:12px;font-weight:700;color:var(--ies-navy);">' + w.actual.toFixed(1) + 'h</div>';
-    html += '<div style="font-size:10px;color:var(--ies-gray-400);">fc: ' + w.forecast.toFixed(1) + 'h</div>';
+    html += '<div style="font-size:12px;font-weight:700;color:var(--ies-navy);">' + fmtNum(w.actual, 1) + 'h</div>';
+    html += '<div style="font-size:10px;color:var(--ies-gray-400);">fc: ' + fmtNum(w.forecast, 1) + 'h</div>';
     html += '<div style="font-size:11px;color:var(--ies-gray-400);">' + w.label + '</div>';
     html += '</div>';
   });

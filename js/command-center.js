@@ -402,7 +402,7 @@ async function loadKPIStrip() {
   if (diesel) {
     const kpis = document.querySelectorAll('.kpi-card');
     if (kpis[0]) {
-      kpis[0].querySelector('.kpi-value').textContent = '$' + parseFloat(diesel.price_per_gallon).toFixed(2);
+      kpis[0].querySelector('.kpi-value').textContent = fmtNum(parseFloat(diesel.price_per_gallon), 2, '$');
       const wow = diesel.week_over_week_change;
       const pct = ((wow / (parseFloat(diesel.price_per_gallon) - wow)) * 100).toFixed(1);
       var dieselSub = kpis[0].querySelector('.kpi-sub');

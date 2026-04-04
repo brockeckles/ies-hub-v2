@@ -394,10 +394,10 @@ function runNetworkOptimization() {
 function updateNetKPIs(dcs, points, vol, avgDist, freight, transit) {
   document.getElementById('net-k-dcs').textContent = dcs || '—';
   document.getElementById('net-k-points').textContent = points || '—';
-  document.getElementById('net-k-vol').textContent = vol > 0 ? (vol >= 1000000 ? (vol/1000000).toFixed(1) + 'M' : (vol/1000).toFixed(0) + 'K') : '—';
+  document.getElementById('net-k-vol').textContent = vol > 0 ? (vol >= 1000000 ? fmtNum(vol/1000000, 1) + 'M' : fmtNum(vol/1000, 0) + 'K') : '—';
   document.getElementById('net-k-dist').textContent = avgDist > 0 ? Math.round(avgDist).toLocaleString() : '—';
-  document.getElementById('net-k-cost').textContent = freight > 0 ? '$' + (freight >= 1000000 ? (freight/1000000).toFixed(1) + 'M' : (freight/1000).toFixed(0) + 'K') : '—';
-  document.getElementById('net-k-transit').textContent = transit > 0 ? transit.toFixed(1) : '—';
+  document.getElementById('net-k-cost').textContent = freight > 0 ? (freight >= 1000000 ? fmtNum(freight/1000000, 1, '$') + 'M' : fmtNum(freight/1000, 0, '$') + 'K') : '—';
+  document.getElementById('net-k-transit').textContent = transit > 0 ? fmtNum(transit, 1) : '—';
 }
 
 function clearNetMap() {
@@ -536,10 +536,10 @@ function renderNetComparison(geoPoints, rate, loadsPerWeek) {
     html += '<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:' + NET_CLUSTER_COLORS[r] + ';margin-right:4px;"></span>';
     html += results[r].k + '</td>';
     html += '<td style="text-align:right;padding:6px;font-variant-numeric:tabular-nums;">' + Math.round(results[r].avgDist).toLocaleString() + ' mi</td>';
-    html += '<td style="text-align:right;padding:6px;font-variant-numeric:tabular-nums;">$' + (results[r].freight >= 1000000 ? (results[r].freight/1000000).toFixed(1) + 'M' : (results[r].freight/1000).toFixed(0) + 'K') + '</td>';
-    html += '<td style="text-align:right;padding:6px;font-variant-numeric:tabular-nums;">' + results[r].transit.toFixed(1) + 'd</td>';
+    html += '<td style="text-align:right;padding:6px;font-variant-numeric:tabular-nums;">' + (results[r].freight >= 1000000 ? fmtNum(results[r].freight/1000000, 1, '$') + 'M' : fmtNum(results[r].freight/1000, 0, '$') + 'K') + '</td>';
+    html += '<td style="text-align:right;padding:6px;font-variant-numeric:tabular-nums;">' + fmtNum(results[r].transit, 1) + 'd</td>';
     html += '<td style="text-align:right;padding:6px;color:' + (savings > 0 ? 'var(--ies-green)' : 'var(--ies-gray-400)') + ';font-variant-numeric:tabular-nums;">';
-    html += savings > 0 ? '-' + savings.toFixed(0) + '%' : '—';
+    html += savings > 0 ? '-' + fmtNum(savings, 0) + '%' : '—';
     html += '</td></tr>';
   }
   html += '</table>';
@@ -582,7 +582,7 @@ function renderNetRecommendation(geoPoints, rate, loadsPerWeek) {
   if (bestElbow === 1) {
     html += '<strong>Single DC recommended.</strong> With the current demand distribution, adding facilities shows diminishing returns. A single, centrally-located DC minimizes fixed costs while maintaining reasonable transit times.';
   } else {
-    html += '<strong>' + bestElbow + ' DC network recommended.</strong> Moving from 1 to ' + bestElbow + ' facilities reduces estimated outbound freight by approximately ' + totalSavings.toFixed(0) + '% ($' + (bestDrop >= 1000000 ? (bestDrop/1000000).toFixed(1) + 'M' : Math.round(bestDrop/1000) + 'K') + ' annually). Beyond ' + bestElbow + ' DCs, marginal transportation savings diminish relative to the added facility overhead.';
+    html += '<strong>' + bestElbow + ' DC network recommended.</strong> Moving from 1 to ' + bestElbow + ' facilities reduces estimated outbound freight by approximately ' + fmtNum(totalSavings, 0) + '% (' + (bestDrop >= 1000000 ? fmtNum(bestDrop/1000000, 1, '$') + 'M' : '$' + Math.round(bestDrop/1000) + 'K') + ' annually). Beyond ' + bestElbow + ' DCs, marginal transportation savings diminish relative to the added facility overhead.';
   }
   html += '</div>';
   html += '<div style="font-size:11px;color:var(--ies-gray-500);border-top:1px solid rgba(0,71,171,.08);padding-top:8px;margin-top:8px;">';
@@ -618,7 +618,7 @@ function netApplyFreightMode() {
   };
   if (mode !== 'custom' && rates[mode]) {
     document.getElementById('net-rate').value = rates[mode];
-    document.getElementById('net-rate-val').textContent = '$' + rates[mode].toFixed(2) + '/mi';
+    document.getElementById('net-rate-val').textContent = fmtNum(rates[mode], 2, '$') + '/mi';
     runNetworkOptimization();
   }
 }
@@ -1511,14 +1511,14 @@ function updateManualCompare() {
   var autoFloorPos = sfPerFloorPos > 0 ? Math.floor(autoStorageSF / sfPerFloorPos) : 0;
   var autoPositions = autoFloorPos * p.rackLevels;
 
-  var manualSFPerPos = manualPositions > 0 ? (manualTotalSF / manualPositions).toFixed(1) : '—';
-  var autoSFPerPos = autoPositions > 0 ? (autoTotalSF / autoPositions).toFixed(1) : '—';
+  var manualSFPerPos = manualPositions > 0 ? fmtNum(manualTotalSF / manualPositions, 1) : '—';
+  var autoSFPerPos = autoPositions > 0 ? fmtNum(autoTotalSF / autoPositions, 1) : '—';
 
   // Calc'd Need values (from the functional calculator, for reference)
   var calcTotalSF = p.totalSF || 0;
   var calcStorageSF = p.storageSF || 0;
   var calcPositions = p.grossPositions || 0;
-  var calcSFPerPos = calcPositions > 0 ? (calcTotalSF / calcPositions).toFixed(1) : '—';
+  var calcSFPerPos = calcPositions > 0 ? fmtNum(calcTotalSF / calcPositions, 1) : '—';
 
   // Helper: format delta (manual vs auto layout)
   function delta(manual, auto) {
@@ -1556,7 +1556,7 @@ function updateManualCompare() {
     if (mSP > 0 && aSP > 0) {
       var d = mSP - aSP;
       var color = d > 0 ? '#f87171' : d < 0 ? '#34d399' : 'rgba(255,255,255,.4)';
-      el('wsc-m-sfperpos-delta').innerHTML = '<span style="color:'+color+'">'+(d>=0?'+':'')+d.toFixed(1)+'</span>';
+      el('wsc-m-sfperpos-delta').innerHTML = '<span style="color:'+color+'">'+(d>=0?'+':'')+fmtNum(d, 1)+'</span>';
     } else {
       el('wsc-m-sfperpos-delta').textContent = '';
     }
@@ -1981,7 +1981,7 @@ function calcWarehouse() { try {
 
   // FIX 3: Display max stacking height (clear height minus sprinkler clearance)
   var maxStackHeightFt = (clearHeightFt * 12 - sprinklerClearanceIn) / 12;
-  document.getElementById('wsc-max-stack-ht').textContent = maxStackHeightFt.toFixed(1) + ' ft';
+  document.getElementById('wsc-max-stack-ht').textContent = fmtNum(maxStackHeightFt, 1) + ' ft';
 
   // Update displayed values
   document.getElementById('wsc-clearht-val').textContent = clearHeightFt;
@@ -2248,7 +2248,7 @@ function calcWarehouse() { try {
   var utilPct = grossPositions > 0 ? Math.min(100, Math.round(peakToAvgRatio * 100)) : 0;
 
   // SF per pallet position (total facility)
-  var sfPerPos = grossPositions > 0 ? (totalSqFt / grossPositions).toFixed(1) : '—';
+  var sfPerPos = grossPositions > 0 ? fmtNum(totalSqFt / grossPositions, 1) : '—';
 
   // ── UPDATE KPI TILES ──
   document.getElementById('wsc-r-sqft').textContent = totalSqFt.toLocaleString();
@@ -2796,7 +2796,7 @@ function netApplyInputs(data) {
     document.getElementById('net-loads').value = data.loads_per_week || 2;
 
     // Update rate display
-    document.getElementById('net-rate-val').textContent = '$' + parseFloat(data.freight_rate_per_mile || 2.25).toFixed(2) + '/mi';
+    document.getElementById('net-rate-val').textContent = fmtNum(parseFloat(data.freight_rate_per_mile || 2.25), 2, '$') + '/mi';
 
     // Restore demand points
     try {
@@ -3257,34 +3257,34 @@ async function netoptFetchFreightRates() {
     // Update market rate display cards
     var el;
     el = document.getElementById('netopt-rate-dat-contract');
-    if (el) el.textContent = netoptMarketRates.datContract ? '$' + netoptMarketRates.datContract.toFixed(2) : '—';
+    if (el) el.textContent = netoptMarketRates.datContract ? fmtNum(netoptMarketRates.datContract, 2, '$') : '—';
     el = document.getElementById('netopt-rate-dat-contract-chg');
     if (el && datContract && datContract.wow_change != null) {
       var chg = parseFloat(datContract.wow_change);
-      el.textContent = (chg >= 0 ? '▲' : '▼') + ' ' + Math.abs(chg).toFixed(1) + '% WoW';
+      el.textContent = (chg >= 0 ? '▲' : '▼') + ' ' + fmtNum(Math.abs(chg), 1) + '% WoW';
       el.style.color = chg >= 0 ? '#059669' : '#dc2626';
     }
 
     el = document.getElementById('netopt-rate-dat-spot');
-    if (el) el.textContent = netoptMarketRates.datSpot ? '$' + netoptMarketRates.datSpot.toFixed(2) : '—';
+    if (el) el.textContent = netoptMarketRates.datSpot ? fmtNum(netoptMarketRates.datSpot, 2, '$') : '—';
     el = document.getElementById('netopt-rate-dat-spot-chg');
     if (el && datSpot && datSpot.wow_change != null) {
       var chg2 = parseFloat(datSpot.wow_change);
-      el.textContent = (chg2 >= 0 ? '▲' : '▼') + ' ' + Math.abs(chg2).toFixed(1) + '% WoW';
+      el.textContent = (chg2 >= 0 ? '▲' : '▼') + ' ' + fmtNum(Math.abs(chg2), 1) + '% WoW';
       el.style.color = chg2 >= 0 ? '#059669' : '#dc2626';
     }
 
     el = document.getElementById('netopt-rate-diesel');
-    if (el) el.textContent = netoptMarketRates.diesel ? '$' + netoptMarketRates.diesel.toFixed(2) : '—';
+    if (el) el.textContent = netoptMarketRates.diesel ? fmtNum(netoptMarketRates.diesel, 2, '$') : '—';
     el = document.getElementById('netopt-rate-diesel-chg');
     if (el && diesel && diesel.week_over_week_change != null) {
       var chg3 = parseFloat(diesel.week_over_week_change);
-      el.textContent = (chg3 >= 0 ? '▲' : '▼') + ' $' + Math.abs(chg3).toFixed(3) + ' WoW';
+      el.textContent = (chg3 >= 0 ? '▲' : '▼') + ' ' + fmtNum(Math.abs(chg3), 3, '$') + ' WoW';
       el.style.color = chg3 >= 0 ? '#dc2626' : '#059669'; // Red = higher fuel cost
     }
 
     el = document.getElementById('netopt-rate-fsc');
-    if (el) el.textContent = netoptMarketRates.fscPct != null ? netoptMarketRates.fscPct.toFixed(1) + '%' : '—';
+    if (el) el.textContent = netoptMarketRates.fscPct != null ? fmtNum(netoptMarketRates.fscPct, 1) + '%' : '—';
 
     // Update freshness indicator
     if (freshEl && netoptMarketRates.lastUpdated) {
@@ -3312,7 +3312,7 @@ function netoptApplyMarketRates() {
   }
   if (netoptMarketRates.fscPct != null) {
     document.getElementById('netopt-fuel-surcharge').value = netoptMarketRates.fscPct.toFixed(1);
-    document.getElementById('netopt-fsc-source').textContent = 'Diesel $' + (netoptMarketRates.diesel || 0).toFixed(2) + ' vs $' + NETOPT_DIESEL_BASELINE.toFixed(2) + ' baseline';
+    document.getElementById('netopt-fsc-source').textContent = 'Diesel ' + fmtNum(netoptMarketRates.diesel || 0, 2, '$') + ' vs ' + fmtNum(NETOPT_DIESEL_BASELINE, 2, '$') + ' baseline';
   }
   netoptRecalcAllCosts();
 }
@@ -3524,7 +3524,7 @@ function netoptRenderParcelRateTable() {
     var html = '<td style="padding:6px 10px;font-weight:600;color:var(--ies-navy);">' + labels[i] + '</td>';
     row.forEach(function(rate) {
       var net = rate * (1 - discount / 100);
-      html += '<td style="padding:6px 10px;text-align:right;color:var(--ies-gray-600);">$' + net.toFixed(2) + '</td>';
+      html += '<td style="padding:6px 10px;text-align:right;color:var(--ies-gray-600);">' + fmtNum(net, 2, '$') + '</td>';
     });
     tr.innerHTML = html;
     tbody.appendChild(tr);
@@ -3593,7 +3593,7 @@ function netoptParseRateCSV(mode, input) {
         }
         if (count > 0) {
           document.getElementById('netopt-tl-rate').value = (total / count).toFixed(2);
-          status.textContent = count + ' lanes, avg $' + (total / count).toFixed(2) + '/mi';
+          status.textContent = count + ' lanes, avg ' + fmtNum(total / count, 2, '$') + '/mi';
           status.style.color = '#059669';
         }
       } else if (mode === 'ltl' && lines.length > 1) {
@@ -3636,7 +3636,7 @@ function netoptRecalcAllCosts() {
 
   // Display TL $/unit-mile
   var tlDisplay = document.getElementById('netopt-tl-unit-mile');
-  if (tlDisplay) tlDisplay.textContent = '$' + tlUnitMile.toFixed(5);
+  if (tlDisplay) tlDisplay.textContent = fmtNum(tlUnitMile, 5, '$');
 
   // LTL cost per unit-mile (at reference distance of 500mi)
   var ltlWeight = parseFloat(document.getElementById('netopt-ltl-avg-weight').value) || 1500;
@@ -3649,7 +3649,7 @@ function netoptRecalcAllCosts() {
   var ltlUnitMile = ltlShipmentCost / ltlUnits / 500; // per unit per mile
 
   var ltlDisplay = document.getElementById('netopt-ltl-unit-mile');
-  if (ltlDisplay) ltlDisplay.textContent = '$' + ltlUnitMile.toFixed(5);
+  if (ltlDisplay) ltlDisplay.textContent = fmtNum(ltlUnitMile, 5, '$');
 
   // Parcel cost per unit (at reference zone 5)
   var carrier = document.getElementById('netopt-parcel-carrier').value || 'ups';
@@ -3661,7 +3661,7 @@ function netoptRecalcAllCosts() {
   var parcelUnitCost = zone5Rate * (1 - parcelDiscount / 100) + (resiCharge * resiPct / 100);
 
   var parcelDisplay = document.getElementById('netopt-parcel-unit-cost');
-  if (parcelDisplay) parcelDisplay.textContent = '$' + parcelUnitCost.toFixed(2);
+  if (parcelDisplay) parcelDisplay.textContent = fmtNum(parcelUnitCost, 2, '$');
 
   // Render parcel rate table
   netoptRenderParcelRateTable();
@@ -3683,10 +3683,10 @@ function netoptRecalcAllCosts() {
   var blendLtl = document.getElementById('netopt-blend-ltl');
   var blendParcel = document.getElementById('netopt-blend-parcel');
   var blendTotal = document.getElementById('netopt-blend-total');
-  if (blendTl) blendTl.textContent = '$' + (tlUnitMile * tlPct / 100).toFixed(5);
-  if (blendLtl) blendLtl.textContent = '$' + (ltlUnitMile * ltlPct / 100).toFixed(5);
-  if (blendParcel) blendParcel.textContent = '$' + (parcelPerUnitMile * parcelPct / 100).toFixed(5);
-  if (blendTotal) blendTotal.textContent = '$' + blendedUnitMile.toFixed(5);
+  if (blendTl) blendTl.textContent = fmtNum(tlUnitMile * tlPct / 100, 5, '$');
+  if (blendLtl) blendLtl.textContent = fmtNum(ltlUnitMile * ltlPct / 100, 5, '$');
+  if (blendParcel) blendParcel.textContent = fmtNum(parcelPerUnitMile * parcelPct / 100, 5, '$');
+  if (blendTotal) blendTotal.textContent = fmtNum(blendedUnitMile, 5, '$');
 
   // Update hidden inputs for the optimizer
   document.getElementById('netopt-outbound-cost').value = blendedUnitMile.toFixed(6);
@@ -4409,7 +4409,7 @@ function netoptGenerateDemoDemand() {
   netoptBalanceModeMix('tl');
 
   if (status) {
-    status.textContent = 'Generated ' + demandPoints.length + ' demand points (' + (totalVolume / 1000000).toFixed(1) + 'M units). Mode mix set to ' + arch.modeMix.tl + '/' + arch.modeMix.ltl + '/' + arch.modeMix.parcel + ' (TL/LTL/Parcel).';
+    status.textContent = 'Generated ' + demandPoints.length + ' demand points (' + fmtNum(totalVolume / 1000000, 1) + 'M units). Mode mix set to ' + arch.modeMix.tl + '/' + arch.modeMix.ltl + '/' + arch.modeMix.parcel + ' (TL/LTL/Parcel).';
     status.style.color = '#059669';
   }
 
@@ -4720,7 +4720,7 @@ function netoptShowMarketPicker() {
     var checkbox = '<input type="checkbox" data-market-idx="' + idx + '" ' + (alreadyAdded ? 'disabled checked' : '') + ' style="width:16px;height:16px;accent-color:var(--ies-blue);cursor:' + (alreadyAdded ? 'default' : 'pointer') + ';">';
     var info = '<div style="flex:1;min-width:0;">' +
       '<div style="font-weight:700;font-size:12px;color:var(--ies-navy);">' + m.name + '</div>' +
-      '<div style="font-size:10px;color:#6b7280;">' + m.city + ' &middot; ' + m.capacity + 'K cap &middot; $' + m.fixedCost.toFixed(1) + 'M fixed</div>' +
+      '<div style="font-size:10px;color:#6b7280;">' + m.city + ' &middot; ' + m.capacity + 'K cap &middot; ' + fmtNum(m.fixedCost, 1, '$') + 'M fixed</div>' +
       (alreadyAdded ? '<div style="font-size:9px;color:var(--ies-blue);font-weight:600;margin-top:2px;">Already added</div>' : '') +
       '</div>';
     card.innerHTML = checkbox + info;
@@ -4943,9 +4943,9 @@ function netoptUpdateKPI() {
   var servicePct = netoptState.results ? netoptState.results.serviceLevel : 0;
 
   document.getElementById('netopt-k-open').textContent = openCount || '—';
-  document.getElementById('netopt-k-demand').textContent = totalDemand ? (totalDemand >= 1000000 ? (totalDemand / 1000000).toFixed(1) + 'M' : (totalDemand / 1000).toFixed(0) + 'K') : '—';
-  document.getElementById('netopt-k-cost').textContent = totalCost ? '$' + totalCost.toFixed(1) + 'M' : '—';
-  document.getElementById('netopt-k-service').textContent = servicePct ? servicePct.toFixed(0) + '%' : '—';
+  document.getElementById('netopt-k-demand').textContent = totalDemand ? (totalDemand >= 1000000 ? fmtNum(totalDemand / 1000000, 1) + 'M' : fmtNum(totalDemand / 1000, 0) + 'K') : '—';
+  document.getElementById('netopt-k-cost').textContent = totalCost ? fmtNum(totalCost, 1, '$') + 'M' : '—';
+  document.getElementById('netopt-k-service').textContent = servicePct ? fmtNum(servicePct, 0) + '%' : '—';
   document.getElementById('netopt-k-dist').textContent = avgDist ? Math.round(avgDist).toLocaleString('en-US') : '—';
 }
 
@@ -5026,7 +5026,7 @@ function netoptRunOptimization() {
   var timeEl = document.getElementById('netopt-solve-time');
   if (timeEl) {
     timeEl.style.display = 'inline';
-    timeEl.textContent = 'Solved in ' + elapsed.toFixed(0) + 'ms (' + (netoptState.solverMode === 'exact' ? 'exact' : 'heuristic') + ')';
+    timeEl.textContent = 'Solved in ' + fmtNum(elapsed, 0) + 'ms (' + (netoptState.solverMode === 'exact' ? 'exact' : 'heuristic') + ')';
   }
 
   netoptState.results = results;
@@ -5065,7 +5065,7 @@ function netoptGreedyOptimize(facilities, demands, transport, constraints) {
     var targetPct = constraints.targetServicePct || constraints.serviceLevelPct || 95;
     if (constraints.hardConstraint && s.serviceLevel < targetPct) {
       s._hardConstraintFail = true;
-      s._hardConstraintReason = 'Service ' + s.serviceLevel.toFixed(1) + '% < ' + targetPct + '% target';
+      s._hardConstraintReason = 'Service ' + fmtNum(s.serviceLevel, 1) + '% < ' + targetPct + '% target';
     }
   });
 
@@ -5456,27 +5456,27 @@ function netoptRenderResults() {
   tbody.innerHTML = `
     <tr style="border-bottom:1px solid var(--ies-gray-200);">
       <td style="padding:10px 0;font-weight:600;">Facility Fixed Costs</td>
-      <td style="padding:10px 0;text-align:right;font-weight:700;color:var(--ies-blue);">$${r.fixedCostM.toFixed(2)}M</td>
+      <td style="padding:10px 0;text-align:right;font-weight:700;color:var(--ies-blue);">${fmtNum(r.fixedCostM, 2, '$')}M</td>
     </tr>
     <tr style="border-bottom:1px solid var(--ies-gray-200);">
       <td style="padding:10px 0;font-weight:600;">Outbound Transport</td>
-      <td style="padding:10px 0;text-align:right;font-weight:700;color:var(--ies-blue);">$${r.transportCostM.toFixed(2)}M</td>
+      <td style="padding:10px 0;text-align:right;font-weight:700;color:var(--ies-blue);">${fmtNum(r.transportCostM, 2, '$')}M</td>
     </tr>
     <tr style="border-bottom:1px solid var(--ies-gray-200);">
       <td style="padding:10px 0;font-weight:600;">Inbound Transport</td>
-      <td style="padding:10px 0;text-align:right;font-weight:700;color:var(--ies-blue);">$${(r.inboundCostM || 0).toFixed(2)}M</td>
+      <td style="padding:10px 0;text-align:right;font-weight:700;color:var(--ies-blue);">${fmtNum(r.inboundCostM || 0, 2, '$')}M</td>
     </tr>
     <tr style="border-bottom:1px solid var(--ies-gray-200);">
       <td style="padding:10px 0;font-weight:600;">Variable Handling</td>
-      <td style="padding:10px 0;text-align:right;font-weight:700;color:var(--ies-blue);">$${r.varCostM.toFixed(2)}M</td>
+      <td style="padding:10px 0;text-align:right;font-weight:700;color:var(--ies-blue);">${fmtNum(r.varCostM, 2, '$')}M</td>
     </tr>
     <tr style="border-bottom:1px solid var(--ies-gray-200);">
       <td style="padding:10px 0;font-weight:600;">Inventory Carrying</td>
-      <td style="padding:10px 0;text-align:right;font-weight:700;color:var(--ies-blue);">$${r.inventoryCostM.toFixed(2)}M</td>
+      <td style="padding:10px 0;text-align:right;font-weight:700;color:var(--ies-blue);">${fmtNum(r.inventoryCostM, 2, '$')}M</td>
     </tr>
     <tr style="border-top:2px solid var(--ies-navy);">
       <td style="padding:10px 0;font-weight:700;color:var(--ies-navy);">TOTAL ANNUAL COST</td>
-      <td style="padding:10px 0;text-align:right;font-weight:900;color:var(--ies-navy);font-size:14px;">$${r.totalCost.toFixed(2)}M</td>
+      <td style="padding:10px 0;text-align:right;font-weight:900;color:var(--ies-navy);font-size:14px;">${fmtNum(r.totalCost, 2, '$')}M</td>
     </tr>
   `;
 
@@ -5488,9 +5488,9 @@ function netoptRenderResults() {
     var barLabels = ['1 Day', '2 Day', '3 Day', '4 Day', '5+ Day'];
     var barVals = [dp.d1, dp.d2, dp.d3, dp.d4, dp.d5plus];
 
-    var avgDaysDisplay = r.avgDeliveryDays ? r.avgDeliveryDays.toFixed(1) : '—';
-    var cumul2Day = (dp.d1 + dp.d2).toFixed(0);
-    var cumul3Day = (dp.d1 + dp.d2 + dp.d3).toFixed(0);
+    var avgDaysDisplay = r.avgDeliveryDays ? fmtNum(r.avgDeliveryDays, 1) : '—';
+    var cumul2Day = fmtNum(dp.d1 + dp.d2, 0);
+    var cumul3Day = fmtNum(dp.d1 + dp.d2 + dp.d3, 0);
     var slaHtml = (r.slaMet != null && r.slaTotal > 0) ?
       '<div style="margin-top:8px;font-size:10px;font-weight:600;color:' + (r.slaMet === r.slaTotal ? '#059669' : r.slaMet >= r.slaTotal * 0.9 ? '#d97706' : '#dc2626') + ';">' + r.slaMet + '/' + r.slaTotal + ' demand points meet SLA</div>' : '';
     var svcColor = r.serviceLevel >= (netoptState.constraints.targetServicePct || 95) ? '#059669' : r.serviceLevel >= (netoptState.constraints.targetServicePct || 95) - 5 ? '#d97706' : '#dc2626';
@@ -5501,7 +5501,7 @@ function netoptRenderResults() {
           <div style="font-size:28px;font-weight:800;color:var(--ies-navy);">${avgDaysDisplay}</div>
           <div style="font-size:10px;font-weight:600;color:var(--ies-gray-500);text-transform:uppercase;letter-spacing:.5px;">Avg Days</div>
           <div style="margin-top:6px;font-size:10px;color:var(--ies-gray-500);">${cumul2Day}% within 2 days &middot; ${cumul3Day}% within 3 days</div>
-          <div style="margin-top:4px;font-size:14px;font-weight:700;color:${svcColor};">${r.serviceLevel ? r.serviceLevel.toFixed(1) : '—'}% Service</div>
+          <div style="margin-top:4px;font-size:14px;font-weight:700;color:${svcColor};">${r.serviceLevel ? fmtNum(r.serviceLevel, 1) : '—'}% Service</div>
           ${slaHtml}
         </div>
         <div style="flex:1;min-width:200px;">
@@ -5512,7 +5512,7 @@ function netoptRenderResults() {
               '<div style="flex:1;height:18px;background:#f1f3f5;border-radius:4px;overflow:hidden;position:relative;">' +
                 '<div style="height:100%;width:' + Math.max(val, 0.5) + '%;background:' + barColors[bi] + ';border-radius:4px;transition:width .3s;"></div>' +
               '</div>' +
-              '<div style="width:36px;font-size:11px;font-weight:700;color:var(--ies-navy);text-align:right;">' + val.toFixed(0) + '%</div>' +
+              '<div style="width:36px;font-size:11px;font-weight:700;color:var(--ies-navy);text-align:right;">' + fmtNum(val, 0) + '%</div>' +
             '</div>';
           }).join('')}
         </div>
@@ -5547,8 +5547,8 @@ function netoptRenderResults() {
       // B3: Delta from baseline
       var deltaPct = baseline && baseline.totalCost > 0 ? ((scenario.totalCost - baseline.totalCost) / baseline.totalCost * 100) : 0;
       var deltaHtml = i === 0 ? '<span style="color:var(--ies-gray-400);">base</span>' :
-        (deltaPct <= 0 ? '<span style="color:#059669;">' + deltaPct.toFixed(1) + '%</span>' :
-         '<span style="color:#dc2626;">+' + deltaPct.toFixed(1) + '%</span>');
+        (deltaPct <= 0 ? '<span style="color:#059669;">' + fmtNum(deltaPct, 1) + '%</span>' :
+         '<span style="color:#dc2626;">+' + fmtNum(deltaPct, 1) + '%</span>');
 
       // B1: Feasibility icon
       var feasIcon = scenario.feasibility === 'green' ? '&#x1f7e2;' : scenario.feasibility === 'yellow' ? '&#x1f7e1;' : scenario.feasibility === 'red' ? '&#x1f534;' : '&#x1f7e2;';
@@ -5567,12 +5567,12 @@ function netoptRenderResults() {
       row.innerHTML =
         '<td style="padding:10px 14px;font-weight:600;">' + numDCs + '</td>' +
         '<td style="padding:10px 14px;font-size:11px;">' + esc(facNames) + '</td>' +
-        '<td style="padding:10px 14px;text-align:right;font-weight:600;">$' + scenario.totalCost.toFixed(2) + 'M</td>' +
-        '<td style="padding:10px 14px;text-align:right;">$' + scenario.fixedCostM.toFixed(2) + 'M</td>' +
-        '<td style="padding:10px 14px;text-align:right;">$' + scenario.transportCostM.toFixed(2) + 'M</td>' +
-        '<td style="padding:10px 14px;text-align:right;">' + (scenario.avgDistance ? scenario.avgDistance.toFixed(0) : '—') + '</td>' +
-        '<td style="padding:10px 14px;text-align:right;">' + (scenario.serviceLevel ? scenario.serviceLevel.toFixed(0) + '%' : '—') + '</td>' +
-        '<td style="padding:10px 14px;text-align:right;font-weight:600;">' + (scenario.avgDeliveryDays ? scenario.avgDeliveryDays.toFixed(1) : '—') + '</td>' +
+        '<td style="padding:10px 14px;text-align:right;font-weight:600;">' + fmtNum(scenario.totalCost, 2, '$') + 'M</td>' +
+        '<td style="padding:10px 14px;text-align:right;">' + fmtNum(scenario.fixedCostM, 2, '$') + 'M</td>' +
+        '<td style="padding:10px 14px;text-align:right;">' + fmtNum(scenario.transportCostM, 2, '$') + 'M</td>' +
+        '<td style="padding:10px 14px;text-align:right;">' + (scenario.avgDistance ? fmtNum(scenario.avgDistance, 0) : '—') + '</td>' +
+        '<td style="padding:10px 14px;text-align:right;">' + (scenario.serviceLevel ? fmtNum(scenario.serviceLevel, 0) + '%' : '—') + '</td>' +
+        '<td style="padding:10px 14px;text-align:right;font-weight:600;">' + (scenario.avgDeliveryDays ? fmtNum(scenario.avgDeliveryDays, 1) : '—') + '</td>' +
         '<td style="padding:10px 14px;text-align:right;font-weight:600;">' + deltaHtml + '</td>' +
         '<td style="padding:10px 14px;text-align:center;font-size:11px;">' + (scenario.slaMet != null ? scenario.slaMet + '/' + scenario.slaTotal : '—') + '</td>' +
         '<td style="padding:10px 14px;text-align:center;">' + feasIcon + '</td>' +
@@ -5625,7 +5625,7 @@ function netoptRenderUtilization(r) {
     html += '<div style="margin-bottom:8px;">';
     html += '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px;">';
     html += '<span style="font-size:11px;font-weight:600;color:var(--ies-navy);">' + esc(f.name) + '</span>';
-    html += '<span style="font-size:10px;color:var(--ies-gray-500);">' + (u.volume || 0).toLocaleString() + 'K / ' + capLabel + ' (' + u.pct.toFixed(0) + '%)</span>';
+    html += '<span style="font-size:10px;color:var(--ies-gray-500);">' + (u.volume || 0).toLocaleString() + 'K / ' + capLabel + ' (' + fmtNum(u.pct, 0) + '%)</span>';
     html += '</div>';
     html += '<div style="height:10px;background:#f1f3f5;border-radius:5px;overflow:hidden;">';
     html += '<div style="height:100%;width:' + Math.min(pct, 100) + '%;background:' + barColor + ';border-radius:5px;transition:width .3s;"></div>';
@@ -5954,7 +5954,7 @@ function netoptDrawServiceZones(openFacilities) {
         opacity: 0.8
       }).addTo(netoptState.netoptMap);
 
-      polygon.bindPopup('<strong>' + f.name + '</strong><br>' + zs.label + ' delivery zone<br>' + th.maxMiles.toFixed(0) + ' mi radius');
+      polygon.bindPopup('<strong>' + f.name + '</strong><br>' + zs.label + ' delivery zone<br>' + fmtNum(th.maxMiles, 0) + ' mi radius');
       netoptState.zoneLayers.push(polygon);
     });
   });
@@ -6041,37 +6041,37 @@ function netoptRenderRecommendation(r) {
     // Service upgrade is cheap (<8% more cost) for meaningful improvement
     recIdx = bestServiceIdx;
     recType = 'service';
-    recRationale = 'The best-service network is only ' + costDeltaPct.toFixed(0) + '% more expensive ($' + costDelta.toFixed(2) + 'M/yr) but improves avg delivery by ' + daysDelta.toFixed(1) + ' days. The marginal cost is well justified by the service improvement.';
+    recRationale = 'The best-service network is only ' + fmtNum(costDeltaPct, 0) + '% more expensive (' + fmtNum(costDelta, 2, '$') + 'M/yr) but improves avg delivery by ' + fmtNum(daysDelta, 1) + ' days. The marginal cost is well justified by the service improvement.';
   } else if (costDeltaPct > 30 && daysDelta < 0.5) {
     // Service upgrade is expensive for minimal improvement
     recIdx = bestCostIdx;
     recType = 'cost';
-    recRationale = 'Adding facilities improves delivery by only ' + daysDelta.toFixed(1) + ' days but costs ' + costDeltaPct.toFixed(0) + '% more ($' + costDelta.toFixed(2) + 'M/yr). The cost-optimized network is recommended unless SLA requirements dictate otherwise.';
+    recRationale = 'Adding facilities improves delivery by only ' + fmtNum(daysDelta, 1) + ' days but costs ' + fmtNum(costDeltaPct, 0) + '% more (' + fmtNum(costDelta, 2, '$') + 'M/yr). The cost-optimized network is recommended unless SLA requirements dictate otherwise.';
   } else if (hasBalanced) {
     // There's a meaningful middle ground
     var balCostDelta = balancedScen.totalCost - costScen.totalCost;
     var balCostPct = costScen.totalCost > 0 ? (balCostDelta / costScen.totalCost * 100) : 0;
     var balDaysGain = costScen.avgDeliveryDays - balancedScen.avgDeliveryDays;
-    var bal2Day = (balancedScen.dayPct.d1 + balancedScen.dayPct.d2).toFixed(0);
+    var bal2Day = fmtNum(balancedScen.dayPct.d1 + balancedScen.dayPct.d2, 0);
     recIdx = balancedIdx;
     recType = 'balanced';
-    recRationale = 'This configuration strikes the best balance — ' + balCostPct.toFixed(0) + '% more than the lowest-cost option ($' + balCostDelta.toFixed(2) + 'M/yr) but ' + balDaysGain.toFixed(1) + ' days faster with ' + bal2Day + '% of orders within 2 days. It offers the best cost-per-day-improved ratio across all scenarios.';
+    recRationale = 'This configuration strikes the best balance — ' + fmtNum(balCostPct, 0) + '% more than the lowest-cost option (' + fmtNum(balCostDelta, 2, '$') + 'M/yr) but ' + fmtNum(balDaysGain, 1) + ' days faster with ' + bal2Day + '% of orders within 2 days. It offers the best cost-per-day-improved ratio across all scenarios.';
   } else {
     // Default: recommend based on whether the trade-off favors cost or service
     if (costDeltaPct < 15) {
       recIdx = bestServiceIdx;
       recType = 'service';
-      recRationale = 'For ' + costDeltaPct.toFixed(0) + '% additional cost ($' + costDelta.toFixed(2) + 'M/yr), the service-optimized network delivers ' + daysDelta.toFixed(1) + ' fewer avg days with ' + twoDayImprove.toFixed(0) + ' percentage points more orders in the 2-day window.';
+      recRationale = 'For ' + fmtNum(costDeltaPct, 0) + '% additional cost (' + fmtNum(costDelta, 2, '$') + 'M/yr), the service-optimized network delivers ' + fmtNum(daysDelta, 1) + ' fewer avg days with ' + fmtNum(twoDayImprove, 0) + ' percentage points more orders in the 2-day window.';
     } else {
       recIdx = bestCostIdx;
       recType = 'cost';
-      recRationale = 'The service upgrade costs ' + costDeltaPct.toFixed(0) + '% more ($' + costDelta.toFixed(2) + 'M/yr) for ' + daysDelta.toFixed(1) + ' days improvement. The cost-optimized network is recommended unless faster delivery is a competitive requirement.';
+      recRationale = 'The service upgrade costs ' + fmtNum(costDeltaPct, 0) + '% more (' + fmtNum(costDelta, 2, '$') + 'M/yr) for ' + fmtNum(daysDelta, 1) + ' days improvement. The cost-optimized network is recommended unless faster delivery is a competitive requirement.';
     }
   }
 
   var recScen = scenarios[recIdx];
   var recFacNames = recScen.openFacilities.map(function(f) { return esc(f.name); }).join(', ');
-  var rec2Day = (recScen.dayPct.d1 + recScen.dayPct.d2).toFixed(0);
+  var rec2Day = fmtNum(recScen.dayPct.d1 + recScen.dayPct.d2, 0);
 
   // Determine badge color/label based on recommendation type
   var badgeColor, badgeLabel;
@@ -6096,8 +6096,8 @@ function netoptRenderRecommendation(r) {
   html += '<div style="display:flex;gap:16px;margin-bottom:12px;flex-wrap:wrap;">';
   var metrics = [
     { label: 'Facilities', value: recScen.openFacilities.length + ' DCs' },
-    { label: 'Total Cost', value: '$' + recScen.totalCost.toFixed(2) + 'M/yr' },
-    { label: 'Avg Delivery', value: recScen.avgDeliveryDays.toFixed(1) + ' days' },
+    { label: 'Total Cost', value: fmtNum(recScen.totalCost, 2, '$') + 'M/yr' },
+    { label: 'Avg Delivery', value: fmtNum(recScen.avgDeliveryDays, 1) + ' days' },
     { label: '≤2 Day', value: rec2Day + '%' }
   ];
   metrics.forEach(function(m) {
@@ -6120,24 +6120,24 @@ function netoptRenderRecommendation(r) {
 
     // Cost-optimal mini card
     var cFacs = costScen.openFacilities.map(function(f) { return esc(f.name); }).join(', ');
-    var c2Day = (costScen.dayPct.d1 + costScen.dayPct.d2).toFixed(0);
+    var c2Day = fmtNum(costScen.dayPct.d1 + costScen.dayPct.d2, 0);
     html += '<div style="flex:1;padding:10px 16px;border-right:1px solid rgba(0,0,0,.06);' + (recIdx === bestCostIdx ? 'background:rgba(16,185,129,.04);' : '') + '">';
     html += '<div style="font-weight:700;color:#059669;font-size:10px;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;">';
     html += '<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#10b981;margin-right:4px;vertical-align:0px;"></span>Lowest Cost</div>';
-    html += '<div style="color:var(--ies-navy);font-weight:600;">' + costScen.openFacilities.length + ' DCs — $' + costScen.totalCost.toFixed(2) + 'M/yr</div>';
+    html += '<div style="color:var(--ies-navy);font-weight:600;">' + costScen.openFacilities.length + ' DCs — ' + fmtNum(costScen.totalCost, 2, '$') + 'M/yr</div>';
     html += '<div style="color:var(--ies-gray-500);font-size:10px;">' + cFacs + '</div>';
-    html += '<div style="color:var(--ies-gray-500);font-size:10px;">' + costScen.avgDeliveryDays.toFixed(1) + ' avg days &middot; ' + c2Day + '% ≤2 day</div>';
+    html += '<div style="color:var(--ies-gray-500);font-size:10px;">' + fmtNum(costScen.avgDeliveryDays, 1) + ' avg days &middot; ' + c2Day + '% ≤2 day</div>';
     html += '</div>';
 
     // Service-optimal mini card
     var sFacs = serviceScen.openFacilities.map(function(f) { return esc(f.name); }).join(', ');
-    var s2Day = (serviceScen.dayPct.d1 + serviceScen.dayPct.d2).toFixed(0);
+    var s2Day = fmtNum(serviceScen.dayPct.d1 + serviceScen.dayPct.d2, 0);
     html += '<div style="flex:1;padding:10px 16px;' + (recIdx === bestServiceIdx ? 'background:rgba(59,130,246,.04);' : '') + '">';
     html += '<div style="font-weight:700;color:#2563eb;font-size:10px;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;">';
     html += '<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#3b82f6;margin-right:4px;vertical-align:0px;"></span>Best Service</div>';
-    html += '<div style="color:var(--ies-navy);font-weight:600;">' + serviceScen.openFacilities.length + ' DCs — $' + serviceScen.totalCost.toFixed(2) + 'M/yr</div>';
+    html += '<div style="color:var(--ies-navy);font-weight:600;">' + serviceScen.openFacilities.length + ' DCs — ' + fmtNum(serviceScen.totalCost, 2, '$') + 'M/yr</div>';
     html += '<div style="color:var(--ies-gray-500);font-size:10px;">' + sFacs + '</div>';
-    html += '<div style="color:var(--ies-gray-500);font-size:10px;">' + serviceScen.avgDeliveryDays.toFixed(1) + ' avg days &middot; ' + s2Day + '% ≤2 day</div>';
+    html += '<div style="color:var(--ies-gray-500);font-size:10px;">' + fmtNum(serviceScen.avgDeliveryDays, 1) + ' avg days &middot; ' + s2Day + '% ≤2 day</div>';
     html += '</div>';
 
     html += '</div>';
@@ -6537,11 +6537,11 @@ function netoptRenderAllocationTable() {
     tr.style.borderBottom = '1px solid var(--ies-gray-200)';
     tr.innerHTML = '<td style="padding:10px 14px;">' + esc(row.demand) + '</td>' +
       '<td style="padding:10px 14px;">' + esc(row.city) + '</td>' +
-      '<td style="padding:10px 14px;text-align:right;">' + row.volume.toFixed(0) + '</td>' +
+      '<td style="padding:10px 14px;text-align:right;">' + fmtNum(row.volume, 0) + '</td>' +
       '<td style="padding:10px 14px;">' + esc(row.facility) + '</td>' +
-      '<td style="padding:10px 14px;text-align:right;">' + row.distance.toFixed(0) + '</td>' +
-      '<td style="padding:10px 14px;text-align:right;">$' + (row.cost / 1000).toFixed(0) + 'K</td>' +
-      '<td style="padding:10px 14px;text-align:right;">' + row.days.toFixed(1) + '</td>';
+      '<td style="padding:10px 14px;text-align:right;">' + fmtNum(row.distance, 0) + '</td>' +
+      '<td style="padding:10px 14px;text-align:right;">' + fmtNum(row.cost / 1000, 0, '$') + 'K</td>' +
+      '<td style="padding:10px 14px;text-align:right;">' + fmtNum(row.days, 1) + '</td>';
     tbody.appendChild(tr);
   });
 
@@ -6577,11 +6577,11 @@ function netoptSortAllocationTable(btn, field) {
     tr.style.borderBottom = '1px solid var(--ies-gray-200)';
     tr.innerHTML = '<td style="padding:10px 14px;">' + esc(row.demand) + '</td>' +
       '<td style="padding:10px 14px;">' + esc(row.city) + '</td>' +
-      '<td style="padding:10px 14px;text-align:right;">' + row.volume.toFixed(0) + '</td>' +
+      '<td style="padding:10px 14px;text-align:right;">' + fmtNum(row.volume, 0) + '</td>' +
       '<td style="padding:10px 14px;">' + esc(row.facility) + '</td>' +
-      '<td style="padding:10px 14px;text-align:right;">' + row.distance.toFixed(0) + '</td>' +
-      '<td style="padding:10px 14px;text-align:right;">$' + (row.cost / 1000).toFixed(0) + 'K</td>' +
-      '<td style="padding:10px 14px;text-align:right;">' + row.days.toFixed(1) + '</td>';
+      '<td style="padding:10px 14px;text-align:right;">' + fmtNum(row.distance, 0) + '</td>' +
+      '<td style="padding:10px 14px;text-align:right;">' + fmtNum(row.cost / 1000, 0, '$') + 'K</td>' +
+      '<td style="padding:10px 14px;text-align:right;">' + fmtNum(row.days, 1) + '</td>';
     tbody.appendChild(tr);
   });
 }
@@ -8012,31 +8012,58 @@ function renderElevationView(p) {
   // Dock height dimension (4' dock elevation)
   _elevDimV(ctx, toX(dockStart + dockDepth / 2), toY(0), toY(4), "4' dock ht");
 
-  // ── Dimension lines ──
-  // Clear height (right side)
-  _elevDimV(ctx, toX(bldgW) + 20, toY(0), toY(clearH), clearH + "'");
-  // Rack level height
-  if (storeType !== 'bulk') {
-    _elevDimV(ctx, toX(bldgW) + 50, toY(0), toY(beamH), beamH.toFixed(1) + "' / level");
-  }
-  // Roof peak height
+  // ── Dimension lines (right side — adaptive spacing to prevent overlap) ──
   var roofPeak = 4;
-  _elevDimV(ctx, toX(bldgW) + 80, toY(0), toY(clearH + roofPeak), (clearH + roofPeak) + "' roof");
-  // Top of stock (TOS)
+  var rightDims = [];
+  // Always show: clear height, roof peak
+  rightDims.push({ y1: 0, y2: clearH, label: clearH + "'" });
+  if (storeType !== 'bulk') {
+    rightDims.push({ y1: 0, y2: beamH, label: beamH.toFixed(1) + "' / level" });
+  }
+  rightDims.push({ y1: 0, y2: clearH + roofPeak, label: (clearH + roofPeak) + "' roof" });
   if (storeType !== 'bulk') {
     var tos = beamH * rackLevels - beamH * 0.25;
-    _elevDimV(ctx, toX(bldgW) + 110, toY(0), toY(tos), tos.toFixed(1) + "' TOS");
-    // Sprinkler clearance bracket
-    if (clearH - tos > 0) {
-      ctx.save();
-      ctx.setLineDash([4, 3]);
-      ctx.strokeStyle = '#e53935';
-      _elevDimV(ctx, toX(bldgW) + 140, toY(tos), toY(clearH), (clearH - tos).toFixed(1) + "' gap");
-      ctx.restore();
+    rightDims.push({ y1: 0, y2: tos, label: tos.toFixed(1) + "' TOS" });
+    // Only show sprinkler gap if > 2 ft
+    if (clearH - tos > 2) {
+      rightDims.push({ y1: tos, y2: clearH, label: (clearH - tos).toFixed(1) + "' gap", dash: true, color: '#e53935' });
     }
-    // Pallet load height (inside first rack bay)
+  }
+  // Sort by midpoint height so labels stack logically
+  rightDims.sort(function(a, b) { return ((a.y1 + a.y2) / 2) - ((b.y1 + b.y2) / 2); });
+  // Assign x positions with collision detection (45px base spacing, nudge if labels overlap)
+  var baseX = toX(bldgW) + 20;
+  var dimSpacing = 45;
+  for (var di = 0; di < rightDims.sort(function(a, b) { return a.y2 - b.y2; }).length; di++) {
+    rightDims[di].x = baseX + di * dimSpacing;
+  }
+  // Collision check: if two label midpoints are within 14px vertically, nudge the later one
+  for (var di = 1; di < rightDims.length; di++) {
+    var prevMid = (toY(rightDims[di - 1].y1) + toY(rightDims[di - 1].y2)) / 2;
+    var curMid = (toY(rightDims[di].y1) + toY(rightDims[di].y2)) / 2;
+    if (Math.abs(prevMid - curMid) < 14) {
+      rightDims[di].x = rightDims[di - 1].x + dimSpacing;
+    }
+  }
+  // Draw right-side dimensions
+  for (var di = 0; di < rightDims.length; di++) {
+    var rd = rightDims[di];
+    if (rd.dash || rd.color) {
+      ctx.save();
+      if (rd.dash) ctx.setLineDash([4, 3]);
+      if (rd.color) ctx.strokeStyle = rd.color;
+      _elevDimV(ctx, rd.x, toY(rd.y1), toY(rd.y2), rd.label);
+      ctx.restore();
+    } else {
+      _elevDimV(ctx, rd.x, toY(rd.y1), toY(rd.y2), rd.label);
+    }
+  }
+  // Pallet load height (inside first rack bay) — only if >= 4 ft
+  if (storeType !== 'bulk') {
     var loadH = beamH * 0.75;
-    _elevDimV(ctx, toX(storageStart + rackDepth + 2), toY(0.5), toY(0.5 + loadH), loadH.toFixed(1) + "'");
+    if (loadH >= 4) {
+      _elevDimV(ctx, toX(storageStart + rackDepth + 2), toY(0.5), toY(0.5 + loadH), loadH.toFixed(1) + "'");
+    }
   }
   // Office height
   if (officeW > 0) {
@@ -8060,8 +8087,8 @@ function renderElevationView(p) {
   // Building width (bottom)
   _elevDimH(ctx, toX(0), toX(bldgW), toY(0) + 35, 'Building Width: ' + Math.round(bldgW) + ' ft');
 
-  // ── Legend ──
-  _elevDrawLegend(ctx, W - 200, 10);
+  // ── Legend (horizontal strip below floor line) ──
+  _elevDrawLegend(ctx, W, toY(0) + 85);
 
   // Store resize handler
   if (!window._wscElevResizeHandler) {
@@ -8159,61 +8186,44 @@ function _elevDimH(ctx, x1, x2, y, label, color) {
   ctx.fillText(label, (x1 + x2) / 2, y - 6);
 }
 
-// ── Elevation legend ──
-function _elevDrawLegend(ctx, x, y) {
-  ctx.fillStyle = '#f8f8f8';
-  ctx.fillRect(x, y, 190, 80);
-  ctx.strokeStyle = '#ddd';
-  ctx.lineWidth = 0.5;
-  ctx.strokeRect(x, y, 190, 80);
-
+// ── Elevation legend (horizontal strip below floor) ──
+function _elevDrawLegend(ctx, canvasW, y) {
+  var items = [
+    { type: 'line', color: '#1a73e8', width: 1.5, label: 'Clear Height' },
+    { type: 'dash', color: '#e53935', width: 1, label: 'Sprinkler Clr' },
+    { type: 'rect', fill: '#DEB887', stroke: '#C8A882', label: 'Pallet Load' },
+    { type: 'vert', color: '#4444cc', width: 2, label: 'Rack Upright' },
+    { type: 'line', color: '#ff8800', width: 1.5, label: 'Rack Beam' },
+    { type: 'rect', fill: '#e0e0e0', stroke: '#ccc', label: 'Floor Slab' }
+  ];
   ctx.font = '9px system-ui';
   ctx.textAlign = 'left';
-  var lx = x + 8;
-  var ly = y + 14;
-  var gap = 14;
+  // Measure total width: 16px swatch + 4px gap + text + 20px item gap
+  var totalW = 0;
+  for (var i = 0; i < items.length; i++) {
+    totalW += 20 + ctx.measureText(items[i].label).width + (i < items.length - 1 ? 20 : 0);
+  }
+  var lx = (canvasW - totalW) / 2;
 
-  // Clear height line
-  ctx.strokeStyle = '#1a73e8';
-  ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.moveTo(lx, ly); ctx.lineTo(lx + 16, ly); ctx.stroke();
-  ctx.fillStyle = '#333';
-  ctx.fillText('Clear Height', lx + 20, ly + 3);
-
-  // Sprinkler
-  ctx.strokeStyle = '#e53935';
-  ctx.lineWidth = 1;
-  ctx.setLineDash([4, 3]);
-  ctx.beginPath(); ctx.moveTo(lx, ly + gap); ctx.lineTo(lx + 16, ly + gap); ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.fillText('Sprinkler Clearance', lx + 20, ly + gap + 3);
-
-  // Pallet load
-  ctx.fillStyle = '#DEB887';
-  ctx.fillRect(lx, ly + gap * 2 - 4, 12, 8);
-  ctx.strokeStyle = '#C8A882';
-  ctx.strokeRect(lx, ly + gap * 2 - 4, 12, 8);
-  ctx.fillStyle = '#333';
-  ctx.fillText('Pallet Load', lx + 20, ly + gap * 2 + 3);
-
-  // Rack uprights
-  ctx.strokeStyle = '#4444cc';
-  ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.moveTo(lx + 100, ly); ctx.lineTo(lx + 100, ly + 10); ctx.stroke();
-  ctx.fillStyle = '#333';
-  ctx.fillText('Rack Upright', lx + 106, ly + 8);
-
-  // Beams
-  ctx.strokeStyle = '#ff8800';
-  ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.moveTo(lx + 100, ly + gap); ctx.lineTo(lx + 116, ly + gap); ctx.stroke();
-  ctx.fillStyle = '#333';
-  ctx.fillText('Rack Beam', lx + 120, ly + gap + 3);
-
-  // Floor
-  ctx.fillStyle = '#e0e0e0';
-  ctx.fillRect(lx + 100, ly + gap * 2 - 4, 12, 8);
-  ctx.fillStyle = '#333';
-  ctx.fillText('Floor Slab', lx + 120, ly + gap * 2 + 3);
+  for (var i = 0; i < items.length; i++) {
+    var it = items[i];
+    if (it.type === 'line') {
+      ctx.strokeStyle = it.color; ctx.lineWidth = it.width; ctx.setLineDash([]);
+      ctx.beginPath(); ctx.moveTo(lx, y); ctx.lineTo(lx + 16, y); ctx.stroke();
+    } else if (it.type === 'dash') {
+      ctx.strokeStyle = it.color; ctx.lineWidth = it.width; ctx.setLineDash([4, 3]);
+      ctx.beginPath(); ctx.moveTo(lx, y); ctx.lineTo(lx + 16, y); ctx.stroke();
+      ctx.setLineDash([]);
+    } else if (it.type === 'rect') {
+      ctx.fillStyle = it.fill; ctx.fillRect(lx, y - 4, 12, 8);
+      ctx.strokeStyle = it.stroke; ctx.lineWidth = 0.5; ctx.strokeRect(lx, y - 4, 12, 8);
+    } else if (it.type === 'vert') {
+      ctx.strokeStyle = it.color; ctx.lineWidth = it.width;
+      ctx.beginPath(); ctx.moveTo(lx + 6, y - 5); ctx.lineTo(lx + 6, y + 5); ctx.stroke();
+    }
+    ctx.fillStyle = '#333';
+    ctx.fillText(it.label, lx + 20, y + 3);
+    lx += 20 + ctx.measureText(it.label).width + 20;
+  }
 }
 
