@@ -6934,31 +6934,34 @@ function _wsc3dBuildOffice(scene, zoneX, zoneZ, zoneW, zoneH) {
 // ── Build zone sign post ──
 function _wsc3dBuildSign(scene, text, x, z, color) {
   var postMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.5 });
-  scene.add(_wsc3dMakeMesh(new THREE.CylinderGeometry(0.15, 0.15, 8, 6), postMat, [x, 4, z]));
+  scene.add(_wsc3dMakeMesh(new THREE.CylinderGeometry(0.2, 0.2, 12, 6), postMat, [x, 6, z]));
   var signColor = color || 0x333333;
   var signMat = new THREE.MeshStandardMaterial({ color: signColor, roughness: 0.4 });
-  scene.add(_wsc3dMakeMesh(new THREE.BoxGeometry(6, 2, 0.2), signMat, [x, 8.5, z]));
+  scene.add(_wsc3dMakeMesh(new THREE.BoxGeometry(14, 4, 0.3), signMat, [x, 13, z]));
 
-  // Text sprite on the sign
+  // Text sprite on the sign — high-res for readability
   var sprite = wsc3dMakeTextSprite(text, 0xffffff);
-  sprite.position.set(x, 8.5, z + 0.2);
-  sprite.scale.set(8, 4, 1);
+  sprite.position.set(x, 13, z + 0.3);
+  sprite.scale.set(18, 9, 1);
   scene.add(sprite);
 }
 
 // ── Text sprite helper ──
 function wsc3dMakeTextSprite(text, color) {
   var canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 128;
+  canvas.width = 512;
+  canvas.height = 256;
   var ctx = canvas.getContext('2d');
-  ctx.clearRect(0, 0, 256, 128);
-  ctx.font = 'bold 22px sans-serif';
+  ctx.clearRect(0, 0, 512, 256);
+  // Dark semi-transparent background for contrast
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  ctx.fillRect(0, 0, 512, 256);
+  ctx.font = 'bold 38px sans-serif';
   ctx.textAlign = 'center';
   ctx.fillStyle = '#' + ('000000' + (color || 0xffffff).toString(16)).slice(-6);
   var lines = text.split('\n');
   for (var i = 0; i < lines.length; i++) {
-    ctx.fillText(lines[i], 128, 40 + i * 28);
+    ctx.fillText(lines[i], 256, 80 + i * 55);
   }
   var tex = new THREE.CanvasTexture(canvas);
   tex.needsUpdate = true;
@@ -7439,7 +7442,7 @@ function render3DLayout(p) {
     var spacing = dW / (doorCount + 1);
     for (var di = 0; di < doorCount; di++) {
       var dx = dX + spacing * (di + 1);
-      _wsc3dBuildDockDoor(scene, dx, dZ + dockZone.h, 'bottom');
+      _wsc3dBuildDockDoor(scene, dx, bD, 'bottom');
       if (_wsc3dRand() < 0.6) {
         _wsc3dBuildTrailer(scene, dx, bD + 3, 'bottom');
       }
@@ -7455,7 +7458,7 @@ function render3DLayout(p) {
     var spacing2 = dtW / (doors2 + 1);
     for (var d2 = 0; d2 < doors2; d2++) {
       var dx2 = dtX + spacing2 * (d2 + 1);
-      _wsc3dBuildDockDoor(scene, dx2, dtZ, 'top');
+      _wsc3dBuildDockDoor(scene, dx2, 0, 'top');
       if (_wsc3dRand() < 0.6) {
         _wsc3dBuildTrailer(scene, dx2, -3, 'top');
       }
@@ -7928,21 +7931,39 @@ function renderElevationView(p) {
   ctx.strokeStyle = '#999';
   ctx.lineWidth = 1;
   ctx.strokeRect(toX(dockStart), toY(4), dockDepth * scaleX, 4 * scaleY);
+  // "DOCK" label inside platform
+  ctx.fillStyle = '#666';
+  ctx.font = 'bold 10px system-ui';
+  ctx.textAlign = 'center';
+  ctx.fillText('DOCK', toX(dockStart + dockDepth / 2), toY(2) + 3);
 
-  // Dock door opening
+  // Building edge wall line (thick dark vertical at dock outer face)
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(toX(dockStart + dockDepth), toY(0));
+  ctx.lineTo(toX(dockStart + dockDepth), toY(clearH));
+  ctx.stroke();
+
+  // Dock door opening (in the wall)
   ctx.fillStyle = '#fff';
   ctx.fillRect(toX(dockStart + dockDepth - 2), toY(14), 2 * scaleX, 14 * scaleY);
-  ctx.strokeStyle = '#666';
-  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = '#444';
+  ctx.lineWidth = 2;
   ctx.strokeRect(toX(dockStart + dockDepth - 2), toY(14), 2 * scaleX, 14 * scaleY);
 
   // Truck trailer profile (outside, backed up to dock)
   var truckX = dockStart + dockDepth;
-  ctx.fillStyle = '#f0f0f0';
+  ctx.fillStyle = '#e8e0d8';
   ctx.fillRect(toX(truckX), toY(13.5), 20 * scaleX, 9.5 * scaleY);
   ctx.strokeStyle = '#888';
   ctx.lineWidth = 1.5;
   ctx.strokeRect(toX(truckX), toY(13.5), 20 * scaleX, 9.5 * scaleY);
+  // "TRAILER" label inside
+  ctx.fillStyle = '#777';
+  ctx.font = 'bold 10px system-ui';
+  ctx.textAlign = 'center';
+  ctx.fillText('TRAILER', toX(truckX + 10), toY(8));
   // Wheels
   ctx.fillStyle = '#333';
   ctx.beginPath();
@@ -7951,20 +7972,15 @@ function renderElevationView(p) {
   ctx.beginPath();
   ctx.arc(toX(truckX + 18), toY(0) - 3, 4, 0, Math.PI * 2);
   ctx.fill();
-  // Label
-  ctx.fillStyle = '#888';
-  ctx.font = '9px system-ui';
-  ctx.textAlign = 'center';
-  ctx.fillText('Trailer', toX(truckX + 10), toY(7));
 
-  // Dock label
+  // Dock zone label (bottom)
   ctx.fillStyle = '#0ea5e9';
   ctx.font = '9px system-ui';
   ctx.textAlign = 'center';
   ctx.fillText('Dock', toX(dockStart + dockDepth / 2), toY(0) - 8);
 
-  // Dock height dimension
-  _elevDimV(ctx, toX(dockStart) - 10, toY(0), toY(4), '48"');
+  // Dock height dimension (4' dock elevation)
+  _elevDimV(ctx, toX(dockStart + dockDepth / 2), toY(0), toY(4), "4' dock ht");
 
   // ── Dimension lines ──
   // Clear height (right side)
@@ -7996,10 +8012,10 @@ function renderElevationView(p) {
   if (officeW > 0) {
     _elevDimV(ctx, toX(0) - 15, toY(0), toY(10), "10' office");
   }
-  // Trailer height
-  _elevDimV(ctx, toX(dockStart) - 30, toY(4), toY(4 + 13.5), "13.5' trailer");
-  // Door opening height
-  _elevDimV(ctx, toX(dockStart + dockDepth - 1), toY(0), toY(14), "14' door");
+  // Trailer height (far right of trailer profile)
+  _elevDimV(ctx, toX(truckX + 22), toY(4), toY(4 + 13.5), "13.5' trailer ht");
+  // Door clear opening height (at building edge)
+  _elevDimV(ctx, toX(dockStart) - 55, toY(0), toY(14), "14' door clr");
   // Aisle width (between first two racks, if applicable)
   if (storeType !== 'bulk' && storeType !== 'carton') {
     var rackSpacingDim = aisleW + rackDepth;
