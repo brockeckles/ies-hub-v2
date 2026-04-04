@@ -38,7 +38,14 @@ var cmTests = {
         for (var i = 0; i < value.length; i++) {
             input.value += value[i];
             input.dispatchEvent(new Event('input', { bubbles: true }));
-            if (document.activeElement !== input) {
+            // After handler fires, check input still has accumulated value
+            // (if innerHTML rebuild stole focus, input.value would reset)
+            var expected = value.substring(0, i + 1);
+            if (input.value !== expected) {
+                return { focused: false, char: i, typed: input.value };
+            }
+            // Also check input is still in the DOM (not replaced by re-render)
+            if (!input.isConnected) {
                 return { focused: false, char: i, typed: input.value };
             }
         }
@@ -51,6 +58,16 @@ var cmTests = {
 
     _parseCurrency: function(text) {
         return parseFloat((text || '').replace(/[$,\/yr]/g, '')) || 0;
+    },
+
+    _snapshotState: function() {
+        this._savedProjectData = JSON.parse(JSON.stringify(cmApp.projectData));
+    },
+
+    _restoreState: function() {
+        if (this._savedProjectData) {
+            Object.assign(cmApp.projectData, JSON.parse(JSON.stringify(this._savedProjectData)));
+        }
     },
 
     _ensureTestMode: function() {
@@ -237,6 +254,7 @@ var cmTests = {
     // ═══════════════════════════════════════════════════════════════
 
     testLaborCellAccuracy: async function() {
+        this._restoreState();
         this._ensureLaborRow();
         var line = cmApp.projectData.laborLines[0];
         line.base_uph = 100;
@@ -279,6 +297,7 @@ var cmTests = {
     },
 
     testIndirectCostAccuracy: async function() {
+        this._restoreState();
         this._ensureIndirectRow();
         var line = cmApp.projectData.indirectLaborLines[0];
         line.headcount = 3;
@@ -300,6 +319,7 @@ var cmTests = {
     },
 
     testEquipmentCostAccuracy: async function() {
+        this._restoreState();
         this._ensureEquipmentRow();
         var line = cmApp.projectData.equipmentLines[0];
 
@@ -322,14 +342,18 @@ var cmTests = {
             this.fail('equip-lease-accuracy', 'Expected ' + expectedLease + ', got ' + displayed);
         }
 
-        // Test purchase mode
+        // Test purchase mode — reset line fully and re-query cell after render
         line.ownership_type = 'purchase';
         line.acquisition_cost = 50000;
         line.amort_years = 5;
         line.maintenance_pct = 0.10;
         line.quantity = 1;
+        line.monthly_cost = 0;
+        line.monthly_maintenance = 0;
         cmApp.renderEquipmentTable();
 
+        // Re-query cell after render (previous reference may be stale)
+        costCell = document.getElementById('equip-cost-0');
         var expectedPurchase = (50000 / 5) + (50000 * 0.10); // $10,000 + $5,000 = $15,000
         displayed = this._parseCurrency(costCell.textContent);
         if (Math.abs(displayed - expectedPurchase) < 1) {
@@ -340,8 +364,10 @@ var cmTests = {
     },
 
     testOverheadCostAccuracy: async function() {
+        this._restoreState();
         this._ensureOverheadRow();
         var line = cmApp.projectData.overheadLines[0];
+        line.annual_cost = 0;
         line.monthly_cost = 3000;
         line.cost_type = 'monthly';
         cmApp._updateLine('overheadLines', 0, 'monthly_cost', '3000', 'number');
@@ -359,13 +385,14 @@ var cmTests = {
     },
 
     testStartupAmortAccuracy: async function() {
+        this._restoreState();
         this._ensureStartupRow();
-        var contractYears = parseFloat((document.getElementById('contractTermYears') || document.getElementById('contractTerm') || {}).value) || 3;
         var line = cmApp.projectData.startupLines[0];
         line.one_time_cost = 60000;
-        line.annual_amort = 60000 / contractYears;
-        line.monthly_amort = line.annual_amort / 12;
         cmApp._updateLine('startupLines', 0, 'one_time_cost', '60000', 'number');
+
+        // Read contractYears from the DOM AFTER _updateLine has run
+        var contractYears = parseFloat((document.getElementById('contractTermYears') || document.getElementById('contractTerm') || {}).value) || 5;
 
         var yrCell = document.getElementById('startup-yr-0');
         if (!yrCell) { this.fail('startup-amort-accuracy', 'Cell not found'); return; }
@@ -380,6 +407,7 @@ var cmTests = {
     },
 
     testVolumeDailyAccuracy: async function() {
+        this._restoreState();
         this._ensureVolumeRow();
         var line = cmApp.projectData.volumeLines[0];
         line.annual_volume = 500000;
@@ -403,6 +431,7 @@ var cmTests = {
     // ═══════════════════════════════════════════════════════════════
 
     testA1FacilityCostBreakdown: async function() {
+        this._restoreState();
         // Set known overrides and sqft
         var sqftEl = document.getElementById('totalSqft');
         if (!sqftEl) { this.fail('A1-facility-breakdown', 'totalSqft not found'); return; }
@@ -443,6 +472,7 @@ var cmTests = {
     },
 
     testA1OverrideBinding: async function() {
+        this._restoreState();
         // Set sqft and render card
         var sqftEl = document.getElementById('totalSqft');
         if (!sqftEl) { this.fail('A1-override-binding', 'totalSqft not found'); return; }
@@ -452,8 +482,11 @@ var cmTests = {
         cmApp.projectData.facilityRateOverrides = {};
         cmApp.renderFacilityCostCard();
 
-        // Open the overrides panel
-        cmApp.toggleFacilityOverrides();
+        // Check if panel is already open before toggling
+        var existingPanel = document.getElementById('facilityOverridesPanel');
+        if (!existingPanel || existingPanel.style.display === 'none') {
+            cmApp.toggleFacilityOverrides();
+        }
         await this._wait(50);
 
         var panel = document.getElementById('facilityOverridesPanel');
@@ -488,6 +521,7 @@ var cmTests = {
     },
 
     testA2ShiftDifferentials: async function() {
+        this._restoreState();
         // Set shift structure
         var shiftsEl = document.getElementById('shiftsPerDay');
         var hoursEl = document.getElementById('hoursPerShift');
@@ -577,6 +611,7 @@ var cmTests = {
     },
 
     testA3EquipmentOwnership: async function() {
+        this._restoreState();
         this._ensureEquipmentRow();
         var line = cmApp.projectData.equipmentLines[0];
 
@@ -586,6 +621,8 @@ var cmTests = {
         line.amort_years = 5;
         line.maintenance_pct = 0.10;
         line.quantity = 1;
+        line.monthly_cost = 0;
+        line.monthly_maintenance = 0;
         cmApp.renderEquipmentTable();
 
         var costCell = document.getElementById('equip-cost-0');
@@ -607,12 +644,15 @@ var cmTests = {
             this.fail('A3-summary-card', 'Equipment summary card missing or incomplete');
         }
 
-        // Switch to Lease and verify
+        // Switch to Lease — explicitly set all lease fields and clear purchase fields
         line.ownership_type = 'lease';
         line.monthly_cost = 1500;
         line.monthly_maintenance = 0;
         line.quantity = 1;
+        line.acquisition_cost = 0;
         cmApp.renderEquipmentTable();
+        // Re-query cell after render
+        costCell = document.getElementById('equip-cost-0');
         displayed = this._parseCurrency(costCell.textContent);
         expected = 1500 * 12; // $18,000
         if (Math.abs(displayed - expected) < 1) {
@@ -623,6 +663,7 @@ var cmTests = {
     },
 
     testA4VasCardCosting: async function() {
+        this._restoreState();
         // Clear existing and add a fresh VAS row
         cmApp.projectData.vasLines = [];
         cmApp.addVasRow();
@@ -688,6 +729,7 @@ var cmTests = {
     // ═══════════════════════════════════════════════════════════════
 
     testSummaryTotals: async function() {
+        this._restoreState();
         // Equipment total
         this._ensureEquipmentRow();
         var line = cmApp.projectData.equipmentLines[0];
@@ -728,6 +770,7 @@ var cmTests = {
     // ═══════════════════════════════════════════════════════════════
 
     testAddDeleteRows: async function() {
+        this._restoreState();
         var initialLen = cmApp.projectData.laborLines.length;
 
         cmApp.addLaborRow();
@@ -988,6 +1031,9 @@ var cmTests = {
         console.log('\n══════════════════════════════════════════════');
         console.log('  Running CM + NetOpt Test Suite...');
         console.log('══════════════════════════════════════════════\n');
+
+        // Snapshot state for isolation between accuracy tests
+        this._snapshotState();
 
         // §1: P0 — Focus retention (7 table types)
         console.log('§1 Focus Retention (P0)');
