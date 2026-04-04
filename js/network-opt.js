@@ -810,9 +810,24 @@ function renderLayout(p) {
 
   // ── SVG SETUP ──
   var pad = 60;
+  var mg = 4;
+
+  // ── ZONE HEIGHTS (derived from actual SF values / building width) ──
+  // Calculate first so we can tighten bD to actual content
+  var dockH = Math.max(18, Math.min(Math.ceil(p.dockSF / bW * (twoDock ? 0.5 : 1)), bD * 0.12));
+  var recvStH = Math.max(14, Math.min(Math.ceil(p.recvStagingSF / bW), bD * 0.10));
+  var shipStH = Math.max(14, Math.min(Math.ceil(p.shipStagingSF / bW), bD * 0.10));
+
+  // Tighten building depth to match actual zone requirements
+  var requiredDepth = (twoDock ? dockH + recvStH : 0) + dockH + Math.max(recvStH, shipStH) + mg * 6 + 40;
+  if (bD > requiredDepth + 20) {
+    bD = requiredDepth + 10;
+    if (dimEl) dimEl.textContent = bW.toLocaleString()+' ft × '+bD.toLocaleString()+' ft';
+  }
+
   var vW = bW+pad*2, vH = bD+pad*2;
   svg.setAttribute('viewBox','0 0 '+vW+' '+vH);
-  var bX = pad, bY = pad, mg = 4;
+  var bX = pad, bY = pad;
   var s = '';
 
   // Grid
@@ -821,11 +836,6 @@ function renderLayout(p) {
   s += '<rect x="0" y="0" width="'+vW+'" height="'+vH+'" fill="url(#grid)"/>';
   // Building outline
   s += '<rect x="'+bX+'" y="'+bY+'" width="'+bW+'" height="'+bD+'" fill="rgba(255,255,255,0.03)" stroke="rgba(255,255,255,0.7)" stroke-width="1.5" rx="2"/>';
-
-  // ── ZONE HEIGHTS (derived from actual SF values / building width) ──
-  var dockH = Math.max(18, Math.min(Math.ceil(p.dockSF / bW * (twoDock ? 0.5 : 1)), bD * 0.12));
-  var recvStH = Math.max(14, Math.min(Math.ceil(p.recvStagingSF / bW), bD * 0.10));
-  var shipStH = Math.max(14, Math.min(Math.ceil(p.shipStagingSF / bW), bD * 0.10));
   var topDH = twoDock ? dockH : 0;
   var topSH = twoDock ? recvStH : 0;
   var botDY = bY+bD-dockH;
@@ -6619,11 +6629,21 @@ var wsc3dCameraTarget = null;
 var wsc3dMouseDown = false;
 var wsc3dMouseBtn = 0;
 var wsc3dLastMouse = { x: 0, y: 0 };
+var wsc3dWallMeshes = [];
+var wsc3dWallsVisible = true;
 
 function _initWsc3dTarget() {
   if (!wsc3dCameraTarget && typeof THREE !== 'undefined') {
     wsc3dCameraTarget = new THREE.Vector3(0, 0, 0);
   }
+}
+
+// ── Wall/roof toggle ──
+function wsc3dToggleWalls() {
+  wsc3dWallsVisible = !wsc3dWallsVisible;
+  wsc3dWallMeshes.forEach(function(m) { m.visible = wsc3dWallsVisible; });
+  var btn = document.getElementById('wsc-3d-walls-btn');
+  if (btn) btn.textContent = wsc3dWallsVisible ? 'Hide Walls' : 'Show Walls';
 }
 
 // ── 3-way view switcher ──
@@ -6647,6 +6667,10 @@ function wscSetView(mode) {
   var activeStyle = 'background:rgba(59,130,246,.3);color:#93c5fd;font-weight:600;';
   var inactiveStyle = 'background:rgba(255,255,255,.06);color:rgba(255,255,255,.5);font-weight:400;';
   [btn2d, btn3d, btnElev].forEach(function(b) { if (b) b.style.cssText += inactiveStyle; });
+
+  // Show/hide wall toggle button
+  var wallBtn = document.getElementById('wsc-3d-walls-btn');
+  if (wallBtn) wallBtn.style.display = (mode === '3d') ? 'inline-block' : 'none';
 
   if (mode === '3d') {
     container3d.style.display = 'block';
@@ -6677,6 +6701,8 @@ function dispose3DView() {
   }
   wsc3dScene = null;
   wsc3dCamera = null;
+  wsc3dWallMeshes = [];
+  wsc3dWallsVisible = true;
 }
 
 // ── Helper: create positioned mesh ──
@@ -6798,7 +6824,8 @@ function _wsc3dBuildDockDoor(scene, x, z, facing) {
 function _wsc3dBuildTrailer(scene, x, z, facing) {
   var bodyMat = new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.4 });
   var wheelMat = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.8 });
-  var zDir = facing === 'top' ? 1 : -1;
+  // Trailer extends AWAY from building: bottom dock → +z, top dock → -z
+  var zDir = (facing === 'bottom') ? 1 : -1;
 
   var body = _wsc3dMakeMesh(new THREE.BoxGeometry(8, 12, 40), bodyMat, [x, 9, z + 25 * zDir]);
   scene.add(body);
@@ -7021,24 +7048,27 @@ function render3DLayout(p) {
   gridHelper.position.set(bW / 2, 0.1, bD / 2);
   scene.add(gridHelper);
 
-  // ── Walls (solid, light gray) ──
+  // ── Walls (solid, light gray) — tagged for hide/show toggle ──
   var wallMat = new THREE.MeshStandardMaterial({ color: 0xe8e8e8, roughness: 0.6, metalness: 0.05 });
   var wallT = 2;
+  wsc3dWallMeshes = [];
   // Back wall
   var wBack = _wsc3dMakeMesh(new THREE.BoxGeometry(bW, clearH, wallT), wallMat, [bW / 2, clearH / 2, 0]);
-  scene.add(wBack);
+  wsc3dWallMeshes.push(wBack); scene.add(wBack);
   // Left wall
-  scene.add(_wsc3dMakeMesh(new THREE.BoxGeometry(wallT, clearH, bD), wallMat, [0, clearH / 2, bD / 2]));
+  var wLeft = _wsc3dMakeMesh(new THREE.BoxGeometry(wallT, clearH, bD), wallMat, [0, clearH / 2, bD / 2]);
+  wsc3dWallMeshes.push(wLeft); scene.add(wLeft);
   // Right wall
-  scene.add(_wsc3dMakeMesh(new THREE.BoxGeometry(wallT, clearH, bD), wallMat, [bW, clearH / 2, bD / 2]));
-  // Front wall — full for now (dock door frames provide visual openings)
-  var wFront = _wsc3dMakeMesh(new THREE.BoxGeometry(bW, clearH, wallT), wallMat, [bW / 2, clearH / 2, bD]);
-  wFront.material = new THREE.MeshStandardMaterial({ color: 0xe8e8e8, roughness: 0.6, metalness: 0.05, transparent: true, opacity: 0.35 });
-  scene.add(wFront);
+  var wRight = _wsc3dMakeMesh(new THREE.BoxGeometry(wallT, clearH, bD), wallMat, [bW, clearH / 2, bD / 2]);
+  wsc3dWallMeshes.push(wRight); scene.add(wRight);
+  // Front wall (semi-transparent for visibility)
+  var wFront = _wsc3dMakeMesh(new THREE.BoxGeometry(bW, clearH, wallT), new THREE.MeshStandardMaterial({ color: 0xe8e8e8, roughness: 0.6, metalness: 0.05, transparent: true, opacity: 0.35 }), [bW / 2, clearH / 2, bD]);
+  wsc3dWallMeshes.push(wFront); scene.add(wFront);
 
   // ── Roof (subtle, semi-transparent) ──
   var roofMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, transparent: true, opacity: 0.15, roughness: 0.5 });
-  scene.add(_wsc3dMakeMesh(new THREE.BoxGeometry(bW, 0.5, bD), roofMat, [bW / 2, clearH, bD / 2]));
+  var roof = _wsc3dMakeMesh(new THREE.BoxGeometry(bW, 0.5, bD), roofMat, [bW / 2, clearH, bD / 2]);
+  wsc3dWallMeshes.push(roof); scene.add(roof);
 
   // ── Read zone positions ──
   var zones = wscManualMode ? wscManualZones : wscAutoZones;
@@ -7099,27 +7129,262 @@ function render3DLayout(p) {
       var isVert = p.rackDir === 'vertical';
 
       if (p.storeType === 'bulk') {
-        // Bulk storage — stacked pallets, no racks
+        // Bulk storage — back-to-back pallet rows with 12ft forklift aisles
         var palletGeo = new THREE.BoxGeometry(3.5, 4, 3.5);
         var stackHi = p.stackHi || 3;
-        var cols = Math.max(1, Math.floor(w3d / 5));
-        var rows = Math.max(1, Math.floor(d3d / 5));
-        for (var sr = 0; sr < rows; sr++) {
-          for (var sc = 0; sc < cols; sc++) {
-            if (_wsc3dRand() < 0.8) {
-              var layers = Math.ceil(_wsc3dRand() * stackHi);
-              for (var sl = 0; sl < layers; sl++) {
-                var pMat = new THREE.MeshStandardMaterial({ color: _wscPickPalletColor(), roughness: 0.7 });
-                var pal = new THREE.Mesh(palletGeo, pMat);
-                pal.position.set(x3d + sc * 5 + 2.5, sl * 4.5 + 2, z3d + sr * 5 + 2.5);
-                pal.castShadow = true;
-                scene.add(pal);
+        var bulkDepth = p.bulkDepth || 4;
+        var bayDepthFt = bulkDepth * 4;
+        var bulkAisle = 12;
+        var moduleFt = bayDepthFt * 2 + bulkAisle;
+        var lineMat = new THREE.MeshStandardMaterial({ color: 0xFFCC00, roughness: 0.5 });
+
+        if (isVert) {
+          var moduleCount = Math.max(1, Math.floor(w3d / moduleFt));
+          var laneLen = d3d;
+          for (var mod = 0; mod < moduleCount; mod++) {
+            var modStart = mod * moduleFt;
+            // Left bay
+            for (var br = 0; br < bulkDepth; br++) {
+              var palletCount = Math.max(1, Math.floor(laneLen / 5));
+              for (var bc = 0; bc < palletCount; bc++) {
+                if (_wsc3dRand() < 0.8) {
+                  var layers = Math.ceil(_wsc3dRand() * stackHi);
+                  for (var sl = 0; sl < layers; sl++) {
+                    var pMat = new THREE.MeshStandardMaterial({ color: _wscPickPalletColor(), roughness: 0.7 });
+                    var pal = new THREE.Mesh(palletGeo, pMat);
+                    pal.position.set(x3d + modStart + br * 4 + 2, sl * 4.5 + 2, z3d + bc * 5 + 2.5);
+                    pal.castShadow = true;
+                    scene.add(pal);
+                  }
+                }
+              }
+            }
+            // Aisle safety lines
+            var aisleStart = modStart + bayDepthFt;
+            scene.add(_wsc3dMakeMesh(new THREE.BoxGeometry(0.3, 0.05, laneLen), lineMat, [x3d + aisleStart, 0.15, z3d + laneLen / 2]));
+            scene.add(_wsc3dMakeMesh(new THREE.BoxGeometry(0.3, 0.05, laneLen), lineMat, [x3d + aisleStart + bulkAisle, 0.15, z3d + laneLen / 2]));
+            // Right bay
+            var rightStart = aisleStart + bulkAisle;
+            for (var br2 = 0; br2 < bulkDepth; br2++) {
+              var palletCount2 = Math.max(1, Math.floor(laneLen / 5));
+              for (var bc2 = 0; bc2 < palletCount2; bc2++) {
+                if (_wsc3dRand() < 0.8) {
+                  var layers2 = Math.ceil(_wsc3dRand() * stackHi);
+                  for (var sl2 = 0; sl2 < layers2; sl2++) {
+                    var pMat2 = new THREE.MeshStandardMaterial({ color: _wscPickPalletColor(), roughness: 0.7 });
+                    var pal2 = new THREE.Mesh(palletGeo, pMat2);
+                    pal2.position.set(x3d + rightStart + br2 * 4 + 2, sl2 * 4.5 + 2, z3d + bc2 * 5 + 2.5);
+                    pal2.castShadow = true;
+                    scene.add(pal2);
+                  }
+                }
+              }
+            }
+          }
+        } else {
+          var moduleCount = Math.max(1, Math.floor(d3d / moduleFt));
+          var laneLen = w3d;
+          for (var mod = 0; mod < moduleCount; mod++) {
+            var modStart = mod * moduleFt;
+            for (var br = 0; br < bulkDepth; br++) {
+              var palletCount = Math.max(1, Math.floor(laneLen / 5));
+              for (var bc = 0; bc < palletCount; bc++) {
+                if (_wsc3dRand() < 0.8) {
+                  var layers = Math.ceil(_wsc3dRand() * stackHi);
+                  for (var sl = 0; sl < layers; sl++) {
+                    var pMat = new THREE.MeshStandardMaterial({ color: _wscPickPalletColor(), roughness: 0.7 });
+                    var pal = new THREE.Mesh(palletGeo, pMat);
+                    pal.position.set(x3d + bc * 5 + 2.5, sl * 4.5 + 2, z3d + modStart + br * 4 + 2);
+                    pal.castShadow = true;
+                    scene.add(pal);
+                  }
+                }
+              }
+            }
+            var aisleStart = modStart + bayDepthFt;
+            scene.add(_wsc3dMakeMesh(new THREE.BoxGeometry(laneLen, 0.05, 0.3), lineMat, [x3d + laneLen / 2, 0.15, z3d + aisleStart]));
+            scene.add(_wsc3dMakeMesh(new THREE.BoxGeometry(laneLen, 0.05, 0.3), lineMat, [x3d + laneLen / 2, 0.15, z3d + aisleStart + bulkAisle]));
+            var rightStart = aisleStart + bulkAisle;
+            for (var br2 = 0; br2 < bulkDepth; br2++) {
+              var palletCount2 = Math.max(1, Math.floor(laneLen / 5));
+              for (var bc2 = 0; bc2 < palletCount2; bc2++) {
+                if (_wsc3dRand() < 0.8) {
+                  var layers2 = Math.ceil(_wsc3dRand() * stackHi);
+                  for (var sl2 = 0; sl2 < layers2; sl2++) {
+                    var pMat2 = new THREE.MeshStandardMaterial({ color: _wscPickPalletColor(), roughness: 0.7 });
+                    var pal2 = new THREE.Mesh(palletGeo, pMat2);
+                    pal2.position.set(x3d + bc2 * 5 + 2.5, sl2 * 4.5 + 2, z3d + rightStart + br2 * 4 + 2);
+                    pal2.castShadow = true;
+                    scene.add(pal2);
+                  }
+                }
+              }
+            }
+          }
+        }
+      } else if (p.storeType === 'carton') {
+        // Carton flow — shorter shelving with angled shelves and small cartons
+        var shelfHeight = 7;
+        var shelfLevels = 5;
+        var levelH = shelfHeight / shelfLevels;
+        var shelfModuleFt = 9.5; // 4.5ft shelves + 5ft pick aisle
+        var shelfDepth = 4.5;
+        var uprightColor = 0x4a90d9;
+        var shelfColor = 0xcccccc;
+        var cartonColors = [0xFFE4B5, 0xDEB887, 0xF5DEB3, 0xFAEBD7, 0xEEE8AA];
+
+        if (isVert) {
+          var moduleCount = Math.max(1, Math.floor(w3d / shelfModuleFt));
+          for (var mod = 0; mod < moduleCount; mod++) {
+            var modX = x3d + mod * shelfModuleFt;
+            // Uprights
+            var upGeo = new THREE.BoxGeometry(0.2, shelfHeight, 0.2);
+            var upMat = new THREE.MeshStandardMaterial({ color: uprightColor, roughness: 0.5 });
+            for (var side = 0; side < 2; side++) {
+              var up = new THREE.Mesh(upGeo, upMat);
+              up.position.set(modX + side * shelfDepth, shelfHeight / 2, z3d + d3d / 2);
+              up.castShadow = true;
+              scene.add(up);
+            }
+            // Shelves per level (slightly tilted)
+            for (var lvl = 0; lvl < shelfLevels; lvl++) {
+              var shelfY = lvl * levelH + 0.5;
+              var shelfGeo = new THREE.BoxGeometry(shelfDepth - 0.4, 0.1, d3d * 0.9);
+              var shelfMat = new THREE.MeshStandardMaterial({ color: shelfColor, metalness: 0.1, roughness: 0.5 });
+              var shelf = new THREE.Mesh(shelfGeo, shelfMat);
+              shelf.position.set(modX + shelfDepth / 2, shelfY, z3d + d3d / 2);
+              shelf.rotation.z = 0.05;
+              scene.add(shelf);
+              // Small cartons
+              var cartonCount = Math.max(1, Math.floor(d3d / 1.5));
+              for (var ci = 0; ci < cartonCount; ci++) {
+                if (_wsc3dRand() < 0.75) {
+                  var cGeo = new THREE.BoxGeometry(1.0, 0.8, 1.2);
+                  var cMat = new THREE.MeshStandardMaterial({ color: cartonColors[Math.floor(_wsc3dRand() * cartonColors.length)], roughness: 0.8 });
+                  var carton = new THREE.Mesh(cGeo, cMat);
+                  carton.position.set(modX + 1 + _wsc3dRand() * 2, shelfY + 0.5, z3d + ci * 1.5 + 0.75);
+                  scene.add(carton);
+                }
+              }
+            }
+          }
+        } else {
+          var moduleCount = Math.max(1, Math.floor(d3d / shelfModuleFt));
+          for (var mod = 0; mod < moduleCount; mod++) {
+            var modZ = z3d + mod * shelfModuleFt;
+            var upGeo = new THREE.BoxGeometry(0.2, shelfHeight, 0.2);
+            var upMat = new THREE.MeshStandardMaterial({ color: uprightColor, roughness: 0.5 });
+            for (var side = 0; side < 2; side++) {
+              var up = new THREE.Mesh(upGeo, upMat);
+              up.position.set(x3d + w3d / 2, shelfHeight / 2, modZ + side * shelfDepth);
+              up.castShadow = true;
+              scene.add(up);
+            }
+            for (var lvl = 0; lvl < shelfLevels; lvl++) {
+              var shelfY = lvl * levelH + 0.5;
+              var shelfGeo = new THREE.BoxGeometry(w3d * 0.9, 0.1, shelfDepth - 0.4);
+              var shelfMat = new THREE.MeshStandardMaterial({ color: shelfColor, metalness: 0.1, roughness: 0.5 });
+              var shelf = new THREE.Mesh(shelfGeo, shelfMat);
+              shelf.position.set(x3d + w3d / 2, shelfY, modZ + shelfDepth / 2);
+              shelf.rotation.x = -0.05;
+              scene.add(shelf);
+              var cartonCount = Math.max(1, Math.floor(w3d / 1.5));
+              for (var ci = 0; ci < cartonCount; ci++) {
+                if (_wsc3dRand() < 0.75) {
+                  var cGeo = new THREE.BoxGeometry(1.2, 0.8, 1.0);
+                  var cMat = new THREE.MeshStandardMaterial({ color: cartonColors[Math.floor(_wsc3dRand() * cartonColors.length)], roughness: 0.8 });
+                  var carton = new THREE.Mesh(cGeo, cMat);
+                  carton.position.set(x3d + ci * 1.5 + 0.75, shelfY + 0.5, modZ + 1 + _wsc3dRand() * 2);
+                  scene.add(carton);
+                }
+              }
+            }
+          }
+        }
+      } else if (p.storeType === 'mix') {
+        // Mixed — rack portion + bulk portion with yellow separator
+        var rackPct = (p.mixRackPct || 60) / 100;
+        var rackW, bulkW;
+        if (isVert) {
+          rackW = w3d * rackPct;
+          bulkW = w3d - rackW;
+        } else {
+          rackW = d3d * rackPct;
+          bulkW = d3d - rackW;
+        }
+        // Rack section
+        if (isVert) {
+          var step = aisleW + rackDepth;
+          var numRows = Math.max(1, Math.floor((rackW - aisleW) / step));
+          for (var rv = 0; rv < numRows; rv++) {
+            var rx = x3d + aisleW + rv * step;
+            _wsc3dBuildRackRow(scene, rx, z3d + 4, d3d - 8, rackLevels, clearH * 0.9, 'vertical', rackDepth);
+          }
+        } else {
+          var step = aisleW + rackDepth;
+          var numRows = Math.max(1, Math.floor((rackW - aisleW) / step));
+          for (var rh = 0; rh < numRows; rh++) {
+            var rz = z3d + aisleW + rh * step;
+            _wsc3dBuildRackRow(scene, x3d + 4, rz, w3d - 8, rackLevels, clearH * 0.9, 'horizontal', rackDepth);
+          }
+        }
+        // Yellow separator
+        var sepMat = new THREE.MeshStandardMaterial({ color: 0xFFCC00, transparent: true, opacity: 0.5 });
+        if (isVert) {
+          scene.add(_wsc3dMakeMesh(new THREE.BoxGeometry(0.2, clearH * 0.3, d3d), sepMat, [x3d + rackW, clearH * 0.15, z3d + d3d / 2]));
+        } else {
+          scene.add(_wsc3dMakeMesh(new THREE.BoxGeometry(w3d, clearH * 0.3, 0.2), sepMat, [x3d + w3d / 2, clearH * 0.15, z3d + rackW]));
+        }
+        // Bulk section (simplified stacked pallets with aisles)
+        var palletGeo = new THREE.BoxGeometry(3.5, 4, 3.5);
+        var stackHi = p.stackHi || 3;
+        var bulkDepth = p.bulkDepth || 4;
+        var bayDepthFt = bulkDepth * 4;
+        var bulkAisle = 12;
+        var moduleFt = bayDepthFt * 2 + bulkAisle;
+        if (isVert) {
+          var bulkStartX = x3d + rackW + 3;
+          var moduleCount = Math.max(1, Math.floor(bulkW / moduleFt));
+          for (var bmod = 0; bmod < moduleCount; bmod++) {
+            for (var br = 0; br < bulkDepth; br++) {
+              var palletCount = Math.max(1, Math.floor(d3d / 5));
+              for (var bc = 0; bc < palletCount; bc++) {
+                if (_wsc3dRand() < 0.8) {
+                  var layers = Math.ceil(_wsc3dRand() * stackHi);
+                  for (var sl = 0; sl < layers; sl++) {
+                    var pMat = new THREE.MeshStandardMaterial({ color: _wscPickPalletColor(), roughness: 0.7 });
+                    var pal = new THREE.Mesh(palletGeo, pMat);
+                    pal.position.set(bulkStartX + bmod * moduleFt + br * 4 + 2, sl * 4.5 + 2, z3d + bc * 5 + 2.5);
+                    pal.castShadow = true;
+                    scene.add(pal);
+                  }
+                }
+              }
+            }
+          }
+        } else {
+          var bulkStartZ = z3d + rackW + 3;
+          var moduleCount = Math.max(1, Math.floor(bulkW / moduleFt));
+          for (var bmod = 0; bmod < moduleCount; bmod++) {
+            for (var br = 0; br < bulkDepth; br++) {
+              var palletCount = Math.max(1, Math.floor(w3d / 5));
+              for (var bc = 0; bc < palletCount; bc++) {
+                if (_wsc3dRand() < 0.8) {
+                  var layers = Math.ceil(_wsc3dRand() * stackHi);
+                  for (var sl = 0; sl < layers; sl++) {
+                    var pMat = new THREE.MeshStandardMaterial({ color: _wscPickPalletColor(), roughness: 0.7 });
+                    var pal = new THREE.Mesh(palletGeo, pMat);
+                    pal.position.set(x3d + bc * 5 + 2.5, sl * 4.5 + 2, bulkStartZ + bmod * moduleFt + br * 4 + 2);
+                    pal.castShadow = true;
+                    scene.add(pal);
+                  }
+                }
               }
             }
           }
         }
       } else {
-        // Rack storage (single, double, mix, carton)
+        // Standard rack storage (single or double)
         if (isVert) {
           var step = aisleW + rackDepth;
           var numRows = Math.max(1, Math.floor((w3d - aisleW) / step));
@@ -7176,7 +7441,7 @@ function render3DLayout(p) {
       var dx = dX + spacing * (di + 1);
       _wsc3dBuildDockDoor(scene, dx, dZ + dockZone.h, 'bottom');
       if (_wsc3dRand() < 0.6) {
-        _wsc3dBuildTrailer(scene, dx, dZ + dockZone.h, 'bottom');
+        _wsc3dBuildTrailer(scene, dx, bD + 3, 'bottom');
       }
     }
   }
@@ -7192,7 +7457,7 @@ function render3DLayout(p) {
       var dx2 = dtX + spacing2 * (d2 + 1);
       _wsc3dBuildDockDoor(scene, dx2, dtZ, 'top');
       if (_wsc3dRand() < 0.6) {
-        _wsc3dBuildTrailer(scene, dx2, dtZ, 'top');
+        _wsc3dBuildTrailer(scene, dx2, -3, 'top');
       }
     }
   }
@@ -7298,7 +7563,16 @@ function wsc3dOnMouseMove(e) {
   }
 }
 function wsc3dOnWheel(e) {
+  if (wscViewMode !== '3d') return;
+  var canvas = wsc3dRenderer ? wsc3dRenderer.domElement : null;
+  if (!canvas) return;
+  var rect = canvas.getBoundingClientRect();
+  if (rect.height === 0) return;
+  var overCanvas = (e.clientX >= rect.left && e.clientX <= rect.right &&
+                    e.clientY >= rect.top && e.clientY <= rect.bottom);
+  if (!overCanvas) return;
   e.preventDefault();
+  e.stopPropagation();
   wsc3dCameraDist *= (1 + e.deltaY * 0.001);
   wsc3dCameraDist = Math.max(50, Math.min(5000, wsc3dCameraDist));
   updateWsc3dCamera();
@@ -7699,6 +7973,44 @@ function renderElevationView(p) {
   if (storeType !== 'bulk') {
     _elevDimV(ctx, toX(bldgW) + 50, toY(0), toY(beamH), beamH.toFixed(1) + "' / level");
   }
+  // Roof peak height
+  var roofPeak = 4;
+  _elevDimV(ctx, toX(bldgW) + 80, toY(0), toY(clearH + roofPeak), (clearH + roofPeak) + "' roof");
+  // Top of stock (TOS)
+  if (storeType !== 'bulk') {
+    var tos = beamH * rackLevels - beamH * 0.25;
+    _elevDimV(ctx, toX(bldgW) + 110, toY(0), toY(tos), tos.toFixed(1) + "' TOS");
+    // Sprinkler clearance bracket
+    if (clearH - tos > 0) {
+      ctx.save();
+      ctx.setLineDash([4, 3]);
+      ctx.strokeStyle = '#e53935';
+      _elevDimV(ctx, toX(bldgW) + 140, toY(tos), toY(clearH), (clearH - tos).toFixed(1) + "' gap");
+      ctx.restore();
+    }
+    // Pallet load height (inside first rack bay)
+    var loadH = beamH * 0.75;
+    _elevDimV(ctx, toX(storageStart + rackDepth + 2), toY(0.5), toY(0.5 + loadH), loadH.toFixed(1) + "'");
+  }
+  // Office height
+  if (officeW > 0) {
+    _elevDimV(ctx, toX(0) - 15, toY(0), toY(10), "10' office");
+  }
+  // Trailer height
+  _elevDimV(ctx, toX(dockStart) - 30, toY(4), toY(4 + 13.5), "13.5' trailer");
+  // Door opening height
+  _elevDimV(ctx, toX(dockStart + dockDepth - 1), toY(0), toY(14), "14' door");
+  // Aisle width (between first two racks, if applicable)
+  if (storeType !== 'bulk' && storeType !== 'carton') {
+    var rackSpacingDim = aisleW + rackDepth;
+    if (storageW > rackSpacingDim * 2) {
+      var aisle1Start = storageStart + rackDepth;
+      var aisle1End = aisle1Start + aisleW;
+      _elevDimH(ctx, toX(aisle1Start), toX(aisle1End), toY(0) + 50, aisleW + "' aisle");
+    }
+  }
+  // Storage zone width
+  _elevDimH(ctx, toX(storageStart), toX(storageEnd), toY(0) + 65, Math.round(storageEnd - storageStart) + "' storage");
   // Building width (bottom)
   _elevDimH(ctx, toX(0), toX(bldgW), toY(0) + 35, 'Building Width: ' + Math.round(bldgW) + ' ft');
 

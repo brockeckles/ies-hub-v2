@@ -6619,6 +6619,7 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
             <button id="wsc-view-3d" onclick="wscSetView('3d')" style="font-size:11px;padding:4px 12px;background:rgba(255,255,255,.06);color:rgba(255,255,255,.5);border:none;border-left:1px solid rgba(255,255,255,.1);cursor:pointer;transition:.2s;">3D View</button>
             <button id="wsc-view-elev" onclick="wscSetView('elevation')" style="font-size:11px;padding:4px 12px;background:rgba(255,255,255,.06);color:rgba(255,255,255,.5);border:none;border-left:1px solid rgba(255,255,255,.1);cursor:pointer;transition:.2s;">Elevation</button>
           </div>
+          <button id="wsc-3d-walls-btn" onclick="wsc3dToggleWalls()" style="display:none;font-size:11px;padding:4px 12px;border-radius:6px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.7);border:1px solid rgba(255,255,255,.15);cursor:pointer;transition:.2s;margin-left:8px;">Hide Walls</button>
         </div>
       </div>
       <div style="position:relative;width:100%;min-height:480px;margin-bottom:12px;">
@@ -10720,7 +10721,7 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
 <!-- Design Tools: landing pages, scenario management, section tours -->
 <script src="js/design-tools.js"></script>
 <!-- Network Optimization: COG, enterprise optimizer, warehouse sizing -->
-<script src="js/network-opt.js?v=20260404-3dupgrade"></script>
+<script src="js/network-opt.js?v=20260404-3dfixes"></script>
 <!-- Change Management: ADKAR initiatives, activities, flowcharts -->
 <script src="js/change-management.js"></script>
 <!-- Analytics: session tracking, dashboard -->
