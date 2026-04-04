@@ -743,16 +743,3 @@ function stripHtml(str) {
 var LINK_SVG = '<svg class="link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>';
 
 // ── Sidebar scroll-leak guard ──
-// Prevents wheel events on the fixed sidebar from leaking into panels behind it
-(function() {
-  var sb = document.querySelector('.sidebar');
-  if (!sb) return;
-  sb.addEventListener('wheel', function(e) {
-    var atTop = sb.scrollTop === 0;
-    var atBottom = sb.scrollTop + sb.clientHeight >= sb.scrollHeight - 1;
-    if ((e.deltaY < 0 && atTop) || (e.deltaY > 0 && atBottom)) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-  }, { passive: false });
-})();

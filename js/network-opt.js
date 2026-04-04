@@ -3751,7 +3751,7 @@ async function wscLoadScenariosList() {
         '<div onclick="wscLoadScenario(\'' + esc(s.id) + '\'); wscShowTool()" style="cursor:pointer;">' +
         '<div class="dt-landing-card-name">' + esc(s.scenario_name || 'Untitled') + '</div>' +
         '<div class="dt-landing-card-meta">' + (s.created_at ? new Date(s.created_at).toLocaleDateString() : '') + '</div>' +
-        '<div class="dt-landing-card-metric">SF: ' + (s.facility_sqft ? s.facility_sqft.toLocaleString() : (s.peak_units && s.units_per_pallet ? Math.round((s.peak_units / s.units_per_pallet) * 25 * 2.2).toLocaleString() + '*' : '—')) + '</div>' +
+        '<div class="dt-landing-card-metric">SF: ' + (s.facility_sqft ? fmtNum(s.facility_sqft) : '—') + '</div>' +
         '</div>' +
         '<div class="dt-landing-card-actions">' +
         '<button class="dt-card-btn-copy" onclick="event.stopPropagation(); dtCopyScenario(\'warehouse_sizing_scenarios\',\'' + esc(s.id) + '\',\'wsc\')"><svg width="12" height="12" fill="none" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2" stroke="currentColor" stroke-width="2"/></svg> Copy</button>' +
@@ -7154,6 +7154,17 @@ function render3DLayout(p) {
       var rackLevels = p.rackLevels || 4;
       var isVert = p.rackDir === 'vertical';
 
+      // Clip storage area to exclude office zone (office overlaps storage in 2D)
+      var effW = w3d, effD = d3d;
+      if (zones['office']) {
+        var oz = zones['office'];
+        var ox3d = oz.x - pad;
+        // Office is at the right edge of storage — reduce effective width
+        if (ox3d > x3d && ox3d < x3d + w3d) {
+          effW = ox3d - x3d - 2; // 2ft gap between racks and office
+        }
+      }
+
       if (p.storeType === 'bulk') {
         // Bulk storage — back-to-back pallet rows with 12ft forklift aisles
         var palletGeo = new THREE.BoxGeometry(3.5, 4, 3.5);
@@ -7165,8 +7176,8 @@ function render3DLayout(p) {
         var lineMat = new THREE.MeshStandardMaterial({ color: 0xFFCC00, roughness: 0.5 });
 
         if (isVert) {
-          var moduleCount = Math.max(1, Math.floor(w3d / moduleFt));
-          var laneLen = d3d;
+          var moduleCount = Math.max(1, Math.floor(effW / moduleFt));
+          var laneLen = effD;
           for (var mod = 0; mod < moduleCount; mod++) {
             var modStart = mod * moduleFt;
             // Left bay
@@ -7208,8 +7219,8 @@ function render3DLayout(p) {
             }
           }
         } else {
-          var moduleCount = Math.max(1, Math.floor(d3d / moduleFt));
-          var laneLen = w3d;
+          var moduleCount = Math.max(1, Math.floor(effD / moduleFt));
+          var laneLen = effW;
           for (var mod = 0; mod < moduleCount; mod++) {
             var modStart = mod * moduleFt;
             for (var br = 0; br < bulkDepth; br++) {
@@ -7260,7 +7271,7 @@ function render3DLayout(p) {
         var cartonColors = [0xFFE4B5, 0xDEB887, 0xF5DEB3, 0xFAEBD7, 0xEEE8AA];
 
         if (isVert) {
-          var moduleCount = Math.max(1, Math.floor(w3d / shelfModuleFt));
+          var moduleCount = Math.max(1, Math.floor(effW / shelfModuleFt));
           for (var mod = 0; mod < moduleCount; mod++) {
             var modX = x3d + mod * shelfModuleFt;
             // Uprights
@@ -7268,21 +7279,21 @@ function render3DLayout(p) {
             var upMat = new THREE.MeshStandardMaterial({ color: uprightColor, roughness: 0.5 });
             for (var side = 0; side < 2; side++) {
               var up = new THREE.Mesh(upGeo, upMat);
-              up.position.set(modX + side * shelfDepth, shelfHeight / 2, z3d + d3d / 2);
+              up.position.set(modX + side * shelfDepth, shelfHeight / 2, z3d + effD / 2);
               up.castShadow = true;
               scene.add(up);
             }
             // Shelves per level (slightly tilted)
             for (var lvl = 0; lvl < shelfLevels; lvl++) {
               var shelfY = lvl * levelH + 0.5;
-              var shelfGeo = new THREE.BoxGeometry(shelfDepth - 0.4, 0.1, d3d * 0.9);
+              var shelfGeo = new THREE.BoxGeometry(shelfDepth - 0.4, 0.1, effD * 0.9);
               var shelfMat = new THREE.MeshStandardMaterial({ color: shelfColor, metalness: 0.1, roughness: 0.5 });
               var shelf = new THREE.Mesh(shelfGeo, shelfMat);
-              shelf.position.set(modX + shelfDepth / 2, shelfY, z3d + d3d / 2);
+              shelf.position.set(modX + shelfDepth / 2, shelfY, z3d + effD / 2);
               shelf.rotation.z = 0.05;
               scene.add(shelf);
               // Small cartons
-              var cartonCount = Math.max(1, Math.floor(d3d / 1.5));
+              var cartonCount = Math.max(1, Math.floor(effD / 1.5));
               for (var ci = 0; ci < cartonCount; ci++) {
                 if (_wsc3dRand() < 0.75) {
                   var cGeo = new THREE.BoxGeometry(1.0, 0.8, 1.2);
@@ -7295,26 +7306,26 @@ function render3DLayout(p) {
             }
           }
         } else {
-          var moduleCount = Math.max(1, Math.floor(d3d / shelfModuleFt));
+          var moduleCount = Math.max(1, Math.floor(effD / shelfModuleFt));
           for (var mod = 0; mod < moduleCount; mod++) {
             var modZ = z3d + mod * shelfModuleFt;
             var upGeo = new THREE.BoxGeometry(0.2, shelfHeight, 0.2);
             var upMat = new THREE.MeshStandardMaterial({ color: uprightColor, roughness: 0.5 });
             for (var side = 0; side < 2; side++) {
               var up = new THREE.Mesh(upGeo, upMat);
-              up.position.set(x3d + w3d / 2, shelfHeight / 2, modZ + side * shelfDepth);
+              up.position.set(x3d + effW / 2, shelfHeight / 2, modZ + side * shelfDepth);
               up.castShadow = true;
               scene.add(up);
             }
             for (var lvl = 0; lvl < shelfLevels; lvl++) {
               var shelfY = lvl * levelH + 0.5;
-              var shelfGeo = new THREE.BoxGeometry(w3d * 0.9, 0.1, shelfDepth - 0.4);
+              var shelfGeo = new THREE.BoxGeometry(effW * 0.9, 0.1, shelfDepth - 0.4);
               var shelfMat = new THREE.MeshStandardMaterial({ color: shelfColor, metalness: 0.1, roughness: 0.5 });
               var shelf = new THREE.Mesh(shelfGeo, shelfMat);
-              shelf.position.set(x3d + w3d / 2, shelfY, modZ + shelfDepth / 2);
+              shelf.position.set(x3d + effW / 2, shelfY, modZ + shelfDepth / 2);
               shelf.rotation.x = -0.05;
               scene.add(shelf);
-              var cartonCount = Math.max(1, Math.floor(w3d / 1.5));
+              var cartonCount = Math.max(1, Math.floor(effW / 1.5));
               for (var ci = 0; ci < cartonCount; ci++) {
                 if (_wsc3dRand() < 0.75) {
                   var cGeo = new THREE.BoxGeometry(1.2, 0.8, 1.0);
@@ -7332,11 +7343,11 @@ function render3DLayout(p) {
         var rackPct = (p.mixRackPct || 60) / 100;
         var rackW, bulkW;
         if (isVert) {
-          rackW = w3d * rackPct;
-          bulkW = w3d - rackW;
+          rackW = effW * rackPct;
+          bulkW = effW - rackW;
         } else {
-          rackW = d3d * rackPct;
-          bulkW = d3d - rackW;
+          rackW = effD * rackPct;
+          bulkW = effD - rackW;
         }
         // Rack section
         if (isVert) {
@@ -7344,22 +7355,22 @@ function render3DLayout(p) {
           var numRows = Math.max(1, Math.floor((rackW - aisleW) / step));
           for (var rv = 0; rv < numRows; rv++) {
             var rx = x3d + aisleW + rv * step;
-            _wsc3dBuildRackRow(scene, rx, z3d + 4, d3d - 8, rackLevels, clearH * 0.9, 'vertical', rackDepth);
+            _wsc3dBuildRackRow(scene, rx, z3d + 4, effD - 8, rackLevels, clearH * 0.9, 'vertical', rackDepth);
           }
         } else {
           var step = aisleW + rackDepth;
           var numRows = Math.max(1, Math.floor((rackW - aisleW) / step));
           for (var rh = 0; rh < numRows; rh++) {
             var rz = z3d + aisleW + rh * step;
-            _wsc3dBuildRackRow(scene, x3d + 4, rz, w3d - 8, rackLevels, clearH * 0.9, 'horizontal', rackDepth);
+            _wsc3dBuildRackRow(scene, x3d + 4, rz, effW - 8, rackLevels, clearH * 0.9, 'horizontal', rackDepth);
           }
         }
         // Yellow separator
         var sepMat = new THREE.MeshStandardMaterial({ color: 0xFFCC00, transparent: true, opacity: 0.5 });
         if (isVert) {
-          scene.add(_wsc3dMakeMesh(new THREE.BoxGeometry(0.2, clearH * 0.3, d3d), sepMat, [x3d + rackW, clearH * 0.15, z3d + d3d / 2]));
+          scene.add(_wsc3dMakeMesh(new THREE.BoxGeometry(0.2, clearH * 0.3, effD), sepMat, [x3d + rackW, clearH * 0.15, z3d + effD / 2]));
         } else {
-          scene.add(_wsc3dMakeMesh(new THREE.BoxGeometry(w3d, clearH * 0.3, 0.2), sepMat, [x3d + w3d / 2, clearH * 0.15, z3d + rackW]));
+          scene.add(_wsc3dMakeMesh(new THREE.BoxGeometry(effW, clearH * 0.3, 0.2), sepMat, [x3d + effW / 2, clearH * 0.15, z3d + rackW]));
         }
         // Bulk section (simplified stacked pallets with aisles)
         var palletGeo = new THREE.BoxGeometry(3.5, 4, 3.5);
@@ -7373,7 +7384,7 @@ function render3DLayout(p) {
           var moduleCount = Math.max(1, Math.floor(bulkW / moduleFt));
           for (var bmod = 0; bmod < moduleCount; bmod++) {
             for (var br = 0; br < bulkDepth; br++) {
-              var palletCount = Math.max(1, Math.floor(d3d / 5));
+              var palletCount = Math.max(1, Math.floor(effD / 5));
               for (var bc = 0; bc < palletCount; bc++) {
                 if (_wsc3dRand() < 0.8) {
                   var layers = Math.ceil(_wsc3dRand() * stackHi);
@@ -7393,7 +7404,7 @@ function render3DLayout(p) {
           var moduleCount = Math.max(1, Math.floor(bulkW / moduleFt));
           for (var bmod = 0; bmod < moduleCount; bmod++) {
             for (var br = 0; br < bulkDepth; br++) {
-              var palletCount = Math.max(1, Math.floor(w3d / 5));
+              var palletCount = Math.max(1, Math.floor(effW / 5));
               for (var bc = 0; bc < palletCount; bc++) {
                 if (_wsc3dRand() < 0.8) {
                   var layers = Math.ceil(_wsc3dRand() * stackHi);
@@ -7415,22 +7426,22 @@ function render3DLayout(p) {
         var modDepth = (p.storeType === 'double') ? 16.5 : 8.5;
         var pairStep = aisleW + modDepth;
         if (isVert) {
-          var numPairs = Math.max(1, Math.floor((w3d - aisleW) / pairStep));
+          var numPairs = Math.max(1, Math.floor((effW - aisleW) / pairStep));
           for (var rv = 0; rv < numPairs; rv++) {
             var rx = x3d + aisleW + rv * pairStep;
             // Row A (facing left aisle)
-            _wsc3dBuildRackRow(scene, rx, z3d + 4, d3d - 8, rackLevels, clearH * 0.9, 'vertical', rackDepth);
+            _wsc3dBuildRackRow(scene, rx, z3d + 4, effD - 8, rackLevels, clearH * 0.9, 'vertical', rackDepth);
             // Row B (back-to-back, facing right aisle)
-            _wsc3dBuildRackRow(scene, rx + rackDepth + 0.5, z3d + 4, d3d - 8, rackLevels, clearH * 0.9, 'vertical', rackDepth);
+            _wsc3dBuildRackRow(scene, rx + rackDepth + 0.5, z3d + 4, effD - 8, rackLevels, clearH * 0.9, 'vertical', rackDepth);
           }
         } else {
-          var numPairs = Math.max(1, Math.floor((d3d - aisleW) / pairStep));
+          var numPairs = Math.max(1, Math.floor((effD - aisleW) / pairStep));
           for (var rh = 0; rh < numPairs; rh++) {
             var rz = z3d + aisleW + rh * pairStep;
             // Row A (facing top aisle)
-            _wsc3dBuildRackRow(scene, x3d + 4, rz, w3d - 8, rackLevels, clearH * 0.9, 'horizontal', rackDepth);
+            _wsc3dBuildRackRow(scene, x3d + 4, rz, effW - 8, rackLevels, clearH * 0.9, 'horizontal', rackDepth);
             // Row B (back-to-back, facing bottom aisle)
-            _wsc3dBuildRackRow(scene, x3d + 4, rz + rackDepth + 0.5, w3d - 8, rackLevels, clearH * 0.9, 'horizontal', rackDepth);
+            _wsc3dBuildRackRow(scene, x3d + 4, rz + rackDepth + 0.5, effW - 8, rackLevels, clearH * 0.9, 'horizontal', rackDepth);
           }
         }
       }
@@ -7443,8 +7454,15 @@ function render3DLayout(p) {
       return;
     }
 
-    // Office → mezzanine with windows
+    // Office → mezzanine with windows + purple floor tint
     if (name === 'office') {
+      // Floor tint so office area is visible even from above
+      var officeTintGeo = new THREE.PlaneGeometry(w3d, d3d);
+      var officeTintMat = new THREE.MeshStandardMaterial({ color: 0xd8b4fe, roughness: 0.9, transparent: true, opacity: 0.6 });
+      var officeTint = new THREE.Mesh(officeTintGeo, officeTintMat);
+      officeTint.rotation.x = -Math.PI / 2;
+      officeTint.position.set(x3d + w3d / 2, 0.2, z3d + d3d / 2);
+      scene.add(officeTint);
       _wsc3dBuildOffice(scene, x3d, z3d, w3d, d3d);
       return;
     }
@@ -7623,7 +7641,7 @@ function renderElevationView(p) {
 
   var canvas = document.createElement('canvas');
   var W = container.clientWidth || 800;
-  var H = 400;
+  var H = 440;
   canvas.width = W * 2;
   canvas.height = H * 2;
   canvas.style.width = W + 'px';
@@ -8012,40 +8030,25 @@ function renderElevationView(p) {
   // Dock height dimension (4' dock elevation)
   _elevDimV(ctx, toX(dockStart + dockDepth / 2), toY(0), toY(4), "4' dock ht");
 
-  // ── Dimension lines (right side — adaptive spacing to prevent overlap) ──
+  // ── RIGHT-SIDE BUILDING DIMENSIONS (stacked outward from building edge) ──
   var roofPeak = 4;
   var rightDims = [];
-  // Always show: clear height, roof peak
-  rightDims.push({ y1: 0, y2: clearH, label: clearH + "'" });
-  if (storeType !== 'bulk') {
-    rightDims.push({ y1: 0, y2: beamH, label: beamH.toFixed(1) + "' / level" });
-  }
+  rightDims.push({ y1: 0, y2: clearH, label: clearH + "' clear" });
   rightDims.push({ y1: 0, y2: clearH + roofPeak, label: (clearH + roofPeak) + "' roof" });
   if (storeType !== 'bulk') {
     var tos = beamH * rackLevels - beamH * 0.25;
     rightDims.push({ y1: 0, y2: tos, label: tos.toFixed(1) + "' TOS" });
-    // Only show sprinkler gap if > 2 ft
     if (clearH - tos > 2) {
       rightDims.push({ y1: tos, y2: clearH, label: (clearH - tos).toFixed(1) + "' gap", dash: true, color: '#e53935' });
     }
   }
-  // Sort by midpoint height so labels stack logically
-  rightDims.sort(function(a, b) { return ((a.y1 + a.y2) / 2) - ((b.y1 + b.y2) / 2); });
-  // Assign x positions with collision detection (45px base spacing, nudge if labels overlap)
+  // Sort by endpoint height (shortest first = closest to building)
+  rightDims.sort(function(a, b) { return a.y2 - b.y2; });
   var baseX = toX(bldgW) + 20;
-  var dimSpacing = 45;
-  for (var di = 0; di < rightDims.sort(function(a, b) { return a.y2 - b.y2; }).length; di++) {
+  var dimSpacing = 55;
+  for (var di = 0; di < rightDims.length; di++) {
     rightDims[di].x = baseX + di * dimSpacing;
   }
-  // Collision check: if two label midpoints are within 14px vertically, nudge the later one
-  for (var di = 1; di < rightDims.length; di++) {
-    var prevMid = (toY(rightDims[di - 1].y1) + toY(rightDims[di - 1].y2)) / 2;
-    var curMid = (toY(rightDims[di].y1) + toY(rightDims[di].y2)) / 2;
-    if (Math.abs(prevMid - curMid) < 14) {
-      rightDims[di].x = rightDims[di - 1].x + dimSpacing;
-    }
-  }
-  // Draw right-side dimensions
   for (var di = 0; di < rightDims.length; di++) {
     var rd = rightDims[di];
     if (rd.dash || rd.color) {
@@ -8058,21 +8061,26 @@ function renderElevationView(p) {
       _elevDimV(ctx, rd.x, toY(rd.y1), toY(rd.y2), rd.label);
     }
   }
+
+  // ── LEFT-SIDE DOCK/TRAILER DIMENSIONS (separate from building dims) ──
+  var leftBaseX = toX(dockStart) - 25;
+  _elevDimV(ctx, leftBaseX, toY(0), toY(14), "14' door clr");
+  _elevDimV(ctx, leftBaseX - dimSpacing, toY(4), toY(4 + 13.5), "13.5' trailer");
+
+  // ── INTERNAL DIMENSIONS ──
   // Pallet load height (inside first rack bay) — only if >= 4 ft
   if (storeType !== 'bulk') {
     var loadH = beamH * 0.75;
     if (loadH >= 4) {
       _elevDimV(ctx, toX(storageStart + rackDepth + 2), toY(0.5), toY(0.5 + loadH), loadH.toFixed(1) + "'");
     }
+    // Beam height per level (inside storage, offset from pallet load)
+    _elevDimV(ctx, toX(storageStart + rackDepth * 2 + aisleW + 2), toY(0), toY(beamH), beamH.toFixed(1) + "' / level");
   }
   // Office height
   if (officeW > 0) {
     _elevDimV(ctx, toX(0) - 15, toY(0), toY(10), "10' office");
   }
-  // Trailer height (far right of trailer profile)
-  _elevDimV(ctx, toX(truckX + 22), toY(4), toY(4 + 13.5), "13.5' trailer ht");
-  // Door clear opening height (at building edge)
-  _elevDimV(ctx, toX(dockStart) - 55, toY(0), toY(14), "14' door clr");
   // Aisle width (between first two racks, if applicable)
   if (storeType !== 'bulk' && storeType !== 'carton') {
     var rackSpacingDim = aisleW + rackDepth;

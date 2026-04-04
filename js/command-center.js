@@ -85,7 +85,9 @@ async function loadSPAutomation() {
       mc.innerHTML = metricsRes.data.map(function(m) {
         var delta = m.period_change || '';
         var cls = delta.indexOf('+') === 0 ? 'up' : (delta.indexOf('-') === 0 ? 'down' : '');
-        return '<div class="sp-metric"><div class="sp-metric-value">' + esc(String(m.metric_value).replace(/\.00$/, '')) + '<span style="font-size:10px;font-weight:600;color:var(--ies-gray-400);margin-left:2px;">' + esc(m.metric_unit || '') + '</span></div><div class="sp-metric-label">' + esc(m.metric_name) + '</div>' + (delta ? '<div class="sp-metric-delta ' + cls + '">' + esc(delta) + '</div>' : '') + '</div>';
+        var mv = m.metric_value;
+        var mvStr = (!isNaN(mv) && mv !== null && mv !== '') ? fmtNum(Number(mv)) : esc(String(mv));
+        return '<div class="sp-metric"><div class="sp-metric-value">' + mvStr + '<span style="font-size:10px;font-weight:600;color:var(--ies-gray-400);margin-left:2px;">' + esc(m.metric_unit || '') + '</span></div><div class="sp-metric-label">' + esc(m.metric_name) + '</div>' + (delta ? '<div class="sp-metric-delta ' + cls + '">' + esc(delta) + '</div>' : '') + '</div>';
       }).join('');
     }
     // Render news
