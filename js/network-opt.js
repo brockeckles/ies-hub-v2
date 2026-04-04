@@ -825,6 +825,10 @@ function renderLayout(p) {
     if (dimEl) dimEl.textContent = bW.toLocaleString()+' ft × '+bD.toLocaleString()+' ft';
   }
 
+  // Store tightened dimensions for 3D view to reuse
+  wscTightenedBW = bW;
+  wscTightenedBD = bD;
+
   var vW = bW+pad*2, vH = bD+pad*2;
   svg.setAttribute('viewBox','0 0 '+vW+' '+vH);
   var bX = pad, bY = pad;
@@ -1314,6 +1318,8 @@ var wscManualZones = {};
 var wscAutoZones = {};  // snapshot of auto layout footprints for comparison
 var wscDragState = null;
 var wscLastLayoutParams = null; // saved for manual re-render
+var wscTightenedBW = 0; // tightened building width from 2D render
+var wscTightenedBD = 0; // tightened building depth from 2D render
 
 // Redraw racks inside the storage zone using current manual bounds
 function redrawManualRacks() {
@@ -2619,6 +2625,10 @@ async function wscSaveScenario(projectId, scenarioName) {
             is_active: true,
             ...inputs
         };
+        // Include calculated facility SF from last run
+        if (window._lastWscParams && window._lastWscParams.totalSF) {
+            payload.facility_sqft = Math.round(window._lastWscParams.totalSF);
+        }
         if (projectId) payload.project_id = projectId;
 
         var resp = await cmApiPost('warehouse_sizing_scenarios', payload);
@@ -6985,11 +6995,11 @@ function render3DLayout(p) {
   var cW = container.clientWidth || 800;
   var cH = container.clientHeight || 480;
 
-  // ── Building dimensions (same calc as renderLayout) ──
+  // ── Building dimensions — use tightened values from 2D render if available ──
   var twoDock = p.dockConfig === 'two';
   var dockFaceW = Math.max((twoDock ? Math.max(p.inDoors, p.outDoors) : p.totalDoors) * 14, 120);
-  var bW = Math.max(dockFaceW, Math.ceil(Math.sqrt(p.totalSF * 2.2)));
-  var bD = Math.max(100, Math.ceil(p.totalSF / bW));
+  var bW = wscTightenedBW || Math.max(dockFaceW, Math.ceil(Math.sqrt(p.totalSF * 2.2)));
+  var bD = wscTightenedBD || Math.max(100, Math.ceil(p.totalSF / bW));
   var clearH = p.clearHeightFt || 32;
   var pad = 60;
 
