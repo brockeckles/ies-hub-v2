@@ -24,6 +24,46 @@ let cmConnectFrom = null;
 let cmDraggedNode = null;
 let cmDragOffset = { x: 0, y: 0 };
 
+// ── SAFE DOM ACCESS HELPERS ──
+// Prevent crashes from missing form elements
+
+function cmVal(id, fallback) {
+  const el = document.getElementById(id);
+  return el ? el.value : (fallback || '');
+}
+
+function cmSetVal(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.value = val || '';
+}
+
+function cmText(id) {
+  const el = document.getElementById(id);
+  return el ? el.textContent : '';
+}
+
+function cmSetText(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val || '';
+}
+
+function cmSafeId(id) {
+  return document.getElementById(id);
+}
+
+function cmSetDisplay(id, display) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = display;
+}
+
+function cmToggleClass(id, className, add) {
+  const el = document.getElementById(id);
+  if (el) {
+    if (add) el.classList.add(className);
+    else el.classList.remove(className);
+  }
+}
+
 // ── INITIALIZATION ──
 
 async function cmLoadAll() {
@@ -60,10 +100,10 @@ function cmRenderStats() {
   });
   const avgAdkar = total > 0 ? Math.round(totalScore / total) : 0;
 
-  document.getElementById('cm-stat-total').textContent = total;
-  document.getElementById('cm-stat-inprogress').textContent = inProgress;
-  document.getElementById('cm-stat-completion').textContent = completionRate + '%';
-  document.getElementById('cm-stat-adkar').textContent = avgAdkar;
+  cmSetText('cm-stat-total', total);
+  cmSetText('cm-stat-inprogress', inProgress);
+  cmSetText('cm-stat-completion', completionRate + '%');
+  cmSetText('cm-stat-adkar', avgAdkar);
 }
 
 // ── VIEW MANAGEMENT ──
@@ -72,11 +112,11 @@ function cmSetView(view) {
   cmCurrentView = view;
 
   document.querySelectorAll('.cm-view-btn').forEach(btn => btn.classList.remove('active'));
-  event.target.classList.add('active');
+  if (event && event.target) event.target.classList.add('active');
 
-  document.getElementById('cm-board-view').style.display = view === 'board' ? 'block' : 'none';
-  document.getElementById('cm-list-view').style.display = view === 'list' ? 'block' : 'none';
-  document.getElementById('cm-timeline-view').style.display = view === 'timeline' ? 'block' : 'none';
+  cmSetDisplay('cm-board-view', view === 'board' ? 'block' : 'none');
+  cmSetDisplay('cm-list-view', view === 'list' ? 'block' : 'none');
+  cmSetDisplay('cm-timeline-view', view === 'timeline' ? 'block' : 'none');
 
   if (view === 'board') cmRenderBoard();
   else if (view === 'list') cmRenderList();
@@ -233,29 +273,33 @@ function cmGetInitiativeColor(init) {
 // ── DETAIL PANEL ──
 
 async function cmShowDetail(id) {
-  cmCurrentInitiative = id;
-  const init = cmData.initiatives.find(i => i.id === id);
-  if (!init) return;
+  try {
+    cmCurrentInitiative = id;
+    const init = cmData.initiatives.find(i => i.id === id);
+    if (!init) return;
 
-  document.getElementById('cm-detail-title').textContent = init.title;
-  document.getElementById('cm-detail-panel').classList.add('active');
+    cmSetText('cm-detail-title', init.title);
+    cmToggleClass('cm-detail-panel', 'active', true);
 
-  cmUpdateADKARBars(init);
-  cmRenderDetailOverview(init);
-  cmRenderActivities(init);
-  cmRenderDetailTimeline(init);
-  cmRenderFlowcharts(init);
+    cmUpdateADKARBars(init);
+    cmRenderDetailOverview(init);
+    await cmRenderActivities(init);
+    cmRenderDetailTimeline(init);
+    cmRenderFlowcharts(init);
 
-  document.querySelectorAll('.cm-tab').forEach(tab => {
-    tab.classList.remove('active');
-    tab.onclick = () => cmShowTab(tab.textContent.toLowerCase());
-  });
-  document.querySelector('.cm-tab').classList.add('active');
-  document.getElementById('cm-tab-overview').classList.add('active');
+    document.querySelectorAll('.cm-tab').forEach(tab => {
+      tab.classList.remove('active');
+      tab.onclick = () => cmShowTab(tab.textContent.toLowerCase());
+    });
+    document.querySelector('.cm-tab').classList.add('active');
+    cmToggleClass('cm-tab-overview', 'active', true);
+  } catch (err) {
+    console.error('Error in cmShowDetail:', err);
+  }
 }
 
 function cmBackToBoard() {
-  document.getElementById('cm-detail-panel').classList.remove('active');
+  cmToggleClass('cm-detail-panel', 'active', false);
   cmCurrentInitiative = null;
 }
 
@@ -263,48 +307,56 @@ function cmUpdateADKARBars(init) {
   const phases = ['awareness', 'desire', 'knowledge', 'ability', 'reinforcement'];
   phases.forEach(phase => {
     const score = init[`${phase}_score`] || 0;
-    document.getElementById(`cm-adkar-${phase}`).style.width = score + '%';
-    document.getElementById(`cm-adkar-${phase}-value`).textContent = score + '%';
+    const el = document.getElementById(`cm-adkar-${phase}`);
+    if (el) el.style.width = score + '%';
+    cmSetText(`cm-adkar-${phase}-value`, score + '%');
   });
 }
 
 // ── DETAIL TAB: OVERVIEW ──
 
 function cmRenderDetailOverview(init) {
-  document.getElementById('cm-overview-description').textContent = init.description || '(No description)';
-  document.getElementById('cm-overview-owner').textContent = init.owner || '—';
-  document.getElementById('cm-overview-category').textContent = init.category || '—';
-  document.getElementById('cm-overview-priority').textContent = (init.priority || 'normal').toUpperCase();
-  document.getElementById('cm-overview-status').textContent = (init.status || 'draft').replace('_', ' ').toUpperCase();
-  document.getElementById('cm-overview-start').textContent = init.start_date ? new Date(init.start_date).toLocaleDateString() : '—';
-  document.getElementById('cm-overview-target').textContent = init.target_date ? new Date(init.target_date).toLocaleDateString() : '—';
-  document.getElementById('cm-overview-completed').textContent = init.completed_date ? new Date(init.completed_date).toLocaleDateString() : '—';
+  cmSetText('cm-overview-description', init.description || '(No description)');
+  cmSetText('cm-overview-owner', init.owner || '—');
+  cmSetText('cm-overview-category', init.category || '—');
+  cmSetText('cm-overview-priority', (init.priority || 'normal').toUpperCase());
+  cmSetText('cm-overview-status', (init.status || 'draft').replace('_', ' ').toUpperCase());
+  cmSetText('cm-overview-start', init.start_date ? new Date(init.start_date).toLocaleDateString() : '—');
+  cmSetText('cm-overview-target', init.target_date ? new Date(init.target_date).toLocaleDateString() : '—');
+  cmSetText('cm-overview-completed', init.completed_date ? new Date(init.completed_date).toLocaleDateString() : '—');
 
   const impacts = document.getElementById('cm-overview-impacts');
-  impacts.innerHTML = '';
-  if (init.impact_areas && Array.isArray(init.impact_areas)) {
-    init.impact_areas.forEach(area => {
-      const tag = document.createElement('span');
-      tag.className = 'cm-impact-tag';
-      tag.textContent = area;
-      impacts.appendChild(tag);
-    });
-  } else {
-    impacts.innerHTML = '<span style="color: var(--ies-gray-500);">(None specified)</span>';
+  if (impacts) {
+    impacts.innerHTML = '';
+    if (init.impact_areas && Array.isArray(init.impact_areas)) {
+      init.impact_areas.forEach(area => {
+        const tag = document.createElement('span');
+        tag.className = 'cm-impact-tag';
+        tag.textContent = area;
+        impacts.appendChild(tag);
+      });
+    } else {
+      impacts.innerHTML = '<span style="color: var(--ies-gray-500);">(None specified)</span>';
+    }
   }
 }
 
 // ── DETAIL TAB: ACTIVITIES ──
 
 async function cmRenderActivities(init) {
-  const list = document.getElementById('cm-activities-list');
-  list.innerHTML = '';
+  try {
+    const list = document.getElementById('cm-activities-list');
+    if (!list) {
+      console.warn('cm-activities-list element not found');
+      return;
+    }
+    list.innerHTML = '';
 
-  const activities = cmData.activities.filter(a => a.initiative_id === init.id);
-  if (activities.length === 0) {
-    list.innerHTML = '<p style="color: var(--ies-gray-500); text-align: center; padding: 1rem;">No activities yet</p>';
-    return;
-  }
+    const activities = cmData.activities.filter(a => a.initiative_id === init.id);
+    if (activities.length === 0) {
+      list.innerHTML = '<p style="color: var(--ies-gray-500); text-align: center; padding: 1rem;">No activities yet</p>';
+      return;
+    }
 
   // Phase gate progress indicators
   const gateBar = document.createElement('div');
@@ -379,12 +431,19 @@ async function cmRenderActivities(init) {
     item.appendChild(deleteBtn);
     list.appendChild(item);
   });
+  } catch (err) {
+    console.error('Error in cmRenderActivities:', err);
+  }
 }
 
 // ── DETAIL TAB: TIMELINE ──
 
 function cmRenderDetailTimeline(init) {
   const timeline = document.getElementById('cm-detail-timeline');
+  if (!timeline) {
+    console.warn('cm-detail-timeline element not found');
+    return;
+  }
   timeline.innerHTML = '';
 
   const activities = cmData.activities.filter(a => a.initiative_id === init.id).sort((a, b) => {
@@ -430,6 +489,10 @@ function cmRenderDetailTimeline(init) {
 
 function cmRenderFlowcharts(init) {
   const list = document.getElementById('cm-flowcharts-list');
+  if (!list) {
+    console.warn('cm-flowcharts-list element not found');
+    return;
+  }
   list.innerHTML = '';
 
   const charts = cmData.flowcharts.filter(f => f.initiative_id === init.id);
@@ -707,37 +770,37 @@ async function cmShowEditInitiative() {
 }
 
 async function cmSaveInitiative(isEdit = false) {
-  const title = document.getElementById('cm-init-title').value.trim();
-  if (!title) {
-    alert('Please enter an initiative title');
-    return;
-  }
-
-  const impacts = document.getElementById('cm-init-impacts').value
-    .split(',')
-    .map(i => i.trim())
-    .filter(i => i);
-
-  const data = {
-    title,
-    description: document.getElementById('cm-init-desc').value,
-    owner: document.getElementById('cm-init-owner').value,
-    category: document.getElementById('cm-init-category').value,
-    priority: document.getElementById('cm-init-priority').value,
-    current_phase: document.getElementById('cm-init-phase')?.value || 'awareness',
-    status: document.getElementById('cm-init-status')?.value || 'draft',
-    start_date: document.getElementById('cm-init-start').value,
-    target_date: document.getElementById('cm-init-target').value,
-    impact_areas: impacts,
-    awareness_score: parseInt(document.getElementById('cm-init-awareness')?.value || 0),
-    desire_score: parseInt(document.getElementById('cm-init-desire')?.value || 0),
-    knowledge_score: parseInt(document.getElementById('cm-init-knowledge')?.value || 0),
-    ability_score: parseInt(document.getElementById('cm-init-ability')?.value || 0),
-    reinforcement_score: parseInt(document.getElementById('cm-init-reinforcement')?.value || 0),
-    updated_at: new Date().toISOString()
-  };
-
   try {
+    const title = cmVal('cm-init-title', '').trim();
+    if (!title) {
+      alert('Please enter an initiative title');
+      return;
+    }
+
+    const impacts = cmVal('cm-init-impacts', '')
+      .split(',')
+      .map(i => i.trim())
+      .filter(i => i);
+
+    const data = {
+      title,
+      description: cmVal('cm-init-desc', ''),
+      owner: cmVal('cm-init-owner', ''),
+      category: cmVal('cm-init-category', ''),
+      priority: cmVal('cm-init-priority', 'normal'),
+      current_phase: cmVal('cm-init-phase', 'awareness'),
+      status: cmVal('cm-init-status', 'draft'),
+      start_date: cmVal('cm-init-start', ''),
+      target_date: cmVal('cm-init-target', ''),
+      impact_areas: impacts,
+      awareness_score: parseInt(cmVal('cm-init-awareness', '0')),
+      desire_score: parseInt(cmVal('cm-init-desire', '0')),
+      knowledge_score: parseInt(cmVal('cm-init-knowledge', '0')),
+      ability_score: parseInt(cmVal('cm-init-ability', '0')),
+      reinforcement_score: parseInt(cmVal('cm-init-reinforcement', '0')),
+      updated_at: new Date().toISOString()
+    };
+
     if (isEdit) {
       await sb.from('change_initiatives').update(data).eq('id', cmCurrentInitiative);
     } else {
@@ -749,10 +812,10 @@ async function cmSaveInitiative(isEdit = false) {
 
     document.querySelector('.cm-modal-overlay')?.remove();
     await cmLoadAll();
-    if (isEdit) cmShowDetail(cmCurrentInitiative);
+    if (isEdit) await cmShowDetail(cmCurrentInitiative);
   } catch (err) {
     console.error('Error saving initiative:', err);
-    alert('Error saving initiative');
+    alert('Error saving initiative: ' + (err.message || 'Unknown error'));
   }
 }
 
@@ -824,32 +887,33 @@ async function cmShowNewActivity() {
 }
 
 async function cmSaveActivity() {
-  const title = document.getElementById('cm-act-title').value.trim();
-  if (!title) {
-    alert('Please enter an activity title');
-    return;
-  }
-
-  const data = {
-    initiative_id: cmCurrentInitiative,
-    title,
-    description: document.getElementById('cm-act-desc').value,
-    owner: document.getElementById('cm-act-owner').value,
-    adkar_phase: document.getElementById('cm-act-phase').value,
-    status: document.getElementById('cm-act-status').value,
-    due_date: document.getElementById('cm-act-due').value,
-    sort_order: cmData.activities.filter(a => a.initiative_id === cmCurrentInitiative).length,
-    created_at: new Date().toISOString()
-  };
-
   try {
+    const title = cmVal('cm-act-title', '').trim();
+    if (!title) {
+      alert('Please enter an activity title');
+      return;
+    }
+
+    const data = {
+      initiative_id: cmCurrentInitiative,
+      title,
+      description: cmVal('cm-act-desc', ''),
+      owner: cmVal('cm-act-owner', ''),
+      adkar_phase: cmVal('cm-act-phase', 'awareness'),
+      status: cmVal('cm-act-status', 'todo'),
+      due_date: cmVal('cm-act-due', ''),
+      sort_order: cmData.activities.filter(a => a.initiative_id === cmCurrentInitiative).length,
+      created_at: new Date().toISOString()
+    };
+
     await sb.from('change_activities').insert(data);
     document.querySelector('.cm-modal-overlay')?.remove();
     await cmLoadAll();
-    cmRenderActivities(cmData.initiatives.find(i => i.id === cmCurrentInitiative));
+    const init = cmData.initiatives.find(i => i.id === cmCurrentInitiative);
+    if (init) await cmRenderActivities(init);
   } catch (err) {
     console.error('Error saving activity:', err);
-    alert('Error saving activity');
+    alert('Error saving activity: ' + (err.message || 'Unknown error'));
   }
 }
 
@@ -890,69 +954,77 @@ async function cmToggleActivityStatus(id, newStatus) {
 const CM_PHASE_ORDER = ['awareness', 'desire', 'knowledge', 'ability', 'reinforcement'];
 
 async function cmCheckPhaseProgression(initiativeId) {
-  // Refresh activities for this initiative
-  const { data: activities } = await sb.from('change_activities').select('*').eq('initiative_id', initiativeId);
-  const init = cmData.initiatives.find(i => i.id === initiativeId);
-  if (!init || !activities) return;
+  try {
+    // Refresh activities for this initiative
+    const { data: activities } = await sb.from('change_activities').select('*').eq('initiative_id', initiativeId);
+    const init = cmData.initiatives.find(i => i.id === initiativeId);
+    if (!init || !activities) return;
 
-  const updates = {};
-  let highestCompletePhase = -1;
+    const updates = {};
+    let highestCompletePhase = -1;
 
-  CM_PHASE_ORDER.forEach((phase, idx) => {
-    const phaseActivities = activities.filter(a => a.adkar_phase === phase);
-    if (phaseActivities.length === 0) return;
+    CM_PHASE_ORDER.forEach((phase, idx) => {
+      const phaseActivities = activities.filter(a => a.adkar_phase === phase);
+      if (phaseActivities.length === 0) return;
 
-    const doneCount = phaseActivities.filter(a => a.status === 'done').length;
-    const total = phaseActivities.length;
-    const pct = Math.round((doneCount / total) * 100);
+      const doneCount = phaseActivities.filter(a => a.status === 'done').length;
+      const total = phaseActivities.length;
+      const pct = Math.round((doneCount / total) * 100);
 
-    // Update the phase score to reflect activity completion
-    updates[`${phase}_score`] = pct;
+      // Update the phase score to reflect activity completion
+      updates[`${phase}_score`] = pct;
 
-    if (doneCount === total) {
-      highestCompletePhase = idx;
+      if (doneCount === total) {
+        highestCompletePhase = idx;
+      }
+    });
+
+    // Advance current_phase to the next incomplete phase
+    if (highestCompletePhase >= 0) {
+      const nextPhaseIdx = highestCompletePhase + 1;
+      if (nextPhaseIdx < CM_PHASE_ORDER.length) {
+        updates.current_phase = CM_PHASE_ORDER[nextPhaseIdx];
+      } else {
+        // All phases complete — mark the initiative as completed
+        updates.current_phase = 'reinforcement';
+        updates.status = 'completed';
+        updates.completed_date = new Date().toISOString().split('T')[0];
+      }
     }
-  });
 
-  // Advance current_phase to the next incomplete phase
-  if (highestCompletePhase >= 0) {
-    const nextPhaseIdx = highestCompletePhase + 1;
-    if (nextPhaseIdx < CM_PHASE_ORDER.length) {
-      updates.current_phase = CM_PHASE_ORDER[nextPhaseIdx];
-    } else {
-      // All phases complete — mark the initiative as completed
-      updates.current_phase = 'reinforcement';
-      updates.status = 'completed';
-      updates.completed_date = new Date().toISOString().split('T')[0];
+    // Auto-set status to in_progress if it was not_started and we have progress
+    if (init.status === 'not_started' && Object.values(updates).some(v => v > 0)) {
+      updates.status = 'in_progress';
     }
-  }
 
-  // Auto-set status to in_progress if it was not_started and we have progress
-  if (init.status === 'not_started' && Object.values(updates).some(v => v > 0)) {
-    updates.status = 'in_progress';
-  }
+    updates.updated_at = new Date().toISOString();
 
-  updates.updated_at = new Date().toISOString();
-
-  if (Object.keys(updates).length > 0) {
-    await sb.from('change_initiatives').update(updates).eq('id', initiativeId);
+    if (Object.keys(updates).length > 0) {
+      await sb.from('change_initiatives').update(updates).eq('id', initiativeId);
+    }
+  } catch (err) {
+    console.error('Error in cmCheckPhaseProgression:', err);
   }
 }
 
 // ── FLOWCHART EDITOR ──
 
 async function cmShowFlowchartEditor(chartId) {
-  cmCurrentFlowchart = chartId;
-  const chart = cmData.flowcharts.find(f => f.id === chartId);
+  try {
+    cmCurrentFlowchart = chartId;
+    const chart = cmData.flowcharts.find(f => f.id === chartId);
 
-  if (chart) {
-    cmFlowNodes = JSON.parse(JSON.stringify(chart.chart_data?.nodes || []));
-    cmFlowEdges = JSON.parse(JSON.stringify(chart.chart_data?.edges || []));
-    document.getElementById('cm-flowchart-title').textContent = `Editing: ${chart.title}`;
+    if (chart) {
+      cmFlowNodes = JSON.parse(JSON.stringify(chart.chart_data?.nodes || []));
+      cmFlowEdges = JSON.parse(JSON.stringify(chart.chart_data?.edges || []));
+      cmSetText('cm-flowchart-title', `Editing: ${chart.title}`);
+    }
+
+    cmToggleClass('cm-flowchart-editor', 'active', true);
+    cmRenderFlowchartSVG();
+  } catch (err) {
+    console.error('Error in cmShowFlowchartEditor:', err);
   }
-
-  document.getElementById('cm-flowchart-editor').classList.add('active');
-  cmRenderFlowchartSVG();
 }
 
 async function cmNewFlowchart() {
@@ -981,15 +1053,15 @@ async function cmNewFlowchart() {
 }
 
 async function cmStartNewFlowchart() {
-  const title = document.getElementById('cm-fc-title').value.trim();
-  if (!title) {
-    alert('Please enter a flowchart title');
-    return;
-  }
-
-  const desc = document.getElementById('cm-fc-desc').value;
-
   try {
+    const title = cmVal('cm-fc-title', '').trim();
+    if (!title) {
+      alert('Please enter a flowchart title');
+      return;
+    }
+
+    const desc = cmVal('cm-fc-desc', '');
+
     const res = await sb.from('change_flowcharts').insert({
       initiative_id: cmCurrentInitiative,
       title,
@@ -1003,17 +1075,21 @@ async function cmStartNewFlowchart() {
     cmFlowNodes = [];
     cmFlowEdges = [];
 
-    document.getElementById('cm-flowchart-title').textContent = `Creating: ${title}`;
-    document.getElementById('cm-flowchart-editor').classList.add('active');
+    cmSetText('cm-flowchart-title', `Creating: ${title}`);
+    cmToggleClass('cm-flowchart-editor', 'active', true);
     cmRenderFlowchartSVG();
   } catch (err) {
     console.error('Error creating flowchart:', err);
-    alert('Error creating flowchart');
+    alert('Error creating flowchart: ' + (err.message || 'Unknown error'));
   }
 }
 
 function cmRenderFlowchartSVG() {
   const svg = document.getElementById('cm-canvas-svg');
+  if (!svg) {
+    console.warn('cm-canvas-svg element not found');
+    return;
+  }
   svg.innerHTML = '';
 
   cmFlowEdges.forEach(edge => {
@@ -1086,7 +1162,7 @@ function cmRenderFlowchartSVG() {
         e.stopPropagation();
         cmSelectedNode = node;
         cmRenderFlowchartSVG();
-        document.getElementById('cm-delete-btn').style.display = 'inline-block';
+        cmSetDisplay('cm-delete-btn', 'inline-block');
       });
 
       svg.appendChild(g);
@@ -1098,7 +1174,7 @@ function cmRenderFlowchartSVG() {
   svg.addEventListener('click', () => {
     cmSelectedNode = null;
     cmRenderFlowchartSVG();
-    document.getElementById('cm-delete-btn').style.display = 'none';
+    cmSetDisplay('cm-delete-btn', 'none');
   });
 }
 
@@ -1150,8 +1226,8 @@ function cmAddFlowNode(type) {
 }
 
 function cmAddStepBased() {
-  const type = document.getElementById('cm-step-type').value;
-  const label = document.getElementById('cm-step-label').value.trim();
+  const type = cmVal('cm-step-type', 'process');
+  const label = cmVal('cm-step-label', '').trim();
 
   if (!label) {
     alert('Please enter a label');
@@ -1170,7 +1246,7 @@ function cmAddStepBased() {
     });
   }
 
-  document.getElementById('cm-step-label').value = '';
+  cmSetVal('cm-step-label', '');
   cmRenderFlowchartSVG();
 }
 
@@ -1182,7 +1258,7 @@ function cmDeleteSelectedNode() {
   cmSelectedNode = null;
 
   cmRenderFlowchartSVG();
-  document.getElementById('cm-delete-btn').style.display = 'none';
+  cmSetDisplay('cm-delete-btn', 'none');
 }
 
 function cmToggleFlowMode(mode) {
@@ -1191,22 +1267,22 @@ function cmToggleFlowMode(mode) {
   const builder = document.getElementById('cm-step-builder');
 
   if (mode === 'canvas') {
-    canvas.style.display = 'flex';
-    builder.style.display = 'none';
+    if (canvas) canvas.style.display = 'flex';
+    if (builder) builder.style.display = 'none';
   } else {
-    canvas.style.display = 'none';
-    builder.style.display = 'block';
+    if (canvas) canvas.style.display = 'none';
+    if (builder) builder.style.display = 'block';
   }
 
   document.querySelectorAll('.cm-mode-btn').forEach(btn => btn.classList.remove('active'));
-  event.target.classList.add('active');
+  if (event && event.target) event.target.classList.add('active');
 }
 
 async function cmSaveFlowchart() {
-  const chart = cmData.flowcharts.find(f => f.id === cmCurrentFlowchart);
-  if (!chart) return;
-
   try {
+    const chart = cmData.flowcharts.find(f => f.id === cmCurrentFlowchart);
+    if (!chart) return;
+
     await sb.from('change_flowcharts').update({
       chart_data: {
         nodes: cmFlowNodes,
@@ -1217,15 +1293,15 @@ async function cmSaveFlowchart() {
 
     await cmLoadAll();
     cmCloseFlowchartEditor();
-    cmShowDetail(cmCurrentInitiative);
+    if (cmCurrentInitiative) await cmShowDetail(cmCurrentInitiative);
   } catch (err) {
     console.error('Error saving flowchart:', err);
-    alert('Error saving flowchart');
+    alert('Error saving flowchart: ' + (err.message || 'Unknown error'));
   }
 }
 
 function cmCloseFlowchartEditor() {
-  document.getElementById('cm-flowchart-editor').classList.remove('active');
+  cmToggleClass('cm-flowchart-editor', 'active', false);
   cmCurrentFlowchart = null;
   cmFlowNodes = [];
   cmFlowEdges = [];

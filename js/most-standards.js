@@ -896,13 +896,13 @@ const mostApp = {
 
   // Persist scenarios to localStorage
   _saveScenarios() {
-    try { localStorage.setItem('most_scenarios', JSON.stringify(this.scenarios)); } catch(e) {}
+    try { localStorage.setItem('most_scenarios', JSON.stringify(this.scenarios)); } catch(e) { console.warn('MOST localStorage error:', e.message); }
   },
   _loadScenarios() {
     try {
       var saved = localStorage.getItem('most_scenarios');
       if (saved) this.scenarios = JSON.parse(saved);
-    } catch(e) {}
+    } catch(e) { console.warn('MOST localStorage error:', e.message); }
   },
 
   async initAnalysis() {

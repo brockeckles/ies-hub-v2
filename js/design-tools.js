@@ -298,7 +298,7 @@ async function netLoadScenariosList() {
         '<div onclick="netLoadScenario(\'' + s.id + '\'); netShowTool()" style="cursor:pointer;">' +
         '<div class="dt-landing-card-name">' + (s.scenario_name || 'Untitled') + '</div>' +
         '<div class="dt-landing-card-meta">' + (s.created_at ? new Date(s.created_at).toLocaleDateString() : '') + '</div>' +
-        '<div class="dt-landing-card-metric">DCs: ' + (s.dc_count || '—') + ' | Freight: $' + (s.result_est_freight ? s.result_est_freight.toLocaleString(undefined, {maximumFractionDigits: 0}) : '—') + '</div>' +
+        '<div class="dt-landing-card-metric">DCs: ' + (s.dc_count || '—') + ' | Freight: $' + ((s.result_est_freight || 0).toLocaleString(undefined, {maximumFractionDigits: 0})) + '</div>' +
         '</div>' +
         '<div class="dt-landing-card-actions">' +
         '<button class="dt-card-btn-copy" onclick="event.stopPropagation(); dtCopyScenario(\'network_optimization_scenarios\',\'' + s.id + '\',\'net\')"><svg width="12" height="12" fill="none" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2" stroke="currentColor" stroke-width="2"/></svg> Copy</button>' +
@@ -351,7 +351,7 @@ async function netoptLoadScenariosList() {
         '<div onclick="netoptLoadScenario(\'' + s.id + '\'); netoptShowTool()" style="cursor:pointer;">' +
         '<div class="dt-landing-card-name">' + (s.scenario_name || 'Untitled') + '</div>' +
         '<div class="dt-landing-card-meta">' + (s.created_at ? new Date(s.created_at).toLocaleDateString() : '') + '</div>' +
-        '<div class="dt-landing-card-metric">Cost: $' + (s.result_total_cost ? s.result_total_cost.toLocaleString(undefined, {maximumFractionDigits: 0}) : '—') + ' | Mode: ' + (s.solver_mode || '—') + '</div>' +
+        '<div class="dt-landing-card-metric">Cost: $' + ((s.result_total_cost || 0).toLocaleString(undefined, {maximumFractionDigits: 0})) + ' | Mode: ' + (s.solver_mode || '—') + '</div>' +
         '</div>' +
         '<div class="dt-landing-card-actions">' +
         '<button class="dt-card-btn-copy" onclick="event.stopPropagation(); dtCopyScenario(\'netopt_scenarios\',\'' + s.id + '\',\'netopt\')"><svg width="12" height="12" fill="none" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2" stroke="currentColor" stroke-width="2"/></svg> Copy</button>' +

@@ -274,7 +274,7 @@ function updateDemandCity(idx, el) {
 }
 
 function updateDemandVol(idx, el) {
-  netDemandPoints[idx].volume = parseInt(el.value) || 0;
+  netDemandPoints[idx].volume = parseInt(el.value, 10) || 0;
   runNetworkOptimization();
 }
 
@@ -1239,9 +1239,9 @@ function balanceStorageMix(changed) {
   var fpEl = document.getElementById('wsc-pct-fullpal');
   var cpEl = document.getElementById('wsc-pct-ctnpal');
   var csEl = document.getElementById('wsc-pct-ctnshelv');
-  var fp = parseInt(fpEl.value) || 0;
-  var cp = parseInt(cpEl.value) || 0;
-  var cs = parseInt(csEl.value) || 0;
+  var fp = parseInt(fpEl.value, 10) || 0;
+  var cp = parseInt(cpEl.value, 10) || 0;
+  var cs = parseInt(csEl.value, 10) || 0;
 
   // Clamp changed field to 0-100
   if (changed === 'fullpal') { fp = Math.max(0, Math.min(100, fp)); fpEl.value = fp; }
@@ -1921,36 +1921,36 @@ function exportCalculatorSummary() {
 
 function calcWarehouse() { try {
   // ── READ INPUTS ──
-  var peakUnits = parseInt(document.getElementById('wsc-peakunits').value) || 500000;
-  var avgUnits = parseInt(document.getElementById('wsc-avgunits').value) || 350000;
+  var peakUnits = parseInt(document.getElementById('wsc-peakunits').value, 10) || 500000;
+  var avgUnits = parseInt(document.getElementById('wsc-avgunits').value, 10) || 350000;
 
   // Storage mix percentages
-  var pctFullPal = (parseInt(document.getElementById('wsc-pct-fullpal').value) || 0) / 100;
-  var pctCtnPal = (parseInt(document.getElementById('wsc-pct-ctnpal').value) || 0) / 100;
-  var pctCtnShelv = (parseInt(document.getElementById('wsc-pct-ctnshelv').value) || 0) / 100;
+  var pctFullPal = (parseInt(document.getElementById('wsc-pct-fullpal').value, 10) || 0) / 100;
+  var pctCtnPal = (parseInt(document.getElementById('wsc-pct-ctnpal').value, 10) || 0) / 100;
+  var pctCtnShelv = (parseInt(document.getElementById('wsc-pct-ctnshelv').value, 10) || 0) / 100;
 
   // Unit conversion factors
-  var unitsPerPallet = parseInt(document.getElementById('wsc-upp').value) || 48;
-  var unitsPerCartonPal = parseInt(document.getElementById('wsc-upc-pal').value) || 6;
-  var cartonsPerPallet = parseInt(document.getElementById('wsc-cpp').value) || 12;
-  var unitsPerCartonShelv = parseInt(document.getElementById('wsc-upc-shelv').value) || 6;
-  var cartonsPerLocation = parseInt(document.getElementById('wsc-cpl').value) || 4;
+  var unitsPerPallet = parseInt(document.getElementById('wsc-upp').value, 10) || 48;
+  var unitsPerCartonPal = parseInt(document.getElementById('wsc-upc-pal').value, 10) || 6;
+  var cartonsPerPallet = parseInt(document.getElementById('wsc-cpp').value, 10) || 12;
+  var unitsPerCartonShelv = parseInt(document.getElementById('wsc-upc-shelv').value, 10) || 6;
+  var cartonsPerLocation = parseInt(document.getElementById('wsc-cpl').value, 10) || 4;
 
-  var clearHeightFt = parseInt(document.getElementById('wsc-clearht').value) || 36;
-  var loadHeightIn = parseInt(document.getElementById('wsc-loadht').value) || 48;
+  var clearHeightFt = parseInt(document.getElementById('wsc-clearht').value, 10) || 36;
+  var loadHeightIn = parseInt(document.getElementById('wsc-loadht').value, 10) || 48;
 
   var storeType = document.getElementById('wsc-storetype').value;
   var aisleType = document.getElementById('wsc-aisletype').value;
-  var bulkDepth = parseInt(document.getElementById('wsc-bulkdp').value) || 4;
-  var stackHi = parseInt(document.getElementById('wsc-stackhi').value) || 3;
-  var mixRackPct = (parseInt(document.getElementById('wsc-mixrack').value) || 70) / 100;
+  var bulkDepth = parseInt(document.getElementById('wsc-bulkdp').value, 10) || 4;
+  var stackHi = parseInt(document.getElementById('wsc-stackhi').value, 10) || 3;
+  var mixRackPct = (parseInt(document.getElementById('wsc-mixrack').value, 10) || 70) / 100;
 
-  var inPal = parseInt(document.getElementById('wsc-inpal').value) || 200;
-  var outPal = parseInt(document.getElementById('wsc-outpal').value) || 200;
-  var pdph = parseInt(document.getElementById('wsc-pdph').value) || 20;
-  var dockHrs = parseInt(document.getElementById('wsc-dockhr').value) || 8;
+  var inPal = parseInt(document.getElementById('wsc-inpal').value, 10) || 200;
+  var outPal = parseInt(document.getElementById('wsc-outpal').value, 10) || 200;
+  var pdph = parseInt(document.getElementById('wsc-pdph').value, 10) || 20;
+  var dockHrs = parseInt(document.getElementById('wsc-dockhr').value, 10) || 8;
 
-  var officePct = parseInt(document.getElementById('wsc-office').value) / 100;
+  var officePct = parseInt(document.getElementById('wsc-office').value, 10) / 100;
 
   // Layout config
   var rackDir = document.getElementById('wsc-rackdir').value;   // 'horizontal' or 'vertical'
@@ -1967,7 +1967,7 @@ function calcWarehouse() { try {
   if (sprinklerSelect === '24') sprinklerClearanceIn = 24;
   else if (sprinklerSelect === '36') sprinklerClearanceIn = 36;
   else if (sprinklerSelect === 'custom') {
-    var customVal = parseInt(document.getElementById('wsc-sprinkler-custom').value) || 18;
+    var customVal = parseInt(document.getElementById('wsc-sprinkler-custom').value, 10) || 18;
     sprinklerClearanceIn = Math.max(12, Math.min(48, customVal));
   }
   document.getElementById('wsc-sprinkler-val').textContent = sprinklerClearanceIn;
@@ -2026,14 +2026,14 @@ function calcWarehouse() { try {
   var palletPositionsNeeded = fullPalPositions + ctnPalPositions;
 
   // Honeycomb / empty-position buffer (user-adjustable)
-  var hcBufPct = parseInt(document.getElementById('wsc-hcbuf').value) || 10;
+  var hcBufPct = parseInt(document.getElementById('wsc-hcbuf').value, 10) || 10;
   document.getElementById('wsc-hcbuf-val').textContent = hcBufPct + '%';
   var bufferFactor = 1 + (hcBufPct / 100);
   var grossPalletPositions = Math.ceil(palletPositionsNeeded * bufferFactor);
   var grossShelvPositions = Math.ceil(shelvPositions * bufferFactor);
 
   // FIX 2: Surge capacity buffer (additional positions for receiving surges)
-  var surgeBufPct = parseInt(document.getElementById('wsc-surge').value) || 20;
+  var surgeBufPct = parseInt(document.getElementById('wsc-surge').value, 10) || 20;
   document.getElementById('wsc-surge-val').textContent = surgeBufPct + '%';
   var surgePositions = Math.ceil((grossPalletPositions + grossShelvPositions) * (surgeBufPct / 100));
   var designedPositions = grossPalletPositions + grossShelvPositions;
@@ -2157,7 +2157,7 @@ function calcWarehouse() { try {
 
   // FIX 4: Dock wall feasibility validator
   var dockWallValidation = '';
-  var availableDockWall = parseInt(document.getElementById('wsc-dock-wall').value) || 0;
+  var availableDockWall = parseInt(document.getElementById('wsc-dock-wall').value, 10) || 0;
   if (availableDockWall > 0) {
     var requiredWallLength = adjustedDoors * 12; // 12 ft on-center standard
     if (requiredWallLength > availableDockWall) {
@@ -2184,7 +2184,7 @@ function calcWarehouse() { try {
   ];
   for (var i = 0; i < optZones.length; i++) {
     if (document.getElementById(optZones[i].cb).checked) {
-      var sf = parseInt(document.getElementById(optZones[i].sf).value) || 0;
+      var sf = parseInt(document.getElementById(optZones[i].sf).value, 10) || 0;
       addlSF += sf;
       addlItems.push({ label: optZones[i].label, sf: sf });
     }
@@ -2193,12 +2193,12 @@ function calcWarehouse() { try {
   // Forward pick area (calculated from SKUs, pick type, days of inventory)
   var fwdPickSF = 0;
   if (document.getElementById('wsc-fwd').checked) {
-    var fwdSkus = parseInt(document.getElementById('wsc-fwd-skus').value) || 0;
-    var fwdDays = parseInt(document.getElementById('wsc-fwd-days').value) || 3;
+    var fwdSkus = parseInt(document.getElementById('wsc-fwd-skus').value, 10) || 0;
+    var fwdDays = parseInt(document.getElementById('wsc-fwd-days').value, 10) || 3;
     var fwdType = document.getElementById('wsc-fwd-type').value;
-    var fwdPickPct = parseInt(document.getElementById('wsc-fwd-pct').value) || 20;
-    var obUnitsYr = parseInt(document.getElementById('wsc-ob-units').value) || 0;
-    var opDaysYr = parseInt(document.getElementById('wsc-op-days').value) || 250;
+    var fwdPickPct = parseInt(document.getElementById('wsc-fwd-pct').value, 10) || 20;
+    var obUnitsYr = parseInt(document.getElementById('wsc-ob-units').value, 10) || 0;
+    var opDaysYr = parseInt(document.getElementById('wsc-op-days').value, 10) || 250;
 
     // Update Active Pick Face % display
     document.getElementById('wsc-fwd-pct-val').textContent = fwdPickPct + '%';
@@ -2234,7 +2234,7 @@ function calcWarehouse() { try {
     var nameEl = row.querySelector('input[type="text"]');
     var sfEl = row.querySelector('input[type="number"]');
     if (nameEl && sfEl) {
-      var sf = parseInt(sfEl.value) || 0;
+      var sf = parseInt(sfEl.value, 10) || 0;
       if (sf > 0) {
         addlSF += sf;
         addlItems.push({ label: nameEl.value || 'Custom Zone', sf: sf });
@@ -2646,7 +2646,7 @@ async function wscSaveScenario(projectId, scenarioName) {
         };
         // facility_sqft already captured by wscCollectInputs() from DOM
         // Recalculate just in case DOM is stale
-        try { calcWarehouse(); } catch(e) {}
+        try { calcWarehouse(); } catch(e) { console.error('calcWarehouse auto-calc error:', e.message); }
         if (projectId) payload.project_id = projectId;
 
         var resp = await cmApiPost('warehouse_sizing_scenarios', payload);
@@ -4565,13 +4565,13 @@ function netoptRenderFacilitiesTable() {
     row.style.borderBottom = '1px solid var(--ies-gray-200)';
     var fid = esc(f.id);
     row.innerHTML = `
-      <td style="padding:12px 16px;"><input type="text" value="${esc(f.name)}" class="wsc-input" style="width:100%;font-size:12px;" onchange="netoptState.facilities.find(x=>x.id==='${fid}').name=this.value;"></td>
-      <td style="padding:12px 16px;"><input type="text" value="${esc(f.city)}" class="wsc-input" style="width:100%;font-size:12px;" onchange="netoptState.facilities.find(x=>x.id==='${fid}').city=this.value;netoptGeocodeFacility('${fid}');"></td>
-      <td style="padding:12px 16px;text-align:right;"><input type="number" value="${f.capacity}" min="100" step="50" class="wsc-input" style="width:100%;text-align:right;font-size:12px;" onchange="netoptState.facilities.find(x=>x.id==='${fid}').capacity=parseFloat(this.value);netoptUpdateKPI();"></td>
-      <td style="padding:12px 16px;text-align:right;"><input type="number" value="${f.fixedCost}" min="0" step="0.1" class="wsc-input" style="width:100%;text-align:right;font-size:12px;" onchange="netoptState.facilities.find(x=>x.id==='${fid}').fixedCost=parseFloat(this.value);netoptUpdateKPI();"></td>
-      <td style="padding:12px 16px;text-align:right;"><input type="number" value="${f.varCost}" min="0" step="0.01" class="wsc-input" style="width:100%;text-align:right;font-size:12px;" onchange="netoptState.facilities.find(x=>x.id==='${fid}').varCost=parseFloat(this.value);netoptUpdateKPI();"></td>
+      <td style="padding:12px 16px;"><input type="text" value="${esc(f.name)}" class="wsc-input" style="width:100%;font-size:12px;" onchange="netoptState.facilities.find(function(x){return x.id==='${fid}'}).name=this.value;"></td>
+      <td style="padding:12px 16px;"><input type="text" value="${esc(f.city)}" class="wsc-input" style="width:100%;font-size:12px;" onchange="netoptState.facilities.find(function(x){return x.id==='${fid}'}).city=this.value;netoptGeocodeFacility('${fid}');"></td>
+      <td style="padding:12px 16px;text-align:right;"><input type="number" value="${f.capacity}" min="100" step="50" class="wsc-input" style="width:100%;text-align:right;font-size:12px;" onchange="netoptState.facilities.find(function(x){return x.id==='${fid}'}).capacity=parseFloat(this.value);netoptUpdateKPI();"></td>
+      <td style="padding:12px 16px;text-align:right;"><input type="number" value="${f.fixedCost}" min="0" step="0.1" class="wsc-input" style="width:100%;text-align:right;font-size:12px;" onchange="netoptState.facilities.find(function(x){return x.id==='${fid}'}).fixedCost=parseFloat(this.value);netoptUpdateKPI();"></td>
+      <td style="padding:12px 16px;text-align:right;"><input type="number" value="${f.varCost}" min="0" step="0.01" class="wsc-input" style="width:100%;text-align:right;font-size:12px;" onchange="netoptState.facilities.find(function(x){return x.id==='${fid}'}).varCost=parseFloat(this.value);netoptUpdateKPI();"></td>
       <td style="padding:12px 16px;text-align:center;">
-        <select class="wsc-select" style="width:100%;font-size:12px;" onchange="netoptState.facilities.find(x=>x.id==='${fid}').status=this.value;">
+        <select class="wsc-select" style="width:100%;font-size:12px;" onchange="netoptState.facilities.find(function(x){return x.id==='${fid}'}).status=this.value;">
           <option ${f.status==='Candidate'?'selected':''}>Candidate</option>
           <option ${f.status==='Locked Open'?'selected':''}>Locked Open</option>
         </select>
@@ -4591,11 +4591,11 @@ function netoptRenderDemandsTable() {
     row.style.borderBottom = '1px solid var(--ies-gray-200)';
     var did = esc(d.id);
     row.innerHTML = `
-      <td style="padding:12px 16px;"><input type="text" value="${esc(d.city)}" class="wsc-input" style="width:100%;font-size:12px;" onchange="netoptState.demands.find(x=>x.id==='${did}').city=this.value;netoptGeocideDemand('${did}');"></td>
-      <td style="padding:12px 16px;"><input type="text" value="${esc(d.state)}" class="wsc-input" style="width:100%;font-size:12px;" onchange="netoptState.demands.find(x=>x.id==='${did}').state=this.value;"></td>
-      <td style="padding:12px 16px;text-align:right;"><input type="number" value="${d.volume}" min="1" step="10" class="wsc-input" style="width:100%;text-align:right;font-size:12px;" onchange="netoptState.demands.find(x=>x.id==='${did}').volume=parseFloat(this.value);netoptUpdateKPI();"></td>
-      <td style="padding:12px 16px;text-align:right;"><input type="number" value="${d.maxMiles}" min="50" step="50" class="wsc-input" style="width:100%;text-align:right;font-size:12px;" onchange="netoptState.demands.find(x=>x.id==='${did}').maxMiles=parseFloat(this.value);"></td>
-      <td style="padding:12px 16px;text-align:right;"><input type="number" value="${d.maxDays || 3}" min="1" max="7" step="1" class="wsc-input" style="width:100%;text-align:right;font-size:12px;" onchange="netoptState.demands.find(x=>x.id==='${did}').maxDays=parseInt(this.value);"></td>
+      <td style="padding:12px 16px;"><input type="text" value="${esc(d.city)}" class="wsc-input" style="width:100%;font-size:12px;" onchange="netoptState.demands.find(function(x){return x.id==='${did}'}).city=this.value;netoptGeocideDemand('${did}');"></td>
+      <td style="padding:12px 16px;"><input type="text" value="${esc(d.state)}" class="wsc-input" style="width:100%;font-size:12px;" onchange="netoptState.demands.find(function(x){return x.id==='${did}'}).state=this.value;"></td>
+      <td style="padding:12px 16px;text-align:right;"><input type="number" value="${d.volume}" min="1" step="10" class="wsc-input" style="width:100%;text-align:right;font-size:12px;" onchange="netoptState.demands.find(function(x){return x.id==='${did}'}).volume=parseFloat(this.value);netoptUpdateKPI();"></td>
+      <td style="padding:12px 16px;text-align:right;"><input type="number" value="${d.maxMiles}" min="50" step="50" class="wsc-input" style="width:100%;text-align:right;font-size:12px;" onchange="netoptState.demands.find(function(x){return x.id==='${did}'}).maxMiles=parseFloat(this.value);"></td>
+      <td style="padding:12px 16px;text-align:right;"><input type="number" value="${d.maxDays || 3}" min="1" max="7" step="1" class="wsc-input" style="width:100%;text-align:right;font-size:12px;" onchange="netoptState.demands.find(function(x){return x.id==='${did}'}).maxDays=parseInt(this.value, 10);"></td>
       <td style="padding:12px 16px;text-align:center;"><button onclick="netoptRemoveDemand('${did}')" style="padding:4px 8px;background:#fff;border:1px solid var(--ies-red);color:var(--ies-red);border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;">Remove</button></td>
     `;
     tbody.appendChild(row);
@@ -4765,7 +4765,7 @@ function netoptAddSelectedMarkets() {
   var cbs = document.querySelectorAll('#netopt-market-grid input[type="checkbox"]:checked:not(:disabled)');
   var count = 0;
   cbs.forEach(function(cb) {
-    var idx = parseInt(cb.getAttribute('data-market-idx'));
+    var idx = parseInt(cb.getAttribute('data-market-idx'), 10);
     var m = NETOPT_FACILITY_CANDIDATES[idx];
     if (!m) return;
     var id = 'fac-' + Date.now() + '-' + idx;
@@ -6740,6 +6740,20 @@ function dispose3DView() {
     window.removeEventListener('resize', window._wsc3dResizeHandler);
     window._wsc3dResizeHandler = null;
   }
+  // Dispose all geometries and materials to free WebGL memory
+  if (wsc3dScene) {
+    wsc3dScene.traverse(function(obj) {
+      if (obj.geometry) obj.geometry.dispose();
+      if (obj.material) {
+        if (Array.isArray(obj.material)) {
+          obj.material.forEach(function(m) { if (m.map) m.map.dispose(); m.dispose(); });
+        } else {
+          if (obj.material.map) obj.material.map.dispose();
+          obj.material.dispose();
+        }
+      }
+    });
+  }
   wsc3dScene = null;
   wsc3dCamera = null;
   wsc3dWallMeshes = [];
@@ -7740,8 +7754,8 @@ function renderElevationView(p) {
   var padL = 60, padR = 80, padT = 40, padB = 55;
   var drawW = W - padL - padR;
   var drawH = H - padT - padB;
-  var scaleX = drawW / bldgW;
-  var scaleY = drawH / maxHeight;
+  var scaleX = bldgW > 0 ? drawW / bldgW : 1;
+  var scaleY = maxHeight > 0 ? drawH / maxHeight : 1;
 
   function toX(ft) { return padL + ft * scaleX; }
   function toY(ft) { return padT + drawH - ft * scaleY; }

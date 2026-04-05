@@ -928,7 +928,7 @@ const cmApp = {
             // Facility rate overrides
             try {
                 this.projectData.facilityRateOverrides = typeof p.facility_rate_overrides === 'string' ? JSON.parse(p.facility_rate_overrides) : (p.facility_rate_overrides || {});
-            } catch(e) { this.projectData.facilityRateOverrides = {}; }
+            } catch(e) { console.warn('Failed to parse facility_rate_overrides, resetting to defaults:', e.message); this.projectData.facilityRateOverrides = {}; }
 
             // Financial
             document.getElementById('targetMargin').value = p.target_margin_pct || '';
@@ -950,7 +950,7 @@ const cmApp = {
             try {
                 var sp = typeof p.seasonality_profile === 'string' ? JSON.parse(p.seasonality_profile) : p.seasonality_profile;
                 this.setSeasonalityProfile(sp);
-            } catch(e) { this.setSeasonalityProfile(null); }
+            } catch(e) { console.warn('Failed to parse seasonality_profile, resetting:', e.message); this.setSeasonalityProfile(null); }
 
             // Update computed values
             this.updateVolumeDailyValues();
@@ -1224,7 +1224,10 @@ const cmApp = {
         const office = parseFloat(document.getElementById('officeSqft').value) || 0;
 
         const warehouse = total - staging - office;
-        document.getElementById('warehousingSpace').textContent = fmtNum(Math.max(0, warehouse), 0) + ' sqft';
+        var wsEl = document.getElementById('warehousingSpace');
+        if (wsEl) wsEl.textContent = fmtNum(Math.max(0, warehouse), 0) + ' sqft (warehouse)';
+        var tfEl = document.getElementById('totalFacilitySpace');
+        if (tfEl) tfEl.textContent = fmtNum(total, 0) + ' sqft (total facility)';
         this.renderFacilityCostCard();
     },
 
@@ -1295,10 +1298,10 @@ const cmApp = {
         var fmtRate = function(v) { return fmtNum(v, 2, '$'); };
         var line = function(label, rate, unit, annual, overrideKey) {
             var isOverridden = ov[overrideKey] != null;
-            return '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--ies-gray-100);font-size:12px;">' +
+            return '<div style="display:grid;grid-template-columns:1fr 200px 120px;align-items:center;padding:4px 0;border-bottom:1px solid var(--ies-gray-100);font-size:12px;gap:8px;">' +
                 '<span style="color:var(--ies-gray-600);">' + esc(label) + (isOverridden ? ' <span style="color:#f59e0b;font-size:10px;">overridden</span>' : '') + '</span>' +
-                '<span style="color:var(--ies-gray-500);font-size:11px;">' + fmtRate(rate) + unit + ' &times; ' + sqft.toLocaleString() + ' SF</span>' +
-                '<span style="font-weight:600;">' + fmt(annual) + '/yr</span>' +
+                '<span style="color:var(--ies-gray-500);font-size:11px;text-align:right;">' + fmtRate(rate) + unit + ' &times; ' + sqft.toLocaleString() + ' SF</span>' +
+                '<span style="font-weight:600;text-align:right;">' + fmt(annual) + '/yr</span>' +
             '</div>';
         };
 
@@ -1521,7 +1524,7 @@ const cmApp = {
 
             // Fallback: MOST template equipment types (only if no explicit MHE assigned)
             if (!line.mhe_equipment_id) {
-                const template = this.refData.mostTemplates.find(t => t.id === line.most_template_id);
+                const template = (this.refData.mostTemplates || []).find(t => t.id === line.most_template_id);
                 if (template && template.equipment_type) {
                     const equipTypes = template.equipment_type.split('+').map(s => s.trim());
                     equipTypes.forEach(eqType => {
@@ -4220,18 +4223,33 @@ const cmApp = {
     calculateFacilityCost() {
         const sqft = parseFloat(document.getElementById('totalSqft').value) || 0;
         const marketId = document.getElementById('market').value;
+        const envType = (document.getElementById('environment').value || 'ambient').toLowerCase();
         const facilityRate = this.refData.facilityRates.find(r => r.market_id === marketId) || {};
         const utilityRate = this.refData.utilityRates.find(r => r.market_id === marketId) || {};
 
-        // DB columns: lease_rate_psf_yr, cam_rate_psf_yr, tax_rate_psf_yr, insurance_rate_psf_yr
-        const lease = sqft * (facilityRate.lease_rate_psf_yr || facilityRate.lease_rate_per_sqft || 0);
-        const cam = sqft * (facilityRate.cam_rate_psf_yr || facilityRate.cam_rate_per_sqft || 0);
-        const tax = sqft * (facilityRate.tax_rate_psf_yr || facilityRate.tax_rate_per_sqft || 0);
-        const insurance = sqft * (facilityRate.insurance_rate_psf_yr || facilityRate.insurance_rate_per_sqft || 0);
-        // DB column: avg_monthly_per_sqft (utilities per sqft per month)
-        const utility = sqft * 12 * (utilityRate.avg_monthly_per_sqft || utilityRate.utility_cost_per_sqft_per_month || 0);
+        // Environment-specific utility rate
+        var utilEnv = envType === 'cold' || envType === 'cooler' ? 'cooler' : (envType === 'frozen' || envType === 'freezer' ? 'freezer' : 'ambient');
+        var utilPerSfMo = utilityRate['utility_' + utilEnv + '_per_sqft_per_month'] || utilityRate.avg_monthly_per_sqft || utilityRate.utility_cost_per_sqft_per_month || 0;
 
-        return lease + cam + tax + insurance + utility;
+        // Apply user overrides (same logic as renderFacilityCostCard)
+        var ov = this.projectData.facilityRateOverrides || {};
+        var leaseRate = ov.lease != null ? ov.lease : (facilityRate.lease_rate_psf_yr || facilityRate.lease_rate_per_sqft || 0);
+        var camRate = ov.cam != null ? ov.cam : (facilityRate.cam_rate_psf_yr || facilityRate.cam_rate_per_sqft || 0);
+        var taxRate = ov.tax != null ? ov.tax : (facilityRate.tax_rate_psf_yr || facilityRate.tax_rate_per_sqft || 0);
+        var insRate = ov.insurance != null ? ov.insurance : (facilityRate.insurance_rate_psf_yr || facilityRate.insurance_rate_per_sqft || 0);
+        var utilRate = ov.utility != null ? ov.utility : utilPerSfMo;
+
+        // Cold storage premium (same as renderFacilityCostCard)
+        var coldMult = envType === 'cold' || envType === 'cooler' ? 1.25 : (envType === 'frozen' || envType === 'freezer' ? 1.50 : 1.0);
+        var adjLease = leaseRate * coldMult;
+
+        // Maintenance
+        var maintMode = ov.maint_mode || 'pct';
+        var maintPct = ov.maint_pct != null ? ov.maint_pct : 0.02;
+        var maintFixed = ov.maint_fixed != null ? ov.maint_fixed : 0;
+        var maintPerSf = maintMode === 'fixed' ? maintFixed : (adjLease * maintPct);
+
+        return (sqft * adjLease) + (sqft * camRate) + (sqft * taxRate) + (sqft * insRate) + (sqft * utilRate * 12) + (sqft * maintPerSf);
     },
 
     calculateEquipmentCost() {
@@ -4919,6 +4937,10 @@ const cmApp = {
                 dock_doors: parseFloat(document.getElementById('dockDoors').value) || 0,
                 staging_sqft: parseFloat(document.getElementById('stagingSqft').value) || 0,
                 office_sqft: parseFloat(document.getElementById('officeSqft').value) || 0,
+                pick_method: document.getElementById('pickMethod') ? document.getElementById('pickMethod').value : null,
+                avg_pick_travel_ft: parseFloat(document.getElementById('avgPickTravel')?.value) || null,
+                avg_putaway_travel_ft: parseFloat(document.getElementById('avgPutawayTravel')?.value) || null,
+                avg_replen_travel_ft: parseFloat(document.getElementById('avgReplenTravel')?.value) || null,
                 shifts_per_day: parseFloat(document.getElementById('shiftsPerDay').value) || 1,
                 hours_per_shift: parseFloat(document.getElementById('hoursPerShift').value) || 8,
                 days_per_week: parseFloat(document.getElementById('daysPerWeek').value) || 5,
@@ -4929,7 +4951,7 @@ const cmApp = {
                 target_margin_pct: parseFloat(document.getElementById('targetMargin').value) || 0,
                 contract_term_years: parseFloat(document.getElementById('contractTerm').value) || 1,
                 annual_volume_growth_pct: parseFloat(document.getElementById('volumeGrowth').value) || 0,
-                startup_cost: parseFloat(document.getElementById('startupCosts').value) || 0,
+                startup_cost: (this.projectData.startupLines || []).reduce(function(sum, l) { return sum + (parseFloat(l.amount) || 0); }, 0) || parseFloat(document.getElementById('startupCosts')?.value || document.getElementById('startupCost')?.value || '0') || 0,
                 pricing_model: document.getElementById('pricingModel').value || 'hybrid',
                 overtime_pct: parseFloat(document.getElementById('overtimePct').value) || 5,
                 benefit_load_pct: parseFloat(document.getElementById('benefitLoadPct').value) || 35,
