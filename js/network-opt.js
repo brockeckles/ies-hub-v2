@@ -2382,7 +2382,7 @@ function calcWarehouse() { try {
   document.getElementById('wsc-reco').innerHTML = reco;
 
   // ── RENDER FACILITY LAYOUT ──
-  renderLayout({
+  var p = {
     totalSF: totalSqFt,
     storageSF: storageSF,
     dockSF: dockSF,
@@ -2405,7 +2405,8 @@ function calcWarehouse() { try {
     shipStagingSF: shipStagingSF,
     rackDir: rackDir,
     dockConfig: dockConfig
-  });
+  };
+  renderLayout(p);
   // Store params for CM integration and show button
   window._lastWscParams = { totalSF: totalSqFt, storageSF: storageSF, dockSF: dockSF, officeSF: officeSF,
     totalDoors: totalDoors, inDoors: inDoors, outDoors: outDoors, clearHeightFt: clearHeightFt,
