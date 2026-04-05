@@ -2360,32 +2360,25 @@ function _wsc3dRand() {
 }
 
 // ── Build rack row with uprights, beams, pallets ──
+// Each rack row is always a standard 4ft-deep frame.
+// Double-deep is handled by the CALLER placing 4 rows per module.
 function _wsc3dBuildRackRow(scene, x, z, length, rackLevels, clearHeight, direction, rackDepth) {
   var bayWidth = 8;
   var beamH = clearHeight / Math.max(rackLevels, 1);
   var depth = rackDepth || 4;
-  var isDD = depth >= 8; // double-deep
   var numBays = Math.max(1, Math.floor(length / bayWidth));
 
-  // DRAMATIC color difference: single=blue uprights, double=orange uprights
-  var uprightColor = isDD ? 0xD97706 : 0x4444cc;   // amber vs blue
-  var beamColor    = isDD ? 0xF59E0B : 0xff8800;    // bright amber vs orange
-  var uprightMat = new THREE.MeshStandardMaterial({ color: uprightColor, roughness: 0.5 });
-  var beamMat = new THREE.MeshStandardMaterial({ color: beamColor, roughness: 0.5 });
-  // Red center upright for double-deep flue point
-  var centerMat = isDD ? new THREE.MeshStandardMaterial({ color: 0xEF4444, roughness: 0.4 }) : uprightMat;
+  var uprightMat = new THREE.MeshStandardMaterial({ color: 0x4444cc, roughness: 0.5 });
+  var beamMat = new THREE.MeshStandardMaterial({ color: 0xff8800, roughness: 0.5 });
 
   for (var bay = 0; bay < numBays; bay++) {
     var bx = bay * bayWidth;
     var uprightGeo = new THREE.BoxGeometry(0.3, clearHeight, 0.3);
 
-    // Uprights: double-deep gets 3 (front, center-flue, back); single gets 2
-    var uprightPositions = isDD ? [0, depth / 2, depth] : [0, depth];
+    // 2 uprights per bay (front + back of this 4ft frame)
+    var uprightPositions = [0, depth];
     for (var ui = 0; ui < uprightPositions.length; ui++) {
-      var isCenter = (isDD && ui === 1);
-      var uGeo = isCenter ? new THREE.BoxGeometry(0.5, clearHeight, 0.5) : uprightGeo;
-      var uMat = isCenter ? centerMat : uprightMat;
-      var upright = new THREE.Mesh(uGeo, uMat);
+      var upright = new THREE.Mesh(uprightGeo, uprightMat);
       if (direction === 'vertical') {
         upright.position.set(x + uprightPositions[ui], clearHeight / 2, z + bx);
       } else {
@@ -2395,96 +2388,39 @@ function _wsc3dBuildRackRow(scene, x, z, length, rackLevels, clearHeight, direct
       scene.add(upright);
     }
 
-    // Beams per level
+    // Beams + pallets per level
     for (var lvl = 1; lvl <= rackLevels; lvl++) {
       var beamY = lvl * beamH;
-      if (isDD) {
-        var halfDepth = depth / 2;
-        var beamGeoHalf = (direction === 'vertical')
-          ? new THREE.BoxGeometry(halfDepth, 0.2, 0.2)
-          : new THREE.BoxGeometry(0.2, 0.2, halfDepth);
-        var bf1 = new THREE.Mesh(beamGeoHalf, beamMat);
-        var bf2 = new THREE.Mesh(beamGeoHalf, beamMat);
-        var bb1 = new THREE.Mesh(beamGeoHalf, beamMat);
-        var bb2 = new THREE.Mesh(beamGeoHalf, beamMat);
-        if (direction === 'vertical') {
-          bf1.position.set(x + halfDepth / 2, beamY, z + bx);
-          bf2.position.set(x + halfDepth / 2, beamY, z + bx + bayWidth);
-          bb1.position.set(x + halfDepth + halfDepth / 2, beamY, z + bx);
-          bb2.position.set(x + halfDepth + halfDepth / 2, beamY, z + bx + bayWidth);
-        } else {
-          bf1.position.set(x + bx, beamY, z + halfDepth / 2);
-          bf2.position.set(x + bx + bayWidth, beamY, z + halfDepth / 2);
-          bb1.position.set(x + bx, beamY, z + halfDepth + halfDepth / 2);
-          bb2.position.set(x + bx + bayWidth, beamY, z + halfDepth + halfDepth / 2);
-        }
-        scene.add(bf1); scene.add(bf2); scene.add(bb1); scene.add(bb2);
+      var beamGeo = (direction === 'vertical')
+        ? new THREE.BoxGeometry(depth, 0.2, 0.2)
+        : new THREE.BoxGeometry(0.2, 0.2, depth);
+      var beam1 = new THREE.Mesh(beamGeo, beamMat);
+      var beam2 = new THREE.Mesh(beamGeo, beamMat);
+      if (direction === 'vertical') {
+        beam1.position.set(x + depth / 2, beamY, z + bx);
+        beam2.position.set(x + depth / 2, beamY, z + bx + bayWidth);
       } else {
-        var beamGeo = (direction === 'vertical')
-          ? new THREE.BoxGeometry(depth, 0.2, 0.2)
-          : new THREE.BoxGeometry(0.2, 0.2, depth);
-        var beam1 = new THREE.Mesh(beamGeo, beamMat);
-        var beam2 = new THREE.Mesh(beamGeo, beamMat);
-        if (direction === 'vertical') {
-          beam1.position.set(x + depth / 2, beamY, z + bx);
-          beam2.position.set(x + depth / 2, beamY, z + bx + bayWidth);
-        } else {
-          beam1.position.set(x + bx, beamY, z + depth / 2);
-          beam2.position.set(x + bx + bayWidth, beamY, z + depth / 2);
-        }
-        scene.add(beam1);
-        scene.add(beam2);
+        beam1.position.set(x + bx, beamY, z + depth / 2);
+        beam2.position.set(x + bx + bayWidth, beamY, z + depth / 2);
       }
+      scene.add(beam1);
+      scene.add(beam2);
 
-      // Pallets — double-deep: 2 rows of 3; single: 1 row of 3
+      // Pallets (3 per bay per level)
       var palletBottom = (lvl - 1) * beamH + 0.5;
       var pH = beamH * 0.65;
-      if (isDD) {
-        // Front row pallets (closer to aisle)
-        for (var pp = 0; pp < 3; pp++) {
-          if (_wsc3dRand() < 0.85) {
-            var pMat = new THREE.MeshStandardMaterial({ color: _wscPickPalletColor(), roughness: 0.7 });
-            var pGeo = new THREE.BoxGeometry(2.2, pH, 3.0);
-            var pal = new THREE.Mesh(pGeo, pMat);
-            if (direction === 'vertical') {
-              pal.position.set(x + depth * 0.25, palletBottom + pH / 2, z + bx + 1.3 + pp * 2.5);
-            } else {
-              pal.position.set(x + bx + 1.3 + pp * 2.5, palletBottom + pH / 2, z + depth * 0.25);
-            }
-            pal.castShadow = true;
-            scene.add(pal);
+      for (var pp = 0; pp < 3; pp++) {
+        if (_wsc3dRand() < 0.85) {
+          var pMat = new THREE.MeshStandardMaterial({ color: _wscPickPalletColor(), roughness: 0.7 });
+          var pGeo = new THREE.BoxGeometry(2.2, pH, Math.min(depth - 0.5, 3.2));
+          var pallet = new THREE.Mesh(pGeo, pMat);
+          if (direction === 'vertical') {
+            pallet.position.set(x + depth / 2, palletBottom + pH / 2, z + bx + 1.3 + pp * 2.5);
+          } else {
+            pallet.position.set(x + bx + 1.3 + pp * 2.5, palletBottom + pH / 2, z + depth / 2);
           }
-        }
-        // Back row pallets (deeper, behind front row)
-        for (var pp2 = 0; pp2 < 3; pp2++) {
-          if (_wsc3dRand() < 0.7) {
-            var pMat2 = new THREE.MeshStandardMaterial({ color: _wscPickPalletColor(), roughness: 0.7 });
-            var pGeo2 = new THREE.BoxGeometry(2.2, pH, 3.0);
-            var pal2 = new THREE.Mesh(pGeo2, pMat2);
-            if (direction === 'vertical') {
-              pal2.position.set(x + depth * 0.75, palletBottom + pH / 2, z + bx + 1.3 + pp2 * 2.5);
-            } else {
-              pal2.position.set(x + bx + 1.3 + pp2 * 2.5, palletBottom + pH / 2, z + depth * 0.75);
-            }
-            pal2.castShadow = true;
-            scene.add(pal2);
-          }
-        }
-      } else {
-        // Single-deep: 1 row of pallets centered
-        for (var pp = 0; pp < 3; pp++) {
-          if (_wsc3dRand() < 0.85) {
-            var pMat = new THREE.MeshStandardMaterial({ color: _wscPickPalletColor(), roughness: 0.7 });
-            var pGeo = new THREE.BoxGeometry(2.2, pH, Math.min(depth - 0.5, 3.2));
-            var pallet = new THREE.Mesh(pGeo, pMat);
-            if (direction === 'vertical') {
-              pallet.position.set(x + depth / 2, palletBottom + pH / 2, z + bx + 1.3 + pp * 2.5);
-            } else {
-              pallet.position.set(x + bx + 1.3 + pp * 2.5, palletBottom + pH / 2, z + depth / 2);
-            }
-            pallet.castShadow = true;
-            scene.add(pallet);
-          }
+          pallet.castShadow = true;
+          scene.add(pallet);
         }
       }
     }
@@ -2864,7 +2800,8 @@ function render3DLayout(p) {
     // Storage zone → rack structures
     if (name === 'storage') {
       var aisleW = p.aisleW || 10;
-      var rackDepth = (p.storeType === 'double') ? 8 : 4;
+      var rackDepth = 4; // always 4ft per individual rack frame
+      var isDoubleDeep = (p.storeType === 'double');
       var rackLevels = p.rackLevels || 4;
       var isVert = p.rackDir === 'vertical';
 
@@ -3135,17 +3072,30 @@ function render3DLayout(p) {
           }
         }
       } else {
-        // Standard rack storage (single or double) — back-to-back pairs
-        // Module = back-to-back rack pair + aisle (matches 2D: 8.5ft for single, 16.5ft for double)
-        var modDepth = (p.storeType === 'double') ? 16.5 : 8.5;
+        // Standard rack storage — back-to-back pairs
+        // Single-deep module: [rack 4ft][rack 4ft] + aisle = 8.5 + aisle
+        // Double-deep module: [rack 4][rack 4][gap 0.5][rack 4][rack 4] + aisle = 16.5 + aisle
+        //   That's 4 individual 4ft rack frames arranged as 2 back-to-back pairs
+        var modDepth = isDoubleDeep ? 16.5 : 8.5;
         var pairStep = aisleW + modDepth;
+        var rd = 4; // each individual rack frame is always 4ft deep
         if (isVert) {
           var numPairs = Math.max(1, Math.floor((effW - aisleW) / pairStep));
           for (var rv = 0; rv < numPairs; rv++) {
             var rx = x3d + aisleW + rv * pairStep;
-            _wsc3dBuildRackRow(scene, rx, z3d + 4, effD - 8, rackLevels, clearH * 0.9, 'vertical', rackDepth);
-            _wsc3dBuildRackRow(scene, rx + rackDepth + 0.5, z3d + 4, effD - 8, rackLevels, clearH * 0.9, 'vertical', rackDepth);
-            // Aisle label (floor-level sign between rack pairs)
+            if (isDoubleDeep) {
+              // 4 rack rows: [front A][back A] 0.5gap [back B][front B]
+              _wsc3dBuildRackRow(scene, rx, z3d + 4, effD - 8, rackLevels, clearH * 0.9, 'vertical', rd);
+              _wsc3dBuildRackRow(scene, rx + 4, z3d + 4, effD - 8, rackLevels, clearH * 0.9, 'vertical', rd);
+              // 0.5ft flue gap
+              _wsc3dBuildRackRow(scene, rx + 8.5, z3d + 4, effD - 8, rackLevels, clearH * 0.9, 'vertical', rd);
+              _wsc3dBuildRackRow(scene, rx + 12.5, z3d + 4, effD - 8, rackLevels, clearH * 0.9, 'vertical', rd);
+            } else {
+              // 2 rack rows: [rack A][rack B] standard back-to-back
+              _wsc3dBuildRackRow(scene, rx, z3d + 4, effD - 8, rackLevels, clearH * 0.9, 'vertical', rd);
+              _wsc3dBuildRackRow(scene, rx + 4 + 0.5, z3d + 4, effD - 8, rackLevels, clearH * 0.9, 'vertical', rd);
+            }
+            // Aisle label
             if (rv < numPairs - 1) {
               var aisleCenter = rx + modDepth + aisleW / 2;
               var aisleLabelSprite = wsc3dMakeTextSprite('Aisle ' + (rv + 1) + '\n' + aisleW + "' wide", 0x2563EB);
@@ -3158,9 +3108,15 @@ function render3DLayout(p) {
           var numPairs = Math.max(1, Math.floor((effD - aisleW) / pairStep));
           for (var rh = 0; rh < numPairs; rh++) {
             var rz = z3d + aisleW + rh * pairStep;
-            _wsc3dBuildRackRow(scene, x3d + 4, rz, effW - 8, rackLevels, clearH * 0.9, 'horizontal', rackDepth);
-            _wsc3dBuildRackRow(scene, x3d + 4, rz + rackDepth + 0.5, effW - 8, rackLevels, clearH * 0.9, 'horizontal', rackDepth);
-            // Aisle label
+            if (isDoubleDeep) {
+              _wsc3dBuildRackRow(scene, x3d + 4, rz, effW - 8, rackLevels, clearH * 0.9, 'horizontal', rd);
+              _wsc3dBuildRackRow(scene, x3d + 4, rz + 4, effW - 8, rackLevels, clearH * 0.9, 'horizontal', rd);
+              _wsc3dBuildRackRow(scene, x3d + 4, rz + 8.5, effW - 8, rackLevels, clearH * 0.9, 'horizontal', rd);
+              _wsc3dBuildRackRow(scene, x3d + 4, rz + 12.5, effW - 8, rackLevels, clearH * 0.9, 'horizontal', rd);
+            } else {
+              _wsc3dBuildRackRow(scene, x3d + 4, rz, effW - 8, rackLevels, clearH * 0.9, 'horizontal', rd);
+              _wsc3dBuildRackRow(scene, x3d + 4, rz + 4 + 0.5, effW - 8, rackLevels, clearH * 0.9, 'horizontal', rd);
+            }
             if (rh < numPairs - 1) {
               var aisleCenter = rz + modDepth + aisleW / 2;
               var aisleLabelSprite = wsc3dMakeTextSprite('Aisle ' + (rh + 1) + '\n' + aisleW + "' wide", 0x2563EB);
@@ -3379,7 +3335,8 @@ function renderElevationView(p) {
   var clearH = p.clearHeightFt || 32;
   var rackLevels = p.rackLevels || 4;
   var aisleW = p.aisleW || 10;
-  var rackDepth = (p.storeType === 'double') ? 8 : 4;
+  var rackDepth = 4; // each individual rack frame is always 4ft deep
+  var isDoubleDeep = (p.storeType === 'double');
   var storeType = p.storeType || 'single';
 
   // Building dimensions
@@ -3582,20 +3539,39 @@ function renderElevationView(p) {
         ctx.strokeRect(toX(stackX), toY(ml * 5 + 4.5), 4 * scaleX, 4.5 * scaleY);
       }
     }
+  } else if (isDoubleDeep) {
+    // Double-deep: each module = [rack 4][rack 4][0.5 flue][rack 4][rack 4] + aisle
+    // That's 4 individual standard rack frames per module
+    var moduleW = 16.5 + aisleW; // 16.5ft of rack + aisle
+    var numModules = Math.max(1, Math.floor(storageW / moduleW));
+    for (var ri = 0; ri < numModules; ri++) {
+      var modStart = storageStart + ri * moduleW;
+      // Pair 1: front rack + back rack (back-to-back)
+      _elevDrawRack(ctx, toX, toY, modStart, 4, rackLevels, beamH, clearH, 'single');
+      _elevDrawRack(ctx, toX, toY, modStart + 4, 4, rackLevels, beamH, clearH, 'single');
+      // 0.5ft flue gap (draw a thin red line)
+      ctx.strokeStyle = '#EF4444';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(toX(modStart + 8.25), toY(0));
+      ctx.lineTo(toX(modStart + 8.25), toY(clearH * 0.9));
+      ctx.stroke();
+      // Pair 2: back rack + front rack (back-to-back)
+      _elevDrawRack(ctx, toX, toY, modStart + 8.5, 4, rackLevels, beamH, clearH, 'single');
+      _elevDrawRack(ctx, toX, toY, modStart + 12.5, 4, rackLevels, beamH, clearH, 'single');
+    }
+    // Label
+    ctx.fillStyle = '#D97706';
+    ctx.font = 'bold 10px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillText('DOUBLE-DEEP (back-to-back)', toX(storageStart + storageW / 2), toY(clearH * 0.95) - 6);
   } else {
-    // Standard rack (single or double)
+    // Single-deep: standard back-to-back pairs
     var rackSpacing = aisleW + rackDepth;
     var numRacks = Math.max(1, Math.floor(storageW / rackSpacing));
     for (var ri = 0; ri < numRacks; ri++) {
       var rackX = storageStart + ri * rackSpacing;
-      _elevDrawRack(ctx, toX, toY, rackX, rackDepth, rackLevels, beamH, clearH, storeType);
-    }
-    // Double-deep indicator label
-    if (storeType === 'double') {
-      ctx.fillStyle = '#D97706';
-      ctx.font = 'bold 10px system-ui';
-      ctx.textAlign = 'center';
-      ctx.fillText('DOUBLE-DEEP (back-to-back)', toX(storageStart + storageW / 2), toY(clearH * 0.95) - 6);
+      _elevDrawRack(ctx, toX, toY, rackX, rackDepth, rackLevels, beamH, clearH, 'single');
     }
   }
 
@@ -3699,9 +3675,10 @@ function renderElevationView(p) {
     // Beam height per level (inside storage, offset from pallet load)
     _elevDimV(ctx, toX(storageStart + rackDepth * 2 + aisleW + 2), toY(0), toY(beamH), beamH.toFixed(1) + "' / level");
   }
-  // Aisle width (between first two racks)
+  // Aisle width (between first two modules)
   if (storeType !== 'bulk') {
-    var aisleStart = storageStart + rackDepth;
+    var firstModW = isDoubleDeep ? 16.5 : rackDepth;
+    var aisleStart = storageStart + firstModW;
     _elevDimH(ctx, toX(aisleStart), toX(aisleStart + aisleW), toY(0) + 35, aisleW + "' aisle");
   }
   // Storage zone width
