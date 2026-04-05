@@ -208,6 +208,8 @@ function renderLayout(p) {
   function drawRacks(x, y, w, h, modFt, aisleFt, fixedPitch) {
     var totFt = modFt + aisleFt;
     var rackRatio = modFt / totFt;
+    var isDouble = modFt > 10; // 16.5 for double-deep vs 8.5 for single
+    var ddFlueColor = 'rgba(255,80,80,0.35)'; // red-ish flue line for double-deep
     if (isVert) {
       // Vertical: racks run top-to-bottom, modules repeat left-to-right
       var mW, nm;
@@ -219,12 +221,25 @@ function renderLayout(p) {
         mW = w / nm;
       }
       var rkW = mW * rackRatio;
-      var hr = (rkW - 1) / 2;
       for (var i = 0; i < nm; i++) {
         var mx = x + i * mW;
-        if (mx + rkW > x + w + 1) break; // don't draw past bounds
-        s += '<rect x="'+mx+'" y="'+y+'" width="'+hr+'" height="'+h+'" fill="'+C.storage.rack+'" rx="0.5" data-rack="1"/>';
-        s += '<rect x="'+(mx+hr+1)+'" y="'+y+'" width="'+hr+'" height="'+h+'" fill="'+C.storage.rack+'" rx="0.5" data-rack="1"/>';
+        if (mx + rkW > x + w + 1) break;
+        if (isDouble) {
+          // Double-deep: 4 sub-strips — [front][back] flue [back][front]
+          var qr = (rkW - 2) / 4; // quarter-rack width (minus flue gap)
+          s += '<rect x="'+mx+'" y="'+y+'" width="'+qr+'" height="'+h+'" fill="'+C.storage.rack+'" rx="0.3" data-rack="1"/>';
+          s += '<rect x="'+(mx+qr+0.3)+'" y="'+y+'" width="'+qr+'" height="'+h+'" fill="#3a6fa8" rx="0.3" data-rack="1"/>'; // darker back row
+          // Center flue line
+          var flueX = mx + qr*2 + 0.6;
+          s += '<line x1="'+flueX+'" y1="'+y+'" x2="'+flueX+'" y2="'+(y+h)+'" stroke="'+ddFlueColor+'" stroke-width="0.8" data-rack="1"/>';
+          s += '<rect x="'+(flueX+0.4)+'" y="'+y+'" width="'+qr+'" height="'+h+'" fill="#3a6fa8" rx="0.3" data-rack="1"/>'; // darker back row
+          s += '<rect x="'+(flueX+0.4+qr+0.3)+'" y="'+y+'" width="'+qr+'" height="'+h+'" fill="'+C.storage.rack+'" rx="0.3" data-rack="1"/>';
+        } else {
+          // Single-deep: 2 back-to-back strips
+          var hr = (rkW - 1) / 2;
+          s += '<rect x="'+mx+'" y="'+y+'" width="'+hr+'" height="'+h+'" fill="'+C.storage.rack+'" rx="0.5" data-rack="1"/>';
+          s += '<rect x="'+(mx+hr+1)+'" y="'+y+'" width="'+hr+'" height="'+h+'" fill="'+C.storage.rack+'" rx="0.5" data-rack="1"/>';
+        }
         if (mW - rkW > 4 && i < nm-1) {
           var ax = mx + rkW + (mW - rkW)/2;
           s += '<text x="'+ax+'" y="'+(y+h/2)+'" text-anchor="middle" fill="'+C.aisle+'" font-size="'+F.aisle+'" font-family="Montserrat,sans-serif" data-rack="1" transform="rotate(90 '+ax+' '+(y+h/2)+')">'+aisleFt+'\' aisle</text>';
@@ -241,12 +256,23 @@ function renderLayout(p) {
         mH = h / nm;
       }
       var rkH = mH * rackRatio;
-      var hr = (rkH - 1) / 2;
       for (var i = 0; i < nm; i++) {
         var my = y + i * mH;
         if (my + rkH > y + h + 1) break;
-        s += '<rect x="'+x+'" y="'+my+'" width="'+w+'" height="'+hr+'" fill="'+C.storage.rack+'" rx="0.5" data-rack="1"/>';
-        s += '<rect x="'+x+'" y="'+(my+hr+1)+'" width="'+w+'" height="'+hr+'" fill="'+C.storage.rack+'" rx="0.5" data-rack="1"/>';
+        if (isDouble) {
+          // Double-deep: 4 sub-strips — [front][back] flue [back][front]
+          var qr = (rkH - 2) / 4;
+          s += '<rect x="'+x+'" y="'+my+'" width="'+w+'" height="'+qr+'" fill="'+C.storage.rack+'" rx="0.3" data-rack="1"/>';
+          s += '<rect x="'+x+'" y="'+(my+qr+0.3)+'" width="'+w+'" height="'+qr+'" fill="#3a6fa8" rx="0.3" data-rack="1"/>';
+          var flueY = my + qr*2 + 0.6;
+          s += '<line x1="'+x+'" y1="'+flueY+'" x2="'+(x+w)+'" y2="'+flueY+'" stroke="'+ddFlueColor+'" stroke-width="0.8" data-rack="1"/>';
+          s += '<rect x="'+x+'" y="'+(flueY+0.4)+'" width="'+w+'" height="'+qr+'" fill="#3a6fa8" rx="0.3" data-rack="1"/>';
+          s += '<rect x="'+x+'" y="'+(flueY+0.4+qr+0.3)+'" width="'+w+'" height="'+qr+'" fill="'+C.storage.rack+'" rx="0.3" data-rack="1"/>';
+        } else {
+          var hr = (rkH - 1) / 2;
+          s += '<rect x="'+x+'" y="'+my+'" width="'+w+'" height="'+hr+'" fill="'+C.storage.rack+'" rx="0.5" data-rack="1"/>';
+          s += '<rect x="'+x+'" y="'+(my+hr+1)+'" width="'+w+'" height="'+hr+'" fill="'+C.storage.rack+'" rx="0.5" data-rack="1"/>';
+        }
         if (mH - rkH > 4 && i < nm-1) {
           s += '<text x="'+(x+w/2)+'" y="'+(my+rkH+(mH-rkH)/2+2)+'" text-anchor="middle" fill="'+C.aisle+'" font-size="'+F.aisle+'" font-family="Montserrat,sans-serif" data-rack="1">'+aisleFt+'\' aisle</text>';
         }
@@ -2331,11 +2357,13 @@ function _wsc3dBuildRackRow(scene, x, z, length, rackLevels, clearHeight, direct
   var numBays = Math.max(1, Math.floor(length / bayWidth));
 
   var uprightMat = new THREE.MeshStandardMaterial({ color: 0x4444cc, roughness: 0.5 });
+  var centerUprightMat = new THREE.MeshStandardMaterial({ color: 0xcc4444, roughness: 0.5 }); // red for double-deep center
   var beamMat = new THREE.MeshStandardMaterial({ color: 0xff8800, roughness: 0.5 });
 
   for (var bay = 0; bay < numBays; bay++) {
     var bx = bay * bayWidth;
     var uprightGeo = new THREE.BoxGeometry(0.3, clearHeight, 0.3);
+    var centerUprightGeo = depth >= 8 ? new THREE.BoxGeometry(0.5, clearHeight, 0.5) : uprightGeo; // thicker center
 
     // Uprights per bay — double-deep gets intermediate upright at back-to-back point
     var uprightPositions = [0, depth];
@@ -2343,7 +2371,8 @@ function _wsc3dBuildRackRow(scene, x, z, length, rackLevels, clearHeight, direct
       uprightPositions = [0, depth / 2, depth];
     }
     for (var ui = 0; ui < uprightPositions.length; ui++) {
-      var upright = new THREE.Mesh(uprightGeo, uprightMat);
+      var isCenter = (depth >= 8 && ui === 1);
+      var upright = new THREE.Mesh(isCenter ? centerUprightGeo : uprightGeo, isCenter ? centerUprightMat : uprightMat);
       if (direction === 'vertical') {
         upright.position.set(x + uprightPositions[ui], clearHeight / 2, z + bx);
       } else {
