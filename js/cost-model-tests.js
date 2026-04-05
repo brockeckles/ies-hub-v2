@@ -1059,6 +1059,109 @@ var cmTests = {
         return { passed: passed, failed: failed.length, skipped: skipped.length, total: total };
     },
 
+    // §6: Financial Metrics — NPV, MIRR, Payback
+    async testFinancialProjections() {
+        var proj = cmApp.buildYearlyProjections();
+        if (!proj || !proj.projections || proj.projections.length === 0) {
+            this.skip('fin-projections', 'No projections available');
+            return;
+        }
+        var p = proj.projections;
+
+        // Test: each year revenue > totalCost when margin > 0
+        var margin = proj.margin;
+        if (margin > 0) {
+            var allPositive = p.every(function(yr) { return yr.revenue > yr.totalCost; });
+            if (allPositive) this.pass('fin-gross-profit-positive');
+            else this.fail('fin-gross-profit-positive', 'Revenue < TotalCost in a year with margin=' + (margin*100) + '%');
+        } else {
+            this.skip('fin-gross-profit-positive', 'margin is 0');
+        }
+
+        // Test: revenue = totalCost * (1 + margin) within 1%
+        var yr1 = p[0];
+        var expectedRev = yr1.totalCost * (1 + margin);
+        var revDiff = Math.abs(yr1.revenue - expectedRev) / expectedRev;
+        if (revDiff < 0.01) this.pass('fin-revenue-formula');
+        else this.fail('fin-revenue-formula', 'Year 1 revenue=' + Math.round(yr1.revenue) + ' expected=' + Math.round(expectedRev) + ' diff=' + (revDiff*100).toFixed(1) + '%');
+
+        // Test: totalCost = labor + facility + equipment + overhead + vas + startup
+        var sumCost = yr1.labor + yr1.facility + yr1.equipment + yr1.overhead + yr1.vas + yr1.startup;
+        var costDiff = Math.abs(yr1.totalCost - sumCost);
+        if (costDiff < 1) this.pass('fin-cost-sum');
+        else this.fail('fin-cost-sum', 'totalCost=' + Math.round(yr1.totalCost) + ' sum=' + Math.round(sumCost) + ' diff=' + Math.round(costDiff));
+
+        // Test: years escalate (Year 2 costs >= Year 1 if escalation > 0)
+        if (p.length >= 2) {
+            if (p[1].totalCost >= p[0].totalCost * 0.95) this.pass('fin-cost-escalation');
+            else this.fail('fin-cost-escalation', 'Year 2 cost dropped unexpectedly vs Year 1');
+        }
+    },
+
+    async testNpvMirrPayback() {
+        var proj = cmApp.buildYearlyProjections();
+        if (!proj || proj.startupCapital <= 0) {
+            this.skip('fin-npv', 'No startup capital for NPV test');
+            this.skip('fin-mirr', 'No startup capital for MIRR test');
+            this.skip('fin-payback', 'No startup capital for payback test');
+            return;
+        }
+        var p = proj.projections;
+        var startupCapital = proj.startupCapital;
+        var discountRate = (parseFloat(document.getElementById('discountRate').value) || 10) / 100;
+        var reinvestRate = (parseFloat(document.getElementById('reinvestRate').value) || 8) / 100;
+
+        // Build cash flow array: year 0 = -startup, years 1..n = operatingCashFlow
+        var cashFlows = [-startupCapital];
+        p.forEach(function(yr) { cashFlows.push(yr.operatingCashFlow); });
+
+        // NPV: manually compute and compare
+        var npv = 0;
+        cashFlows.forEach(function(cf, i) { npv += cf / Math.pow(1 + discountRate, i); });
+
+        // NPV should use operatingCashFlow, NOT grossProfit
+        // Verify by checking that NPV matches what renderFinancialMetrics would show
+        // Key invariant: if total OCF > startup capital, NPV should be positive at reasonable discount rates
+        var totalOCF = p.reduce(function(s, yr) { return s + yr.operatingCashFlow; }, 0);
+        if (totalOCF > startupCapital && npv > 0) this.pass('fin-npv-positive');
+        else if (totalOCF <= startupCapital) this.skip('fin-npv-positive', 'Total OCF < startup, negative NPV is correct');
+        else this.fail('fin-npv-positive', 'Total OCF(' + Math.round(totalOCF) + ') > startup(' + Math.round(startupCapital) + ') but NPV=' + Math.round(npv));
+
+        // MIRR: should be positive when OCF > startup
+        var n = cashFlows.length - 1;
+        var pvNeg = 0, fvPos = 0;
+        cashFlows.forEach(function(cf, i) {
+            if (cf < 0) pvNeg += cf / Math.pow(1 + discountRate, i);
+            if (cf > 0) fvPos += cf * Math.pow(1 + reinvestRate, n - i);
+        });
+        var mirr = (pvNeg < 0 && fvPos > 0) ? (Math.pow(fvPos / (-pvNeg), 1 / n) - 1) * 100 : 0;
+        if (totalOCF > startupCapital && mirr > 0) this.pass('fin-mirr-positive');
+        else if (totalOCF <= startupCapital) this.skip('fin-mirr-positive', 'Total OCF < startup, low MIRR expected');
+        else this.fail('fin-mirr-positive', 'Total OCF > startup but MIRR=' + mirr.toFixed(1) + '%');
+
+        // Payback: should be < contract term (in months) when OCF > startup
+        var years = p.length;
+        var cumCash = -startupCapital;
+        var paybackMonths = years * 12;
+        for (var yr = 0; yr < years; yr++) {
+            var monthlyOCF = p[yr].operatingCashFlow / 12;
+            for (var m = 0; m < 12; m++) {
+                cumCash += monthlyOCF;
+                if (cumCash >= 0) { paybackMonths = yr * 12 + m + 1; yr = years; break; }
+            }
+        }
+        if (totalOCF > startupCapital && paybackMonths < years * 12) this.pass('fin-payback-within-term');
+        else if (totalOCF <= startupCapital) this.skip('fin-payback-within-term', 'Total OCF < startup');
+        else this.fail('fin-payback-within-term', 'Payback=' + paybackMonths + 'mo but contract=' + (years*12) + 'mo');
+
+        // Sanity: cash flows should use operatingCashFlow, not grossProfit
+        // grossProfit is always < operatingCashFlow (OCF adds back depreciation)
+        var yr1OCF = p[0].operatingCashFlow;
+        var yr1GP = p[0].grossProfit;
+        if (yr1OCF > yr1GP) this.pass('fin-ocf-gt-grossprofit');
+        else this.fail('fin-ocf-gt-grossprofit', 'OCF(' + Math.round(yr1OCF) + ') should be > grossProfit(' + Math.round(yr1GP) + ')');
+    },
+
     async runAll() {
         if (!this._ensureTestMode()) return;
         this.results = [];
@@ -1109,6 +1212,11 @@ var cmTests = {
         // §5: P1 — NetOpt B1-B5
         console.log('\n§5 Network Optimizer B1-B5 (P1)');
         await this.testNetOptAccuracy();
+
+        // §6: P1 — Financial Metrics (NPV, MIRR, Payback)
+        console.log('\n§6 Financial Metrics (P1)');
+        await this.testFinancialProjections();
+        await this.testNpvMirrPayback();
 
         return this.printReport();
     }

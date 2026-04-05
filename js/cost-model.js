@@ -3681,8 +3681,10 @@ const cmApp = {
         // MIRR calculation
         const discountRate = (parseFloat(document.getElementById('discountRate').value) || 10) / 100;
         const reinvestRate = (parseFloat(document.getElementById('reinvestRate').value) || 8) / 100;
-        // Cash flows: year 0 = -startup capital, years 1..n = gross profit
-        const cashFlows = [-startupCapital, ...projections.map(p => p.grossProfit)];
+        // Cash flows: year 0 = -startup capital, years 1..n = operating cash flow
+        // Using operatingCashFlow (net income + depreciation - working capital change)
+        // NOT grossProfit, which would double-count startup costs already in cashFlows[0]
+        const cashFlows = [-startupCapital, ...projections.map(p => p.operatingCashFlow)];
         let mirr = 0;
         if (startupCapital > 0 && cashFlows.length > 1) {
             // PV of negative cash flows at discount rate
@@ -3707,13 +3709,13 @@ const cmApp = {
             npv += cf / Math.pow(1 + discountRate, i);
         });
 
-        // Payback period (months)
+        // Payback period (months) — use operating cash flow to recover startup investment
         let paybackMonths = years * 12; // default to full term if never paid back
         let cumCash = -startupCapital;
         for (let yr = 0; yr < years; yr++) {
-            const monthlyProfit = projections[yr].grossProfit / 12;
+            const monthlyOCF = projections[yr].operatingCashFlow / 12;
             for (let m = 0; m < 12; m++) {
-                cumCash += monthlyProfit;
+                cumCash += monthlyOCF;
                 if (cumCash >= 0) {
                     paybackMonths = yr * 12 + m + 1;
                     yr = years; // break outer
