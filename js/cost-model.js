@@ -703,9 +703,10 @@ const cmApp = {
                     groupEl.innerHTML =
                         '<div class="dt-deal-group-stack" onclick="cmToggleDealGroup(\'' + dealId + '\')">' +
                         '<div class="dt-deal-group-card">' +
-                        '<div class="dt-deal-group-badge"><svg width="12" height="12" fill="none" viewBox="0 0 24 24"><path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V7M3 7a2 2 0 012-2h14a2 2 0 012 2" stroke="currentColor" stroke-width="1.5"/></svg> ' + (deal.deal_name || 'Deal') + ' &middot; ' + models.length + ' models</div>' +
-                        '<div class="dt-landing-card-metric" style="font-weight:700;color:var(--ies-navy);font-size:16px;margin-bottom:6px;">$' + totalCost.toLocaleString('en-US', {maximumFractionDigits: 0}) + '/yr</div>' +
-                        '<div class="dt-landing-card-meta">' + (deal.client_name || '') + (deal.status ? ' &middot; ' + deal.status : '') + '</div>' +
+                        '<div class="dt-deal-group-badge"><svg width="12" height="12" fill="none" viewBox="0 0 24 24"><path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V7M3 7a2 2 0 012-2h14a2 2 0 012 2" stroke="currentColor" stroke-width="1.5"/></svg> Multi-Site Deal &middot; ' + models.length + ' Sites</div>' +
+                        '<div style="font-weight:800;font-size:17px;color:var(--ies-navy);margin-bottom:4px;">' + esc(deal.deal_name || 'Deal') + '</div>' +
+                        '<div class="dt-landing-card-metric" style="font-weight:700;color:var(--ies-navy);font-size:15px;margin-bottom:6px;">$' + totalCost.toLocaleString('en-US', {maximumFractionDigits: 0}) + '/yr <span style="font-size:11px;font-weight:500;color:var(--ies-gray-500);">combined cost</span></div>' +
+                        '<div class="dt-landing-card-meta">' + (deal.client_name || '') + (deal.status ? ' &middot; <span style="font-weight:700;">' + deal.status + '</span>' : '') + '</div>' +
                         '<div class="dt-deal-group-models">' + modelPills + '</div>' +
                         '</div></div>';
 

@@ -2780,7 +2780,7 @@
         .dt-deal-group {
             position: relative;
             cursor: pointer;
-            border-radius: 10px;
+            border-radius: 12px;
             transition: all 0.25s;
         }
 
@@ -2793,67 +2793,85 @@
         .dt-deal-group-stack::after {
             content: '';
             position: absolute;
-            border-radius: 10px;
-            border: 1px solid var(--ies-gray-200);
-            background: #f8f9fb;
+            border-radius: 12px;
+            border: 1px solid rgba(33,150,243,0.2);
+            background: rgba(33,150,243,0.04);
         }
 
         .dt-deal-group-stack::before {
-            top: 4px; left: 4px; right: 4px; bottom: -4px;
+            top: 5px; left: 5px; right: 5px; bottom: -5px;
             z-index: 0;
-            opacity: .6;
+            opacity: .7;
         }
 
         .dt-deal-group-stack::after {
-            top: 8px; left: 8px; right: 8px; bottom: -8px;
+            top: 10px; left: 10px; right: 10px; bottom: -10px;
             z-index: -1;
-            opacity: .3;
+            opacity: .4;
         }
 
         .dt-deal-group-card {
             position: relative;
             z-index: 1;
-            background: white;
-            border: 1.5px solid var(--ies-blue);
-            border-radius: 10px;
+            background: linear-gradient(135deg, #ffffff 0%, #f0f7ff 100%);
+            border: 2px solid var(--ies-blue);
+            border-radius: 12px;
             padding: 20px;
-            box-shadow: 0 2px 8px rgba(0,71,171,0.08);
+            box-shadow: 0 3px 12px rgba(0,71,171,0.10);
+            border-left: 5px solid var(--ies-blue);
         }
 
         .dt-deal-group:hover .dt-deal-group-card {
             border-color: var(--ies-orange);
-            box-shadow: 0 4px 16px rgba(243,112,33,0.15);
-            transform: translateY(-2px);
+            border-left-color: var(--ies-orange);
+            box-shadow: 0 6px 20px rgba(243,112,33,0.18);
+            transform: translateY(-3px);
         }
 
         .dt-deal-group-badge {
             display: inline-flex;
             align-items: center;
-            gap: 4px;
-            padding: 3px 10px;
-            border-radius: 20px;
-            font-size: 11px;
-            font-weight: 700;
-            background: rgba(33,150,243,0.1);
-            color: var(--ies-blue);
-            margin-bottom: 10px;
+            gap: 5px;
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+            background: var(--ies-blue);
+            color: #fff;
+            margin-bottom: 12px;
         }
 
         .dt-deal-group-models {
             display: flex;
             flex-wrap: wrap;
             gap: 6px;
-            margin-top: 10px;
+            margin-top: 12px;
+            padding-top: 10px;
+            border-top: 1px solid rgba(33,150,243,0.15);
         }
 
         .dt-deal-group-models span {
-            padding: 3px 8px;
-            background: var(--ies-gray-50);
-            border: 1px solid var(--ies-gray-200);
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            background: rgba(33,150,243,0.08);
+            border: 1px solid rgba(33,150,243,0.2);
             border-radius: 6px;
             font-size: 11px;
-            color: var(--ies-gray-700);
-            font-weight: 500;
+            color: var(--ies-blue);
+            font-weight: 600;
+        }
+
+        .dt-deal-group-models span::before {
+            content: '';
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--ies-blue);
         }
 
         /* ── Deal group expand view ── */
@@ -10841,7 +10859,7 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
 <!-- Feedback: idea submission, voting -->
 <script src="js/feedback.js"></script>
 <!-- Cost Model Builder: cmApp, dealApp, financial modeling -->
-<script src="js/cost-model.js?v=20260405-s16"></script>
+<script src="js/cost-model.js?v=20260405-s18"></script>
 <!-- Cost Model Interaction Tests (gated behind __CM_TEST_MODE__) -->
 <script src="js/cost-model-tests.js?v=20260405-s2"></script>
 <!-- Fleet Modeler: fmApp, lane optimization -->
