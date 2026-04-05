@@ -3080,9 +3080,9 @@ function render3DLayout(p) {
         var pairStep = aisleW + modDepth;
         var rd = 4; // each individual rack frame is always 4ft deep
         if (isVert) {
-          var numPairs = Math.max(1, Math.floor((effW - aisleW) / pairStep));
+          var numPairs = Math.max(1, Math.floor(effW / pairStep));
           for (var rv = 0; rv < numPairs; rv++) {
-            var rx = x3d + aisleW + rv * pairStep;
+            var rx = x3d + rv * pairStep;
             if (isDoubleDeep) {
               // 4 rack rows: [front A][back A] 0.5gap [back B][front B]
               _wsc3dBuildRackRow(scene, rx, z3d + 4, effD - 8, rackLevels, clearH * 0.9, 'vertical', rd);
@@ -3105,9 +3105,9 @@ function render3DLayout(p) {
             }
           }
         } else {
-          var numPairs = Math.max(1, Math.floor((effD - aisleW) / pairStep));
+          var numPairs = Math.max(1, Math.floor(effD / pairStep));
           for (var rh = 0; rh < numPairs; rh++) {
-            var rz = z3d + aisleW + rh * pairStep;
+            var rz = z3d + rh * pairStep;
             if (isDoubleDeep) {
               _wsc3dBuildRackRow(scene, x3d + 4, rz, effW - 8, rackLevels, clearH * 0.9, 'horizontal', rd);
               _wsc3dBuildRackRow(scene, x3d + 4, rz + 4, effW - 8, rackLevels, clearH * 0.9, 'horizontal', rd);
