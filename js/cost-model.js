@@ -3298,8 +3298,16 @@ const cmApp = {
         document.getElementById('summaryTotalFtes').textContent = fmtNum(this.getTotalFtes(), 0);
 
         const ordersPerYear = parseFloat(document.getElementById('ordersPacked').value) || 1;
-        const costPerOrder = totalCost / ordersPerYear;
-        document.getElementById('summaryCostPerOrder').textContent = fmtNum(costPerOrder, 2, '$');
+        const outboundInfo = this.getOutboundUom();
+        const costPerOutboundUnit = outboundInfo.volume > 0 ? totalCost / outboundInfo.volume : 0;
+        var costPerOutboundEl = document.getElementById('summaryCostPerOrder');
+        if (costPerOutboundEl) {
+            costPerOutboundEl.textContent = fmtNum(costPerOutboundUnit, 2, '$');
+        }
+        var costPerOutboundLabel = document.getElementById('summaryCostPerOrderLabel');
+        if (costPerOutboundLabel) {
+            costPerOutboundLabel.textContent = 'Cost / ' + outboundInfo.uom;
+        }
 
         // Cost breakdown
         const costBreakdown = [
@@ -3326,7 +3334,10 @@ const cmApp = {
         const eachesPerYear = parseFloat(document.getElementById('eachesPicked').value) || 0;
         const sqftYear = parseFloat(document.getElementById('totalSqft').value) || 1;
 
-        document.getElementById('unitCostPerOrder').textContent = fmtNum(costPerOrder, 2, '$');
+        var unitCostOutboundEl = document.getElementById('unitCostPerOrder');
+        if (unitCostOutboundEl) unitCostOutboundEl.textContent = fmtNum(costPerOutboundUnit, 2, '$');
+        var unitCostOutboundLbl = document.getElementById('unitCostPerOrderLabel');
+        if (unitCostOutboundLbl) unitCostOutboundLbl.textContent = 'Cost / Outbound ' + outboundInfo.uom;
 
         // Fixed vs Variable breakdown
         this.initDefaultBuckets();
@@ -3334,17 +3345,24 @@ const cmApp = {
         const { bucketCosts } = this.calculatePricingSchedule();
         const fixedAnnual = bucketCosts['mgmt_fee'] || 0;
         const variableAnnual = totalCost - fixedAnnual;
-        const variableCostPerOrder = ordersPerYear > 0 ? variableAnnual / ordersPerYear : 0;
-        document.getElementById('unitVarCostPerOrder').textContent = fmtNum(variableCostPerOrder, 2, '$');
+        const variableCostPerOutbound = outboundInfo.volume > 0 ? variableAnnual / outboundInfo.volume : 0;
+        var unitVarEl = document.getElementById('unitVarCostPerOrder');
+        if (unitVarEl) unitVarEl.textContent = fmtNum(variableCostPerOutbound, 2, '$');
+        var unitVarLbl = document.getElementById('unitVarCostPerOrderLabel');
+        if (unitVarLbl) unitVarLbl.textContent = 'Variable Cost / Outbound ' + outboundInfo.uom;
 
         document.getElementById('unitCostPerPallet').textContent = fmtNum(palletsPerYear > 0 ? totalCost / palletsPerYear : 0, 2, '$');
         document.getElementById('unitCostPerCase').textContent = fmtNum(casesPerYear > 0 ? totalCost / casesPerYear : 0, 2, '$');
         document.getElementById('unitCostPerEach').textContent = fmtNum(eachesPerYear > 0 ? totalCost / eachesPerYear : 0, 4, '$');
         document.getElementById('unitCostPerSqft').textContent = fmtNum(totalCost / sqftYear, 2, '$');
-        document.getElementById('unitRevenuePerOrder').textContent = fmtNum(totalRevenue / ordersPerYear, 2, '$');
+        var revPerOutbound = outboundInfo.volume > 0 ? totalRevenue / outboundInfo.volume : 0;
+        var unitRevEl = document.getElementById('unitRevenuePerOrder');
+        if (unitRevEl) unitRevEl.textContent = fmtNum(revPerOutbound, 2, '$');
+        var unitRevLbl = document.getElementById('unitRevenuePerOrderLabel');
+        if (unitRevLbl) unitRevLbl.textContent = 'Revenue / Outbound ' + outboundInfo.uom;
 
         const fixedMonthly = fixedAnnual / 12;
-        const varPerOrder = variableCostPerOrder;
+        const varPerOrder = variableCostPerOutbound;
 
         const fmEl = document.getElementById('summaryFixedMonthly');
         const vpEl = document.getElementById('summaryVarPerOrder');
@@ -3358,7 +3376,7 @@ const cmApp = {
         // Generate decision support heuristics
         this.generateHeuristics({
             laborCost, facilityCost, equipmentCost, overheadCost, vasCost, startupAmort,
-            totalCost, costPerOrder, ordersPerYear, sqft: sqftYear,
+            totalCost, costPerOrder: costPerOutboundUnit, ordersPerYear, sqft: sqftYear,
             palletsPerYear, casesPerYear, eachesPerYear
         });
 
@@ -3381,8 +3399,9 @@ const cmApp = {
         const baseVasCost = this.calculateVasCost();
         const baseStartupAmort = this.calculateStartupAmortization();
         const baseTotalCost = baseLaborCost + baseFacilityCost + baseEquipmentCost + baseOverheadCost + baseVasCost + baseStartupAmort;
-        const baseOrders = parseFloat(document.getElementById('ordersPacked').value) || 1;
-        const baseCostPerOrder = baseTotalCost / baseOrders;
+        const sensOutbound = this.getOutboundUom();
+        const baseOutboundVol = sensOutbound.volume || 1;
+        const baseCostPerUnit = baseTotalCost / baseOutboundVol;
 
         // Helper to calculate costs with adjusted parameters
         const calcCostWithAdjustment = (adjType, adjustment) => {
@@ -3392,10 +3411,10 @@ const cmApp = {
             let overheadCost = baseOverheadCost;
             let vasCost = baseVasCost;
             let startupAmort = baseStartupAmort;
-            let orders = baseOrders;
+            let outVol = baseOutboundVol;
 
             if (adjType === 'volume') {
-                orders = baseOrders * (1 + adjustment);
+                outVol = baseOutboundVol * (1 + adjustment);
             } else if (adjType === 'labor_rate') {
                 // Adjust all labor costs by percentage
                 laborCost = baseLaborCost * (1 + adjustment);
@@ -3426,13 +3445,13 @@ const cmApp = {
             }
 
             const totalCost = laborCost + facilityCost + equipmentCost + overheadCost + vasCost + startupAmort;
-            const costPerOrder = orders > 0 ? totalCost / orders : 0;
-            return { totalCost, costPerOrder };
+            const costPerUnit = outVol > 0 ? totalCost / outVol : 0;
+            return { totalCost, costPerUnit };
         };
 
         // Define variables to test
         const variables = [
-            { name: 'Order Volume', type: 'volume' },
+            { name: 'Outbound Volume', type: 'volume' },
             { name: 'Labor Rate', type: 'labor_rate' },
             { name: 'Facility Size (sqft)', type: 'sqft' },
             { name: 'Burden %', type: 'burden' },
@@ -3443,14 +3462,14 @@ const cmApp = {
         variables.forEach(v => {
             const negResult = calcCostWithAdjustment(v.type, -0.1);
             const posResult = calcCostWithAdjustment(v.type, 0.1);
-            const impactRange = Math.abs(posResult.costPerOrder - negResult.costPerOrder);
-            const baseResult = { totalCost: baseTotalCost, costPerOrder: baseCostPerOrder };
+            const impactRange = Math.abs(posResult.costPerUnit - negResult.costPerUnit);
+            const baseResult = { totalCost: baseTotalCost, costPerUnit: baseCostPerUnit };
 
             html += '<tr>' +
                 '<td>' + v.name + '</td>' +
-                '<td style="text-align:right;">' + fmtNum(negResult.costPerOrder, 2, '$') + '</td>' +
-                '<td style="text-align:right;">' + fmtNum(baseResult.costPerOrder, 2, '$') + '</td>' +
-                '<td style="text-align:right;">' + fmtNum(posResult.costPerOrder, 2, '$') + '</td>' +
+                '<td style="text-align:right;">' + fmtNum(negResult.costPerUnit, 2, '$') + '</td>' +
+                '<td style="text-align:right;">' + fmtNum(baseResult.costPerUnit, 2, '$') + '</td>' +
+                '<td style="text-align:right;">' + fmtNum(posResult.costPerUnit, 2, '$') + '</td>' +
                 '<td style="text-align:right;font-weight:600;color:' + (impactRange > 1 ? '#ef4444' : '#10b981') + ';">' + fmtNum(impactRange, 2, '$') + '</td>' +
             '</tr>';
         });
@@ -3511,6 +3530,21 @@ const cmApp = {
         return Math.max(1, Math.round(parseFloat(document.getElementById('contractTerm').value) || 3));
     },
 
+    // Determine the primary outbound UOM and annual volume for the deal
+    // Priority: eaches > cases > pallets (most granular first)
+    getOutboundUom() {
+        var eaches = parseFloat(document.getElementById('eachesPicked').value) || 0;
+        var cases = parseFloat(document.getElementById('casesPicked').value) || 0;
+        var pallets = parseFloat(document.getElementById('palletsShipped').value) || 0;
+        if (eaches > 0) return { uom: 'Each', volume: eaches };
+        if (cases > 0) return { uom: 'Case', volume: cases };
+        if (pallets > 0) return { uom: 'Pallet', volume: pallets };
+        // Fallback to orders if no outbound volumes defined
+        var orders = parseFloat(document.getElementById('ordersPacked').value) || 0;
+        if (orders > 0) return { uom: 'Order', volume: orders };
+        return { uom: 'Unit', volume: 0 };
+    },
+
     buildYearlyProjections() {
         const years = this.getContractYears();
         const volGrowth = (parseFloat(document.getElementById('volumeGrowth').value) || 0) / 100;
@@ -3526,6 +3560,9 @@ const cmApp = {
         const startupAmort = this.calculateStartupAmortization();
         const startupCapital = this.projectData.startupLines.reduce((s, l) => s + (l.one_time_cost || 0), 0);
         const baseOrders = parseFloat(document.getElementById('ordersPacked').value) || 0;
+        const outbound = this.getOutboundUom();
+        const baseOutboundVolume = outbound.volume;
+        const outboundUom = outbound.uom;
 
         // Learning curve: compute weighted avg productivity factor for Year 1
         let yr1LearningFactor = 1.0;
@@ -3561,6 +3598,7 @@ const cmApp = {
             const ebitda = grossProfit + depreciation;
             const ebit = grossProfit;
             const orders = baseOrders * volMult;
+            const outboundVolume = baseOutboundVolume * volMult;
 
             // Cash flow components
             const taxes = Math.max(0, ebit * 0.25); // 25% effective tax rate
@@ -3571,7 +3609,8 @@ const cmApp = {
             const freeCashFlow = operatingCashFlow - capex;
 
             projections.push({
-                year: yr, orders, labor, facility, equipment, overhead, vas, startup,
+                year: yr, orders, outboundVolume, outboundUom,
+                labor, facility, equipment, overhead, vas, startup,
                 totalCost, revenue, grossProfit, ebitda, ebit, depreciation,
                 taxes, netIncome, capex, workingCapitalChange, operatingCashFlow, freeCashFlow,
                 learningMult,
@@ -3656,8 +3695,9 @@ const cmApp = {
             { label: 'Total Equity', key: 'bsTotalEquity', bold: true, snapshot: true },
             { label: 'Total Liab. + Equity', key: 'bsTotalLiabEquity', bold: true, border: true, snapshot: true },
             { label: '── KEY METRICS ──', section: true },
-            { label: 'Orders', key: 'orders', format: 'int' },
-            { label: 'Cost/Order', key: null, calc: p => p.totalCost / (p.orders || 1), format: 'dollar2' },
+            { label: 'Outbound Volume (' + (projections[0] ? projections[0].outboundUom + 's' : 'Units') + ')', key: 'outboundVolume', format: 'int' },
+            { label: 'Cost / Outbound ' + (projections[0] ? projections[0].outboundUom : 'Unit'), key: null, calc: p => p.outboundVolume > 0 ? p.totalCost / p.outboundVolume : 0, format: 'dollar2' },
+            { label: 'Revenue / Outbound ' + (projections[0] ? projections[0].outboundUom : 'Unit'), key: null, calc: p => p.outboundVolume > 0 ? p.revenue / p.outboundVolume : 0, format: 'dollar2' },
             { label: 'Learning Curve Mult.', key: null, calc: p => p.learningMult || 1.0, format: 'mult' }
         ];
 
@@ -3778,9 +3818,10 @@ const cmApp = {
         const totalFtes = this.getTotalFtes();
         const revenuePerFte = totalFtes > 0 ? projections[0].revenue / totalFtes : 0;
 
-        // Contribution margin per order
+        // Cost per outbound unit (each/case/pallet as defined by the deal)
         const yr1 = projections[0];
-        const contribPerOrder = yr1.orders > 0 ? yr1.grossProfit / yr1.orders : 0;
+        const costPerOutbound = yr1.outboundVolume > 0 ? yr1.totalCost / yr1.outboundVolume : 0;
+        const outboundUomLabel = yr1.outboundUom || 'Unit';
 
         // Operating leverage (fixed cost as % of total)
         this.initDefaultBuckets();
@@ -3812,7 +3853,7 @@ const cmApp = {
             mc('Payback Period', paybackMonths, paybackMonths + ' mo', th.payback, false, 'Target: \u2264' + th.payback + ' mo'),
             mc('NPV', npv, '$' + Math.round(npv).toLocaleString('en-US'), 0, true, 'At ' + (discountRate * 100) + '% discount'),
             mc('Revenue / FTE', revenuePerFte, '$' + Math.round(revenuePerFte).toLocaleString('en-US'), null, true, 'Year 1'),
-            mc('Contribution / Order', contribPerOrder, fmtNum(contribPerOrder, 2, '$'), null, true, 'Year 1 gross'),
+            mc('Cost / ' + outboundUomLabel, costPerOutbound, fmtNum(costPerOutbound, 2, '$'), null, null, 'Year 1 per outbound ' + outboundUomLabel.toLowerCase()),
             mc('Operating Leverage', opLeverage, fmtNum(opLeverage, 0) + '%', null, null, 'Fixed cost % of total'),
             mc('Contract Value', totalRevenue, '$' + Math.round(totalRevenue).toLocaleString('en-US'), null, null, years + '-year total revenue'),
             mc('Total Investment', startupCapital, '$' + Math.round(startupCapital).toLocaleString('en-US'), null, null, 'Start-up capital')
@@ -4198,17 +4239,10 @@ const cmApp = {
             h('warn', '\u26a0\ufe0f', 'Very high throughput density: ' + ordersPerSqft.toFixed(1) + ' orders/sqft/yr',
                 'May need conveyor/sortation or multi-shift to handle volume in this footprint.');
 
-        // --- 4. Cost per order benchmark ---
+        // --- 4. Cost per outbound unit benchmark ---
         if (m.costPerOrder > 0) {
-            if (m.costPerOrder < 1.50)
-                h('warn', '\u26a0\ufe0f', 'Cost/order very low ($' + m.costPerOrder.toFixed(2) + ')',
-                    'Below $1.50/order is unusual for full-service 3PL. Check for missing cost components.');
-            else if (m.costPerOrder > 8.00)
-                h('warn', '\u26a0\ufe0f', 'Cost/order above typical range ($' + m.costPerOrder.toFixed(2) + ')',
-                    'Benchmark: $3-6 for high-volume ecommerce. Higher cost common for B2B or low-volume accounts.');
-            else
-                h('ok', '\u2705', 'Cost/order within range ($' + m.costPerOrder.toFixed(2) + ')',
-                    '$3-6 range is typical for high-volume ecommerce 3PL.');
+            h('info', '\ud83d\udce6', 'Cost per outbound unit: $' + m.costPerOrder.toFixed(2),
+                'Benchmark varies by UOM — eaches: $0.50-$3, cases: $1-$5, pallets: $5-$25, orders: $3-$8.');
         }
 
         // --- 5. Staffing ratio checks ---
@@ -5795,9 +5829,9 @@ const dealApp = {
             { label: 'EBITDA Margin %', key: null, calc: function(p){ return p.revenue > 0 ? p.ebitda / p.revenue : 0; }, format: 'pct' },
             { label: '── KEY METRICS ──', section: true },
             { label: 'Orders', key: 'orders', format: 'int' },
-            { label: 'Cost/Order', key: null, calc: function(p){ return p.orders > 0 ? p.totalCost / p.orders : 0; }, format: 'dollar2' },
-            { label: 'Revenue/Order', key: null, calc: function(p){ return p.orders > 0 ? p.revenue / p.orders : 0; }, format: 'dollar2' },
-            { label: 'Profit/Order', key: null, calc: function(p){ return p.orders > 0 ? p.grossProfit / p.orders : 0; }, format: 'dollar2' }
+            { label: 'Cost/Outbound Unit', key: null, calc: function(p){ return p.orders > 0 ? p.totalCost / p.orders : 0; }, format: 'dollar2' },
+            { label: 'Revenue/Outbound Unit', key: null, calc: function(p){ return p.orders > 0 ? p.revenue / p.orders : 0; }, format: 'dollar2' },
+            { label: 'Profit/Outbound Unit', key: null, calc: function(p){ return p.orders > 0 ? p.grossProfit / p.orders : 0; }, format: 'dollar2' }
         ];
 
         var colCount = projections.length + 2;
@@ -5885,9 +5919,9 @@ const dealApp = {
         var totalCases = sites.reduce(function(s,x){ return s + x.casesPicked; }, 0);
 
         var ueRows = [
-            { label: 'Cost per Order', value: totalOrders > 0 ? self.fmt.currency(agg.totalCost / totalOrders) : '—', cls: 'cm-text-orange' },
-            { label: 'Revenue per Order', value: totalOrders > 0 ? self.fmt.currency(totalRev / totalOrders) : '—', cls: 'cm-text-success' },
-            { label: 'Profit per Order', value: totalOrders > 0 ? self.fmt.currency((totalRev - agg.totalCost) / totalOrders) : '—', cls: 'cm-text-success' },
+            { label: 'Cost / Outbound Unit', value: totalOrders > 0 ? self.fmt.currency(agg.totalCost / totalOrders) : '—', cls: 'cm-text-orange' },
+            { label: 'Revenue / Outbound Unit', value: totalOrders > 0 ? self.fmt.currency(totalRev / totalOrders) : '—', cls: 'cm-text-success' },
+            { label: 'Profit / Outbound Unit', value: totalOrders > 0 ? self.fmt.currency((totalRev - agg.totalCost) / totalOrders) : '—', cls: 'cm-text-success' },
             { label: 'Cost per Pallet Shipped', value: totalPallets > 0 ? self.fmt.currency(agg.totalCost / totalPallets) : '—', cls: 'cm-text-orange' },
             { label: 'Cost per Each Picked', value: totalEaches > 0 ? '$' + (agg.totalCost / totalEaches).toFixed(4) : '—', cls: 'cm-text-orange' },
             { label: 'Cost per Case Picked', value: totalCases > 0 ? self.fmt.currency(agg.totalCost / totalCases) : '—', cls: 'cm-text-orange' },

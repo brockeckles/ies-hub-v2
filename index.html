@@ -3399,15 +3399,17 @@
         .cm-fin-metric {
             padding: 12px; border-radius: 6px; text-align: center;
         }
-        .cm-fin-metric .label { font-size: 0.78rem; color: #94a3b8; margin-bottom: 4px; }
+        .cm-fin-metric .label { font-size: 0.78rem; color: #cbd5e1; margin-bottom: 4px; font-weight: 500; }
         .cm-fin-metric .value { font-size: 1.3rem; font-weight: 700; }
-        .cm-fin-metric .sub { font-size: 0.72rem; color: #64748b; margin-top: 2px; }
+        .cm-fin-metric .sub { font-size: 0.72rem; color: #94a3b8; margin-top: 2px; }
         .cm-fin-metric.green { background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.3); }
         .cm-fin-metric.green .value { color: #10b981; }
         .cm-fin-metric.red { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.3); }
         .cm-fin-metric.red .value { color: #ef4444; }
-        .cm-fin-metric.neutral { background: rgba(100,116,139,0.08); border: 1px solid rgba(100,116,139,0.3); }
-        .cm-fin-metric.neutral .value { color: #e2e8f0; }
+        .cm-fin-metric.neutral { background: rgba(100,116,139,0.12); border: 1px solid rgba(100,116,139,0.4); }
+        .cm-fin-metric.neutral .value { color: #f1f5f9; }
+        .cm-fin-metric.neutral .label { color: #cbd5e1; }
+        .cm-fin-metric.neutral .sub { color: #94a3b8; }
 
         /* Editable Cell */
         .cm-editable {
@@ -9126,7 +9128,7 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
                     <div class="cm-metric-value" id="summaryTotalFtes">0</div>
                 </div>
                 <div class="cm-metric-card">
-                    <div class="cm-metric-label">Cost per Order</div>
+                    <div class="cm-metric-label" id="summaryCostPerOrderLabel">Cost / Outbound Unit</div>
                     <div class="cm-metric-value" id="summaryCostPerOrder">$0.00</div>
                 </div>
             </div>
@@ -9196,11 +9198,11 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
                 <table class="cm-table">
                     <tbody>
                         <tr>
-                            <td>Cost per Order</td>
+                            <td id="unitCostPerOrderLabel">Cost / Outbound Unit</td>
                             <td class="cm-table-number cm-text-orange" id="unitCostPerOrder">$0.00</td>
                         </tr>
                         <tr>
-                            <td>Variable Cost per Order</td>
+                            <td id="unitVarCostPerOrderLabel">Variable Cost / Outbound Unit</td>
                             <td class="cm-table-number cm-text-orange" id="unitVarCostPerOrder">$0.00</td>
                         </tr>
                         <tr>
@@ -9220,7 +9222,7 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
                             <td class="cm-table-number cm-text-orange" id="unitCostPerSqft">$0.00</td>
                         </tr>
                         <tr>
-                            <td>Revenue per Order</td>
+                            <td id="unitRevenuePerOrderLabel">Revenue / Outbound Unit</td>
                             <td class="cm-table-number cm-text-success" id="unitRevenuePerOrder">$0.00</td>
                         </tr>
                     </tbody>
@@ -9258,7 +9260,7 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
 
             <div class="cm-card">
                 <div class="cm-card-title">Sensitivity Analysis</div>
-                <p style="font-size:14px;color:#94a3b8;margin-bottom:12px;">Impact of ±10% changes in key variables on total cost and cost/order.</p>
+                <p style="font-size:14px;color:#94a3b8;margin-bottom:12px;">Impact of ±10% changes in key variables on total cost and cost per outbound unit.</p>
                 <table class="cm-table" id="sensitivityTable">
                     <thead>
                         <tr>
@@ -10862,7 +10864,7 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
 <!-- Feedback: idea submission, voting -->
 <script src="js/feedback.js"></script>
 <!-- Cost Model Builder: cmApp, dealApp, financial modeling -->
-<script src="js/cost-model.js?v=20260405-s33"></script>
+<script src="js/cost-model.js?v=20260405-s34"></script>
 <!-- Cost Model Interaction Tests (gated behind __CM_TEST_MODE__) -->
 <script src="js/cost-model-tests.js?v=20260405-s31"></script>
 <!-- Fleet Modeler: fmApp, lane optimization -->
