@@ -609,6 +609,16 @@ function netoptSwitchTab(tabName) {
     setTimeout(() => netoptInitializeMap(), 100);
   }
 
+  // Auto-scroll to results content
+  if (tabName === 'results' && netoptState.results) {
+    setTimeout(function() {
+      var content = document.getElementById('netopt-results-content');
+      if (content && content.style.display !== 'none') {
+        content.scrollIntoView({behavior: 'smooth', block: 'start'});
+      }
+    }, 100);
+  }
+
   // Auto-fetch freight rates on first Transportation tab visit
   if (tabName === 'transportation' && !netoptMarketRates.lastUpdated) {
     netoptFetchFreightRates();
@@ -1022,7 +1032,7 @@ function netoptUpdateKPI() {
   document.getElementById('netopt-k-open').textContent = openCount || '—';
   document.getElementById('netopt-k-demand').textContent = totalDemand ? (totalDemand >= 1000000 ? fmtNum(totalDemand / 1000000, 1) + 'M' : fmtNum(totalDemand / 1000, 0) + 'K') : '—';
   document.getElementById('netopt-k-cost').textContent = totalCost ? fmtNum(totalCost, 1, '$') + 'M' : '—';
-  document.getElementById('netopt-k-service').textContent = servicePct ? fmtNum(servicePct, 0) + '%' : '—';
+  document.getElementById('netopt-k-service').textContent = servicePct != null ? fmtNum(servicePct, 0) + '%' : '—';
   document.getElementById('netopt-k-dist').textContent = avgDist ? Math.round(avgDist).toLocaleString('en-US') : '—';
 }
 
