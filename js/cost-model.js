@@ -5214,11 +5214,11 @@ const dealApp = {
         // Populate client datalist
         this.populateClientDatalist();
 
+        // Reset aggregates so summary tab fetches fresh
+        this.dealAggregates = null;
+
         // Load summary data and show Summary tab by default
         this.switchTab('summary', document.querySelector('#dealDetailTabs .dt-tab'));
-
-        // Also fetch detailed data for financials/pricing (child tables)
-        this.loadDealChildData();
     },
 
     switchTab(tabName, tabEl) {
