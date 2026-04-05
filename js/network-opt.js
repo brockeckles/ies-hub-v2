@@ -6711,10 +6711,22 @@ function toggleWsc3DView() { wscSetView(wscViewMode === '3d' ? '2d' : '3d'); }
 function dispose3DView() {
   if (wsc3dAnimationId) { cancelAnimationFrame(wsc3dAnimationId); wsc3dAnimationId = null; }
   if (wsc3dRenderer) {
-    wsc3dRenderer.dispose();
+    // Remove event listeners before disposing
     var canvas = wsc3dRenderer.domElement;
+    if (canvas) {
+      canvas.removeEventListener('mousedown', wsc3dOnMouseDown);
+      canvas.removeEventListener('mousemove', wsc3dOnMouseMove);
+      canvas.removeEventListener('mouseup', wsc3dOnMouseUp);
+      canvas.removeEventListener('mouseleave', wsc3dOnMouseUp);
+      canvas.removeEventListener('wheel', wsc3dOnWheel);
+    }
+    wsc3dRenderer.dispose();
     if (canvas && canvas.parentNode) canvas.parentNode.removeChild(canvas);
     wsc3dRenderer = null;
+  }
+  if (window._wsc3dResizeHandler) {
+    window.removeEventListener('resize', window._wsc3dResizeHandler);
+    window._wsc3dResizeHandler = null;
   }
   wsc3dScene = null;
   wsc3dCamera = null;
