@@ -834,6 +834,7 @@ const cmApp = {
         netoptRefreshScenarioList(null);
 
         this.switchSection('setup');
+        this._bindFinancialInputs();
     },
 
     goBackToLanding() {
@@ -938,6 +939,9 @@ const cmApp = {
             // Financial
             document.getElementById('targetMargin').value = p.target_margin_pct || '';
             document.getElementById('contractTerm').value = p.contract_term_years || '';
+            // Sync startup amortization term to match
+            var ctyEl = document.getElementById('contractTermYears');
+            if (ctyEl) ctyEl.value = p.contract_term_years || 3;
             document.getElementById('volumeGrowth').value = p.annual_volume_growth_pct || '';
             document.getElementById('startupCosts').value = p.startup_cost || '';
             document.getElementById('pricingModel').value = p.pricing_model || 'all-in';
@@ -3456,6 +3460,51 @@ const cmApp = {
     // =====================================================================
     // MULTI-YEAR BUDGET & FINANCIAL METRICS
     // =====================================================================
+
+    // Bind all financial-impacting inputs so changing them live-updates
+    // the multi-year budget table and Financial Metrics panel.
+    _bindFinancialInputs() {
+        var self = this;
+        // Debounce: avoid rapid-fire re-renders while typing
+        var _finTimer = null;
+        var rerender = function() {
+            clearTimeout(_finTimer);
+            _finTimer = setTimeout(function() {
+                // Only re-render if the financial section is currently visible
+                var finSec = document.getElementById('financialSection');
+                if (finSec && finSec.style.display !== 'none') {
+                    self.renderMultiYearBudget();
+                    self.renderFinancialMetrics();
+                }
+            }, 300);
+        };
+
+        // All inputs that affect projections / financial metrics
+        var ids = [
+            'contractTerm', 'contractTermYears', 'targetMargin',
+            'volumeGrowth', 'annualEscalation', 'laborEscalation',
+            'discountRate', 'reinvestRate', 'overtimePct',
+            'benefitLoadPct', 'bonusPct', 'absenceAllowance',
+            'shift2Premium', 'shift3Premium',
+            'threshGrossMargin', 'threshEbitda', 'threshEbit',
+            'threshRoic', 'threshMirr', 'threshPayback'
+        ];
+        ids.forEach(function(id) {
+            var el = document.getElementById(id);
+            if (el) {
+                el.addEventListener('input', rerender);
+                el.addEventListener('change', rerender);
+            }
+        });
+
+        // Also sync the two contract term inputs with each other
+        var ct = document.getElementById('contractTerm');
+        var cty = document.getElementById('contractTermYears');
+        if (ct && cty) {
+            ct.addEventListener('input', function() { cty.value = ct.value; });
+            cty.addEventListener('input', function() { ct.value = cty.value; });
+        }
+    },
 
     getContractYears() {
         return Math.max(1, Math.round(parseFloat(document.getElementById('contractTerm').value) || 3));
