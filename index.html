@@ -3688,6 +3688,110 @@
             background: var(--gray-300);
         }
 
+        /* ── CM Utility Classes (added for consistency) ── */
+
+        /* Integration cards (WSC, NetOpt imports) */
+        .cm-integration-card {
+            border-left: 3px solid var(--ies-blue, #0047ab);
+            background: linear-gradient(135deg, #f0f7ff 0%, #fff 60%);
+            border-radius: 10px;
+            padding: 14px 16px;
+            margin-bottom: 16px;
+        }
+        .cm-integration-card.green {
+            border-left-color: #10b981;
+            background: linear-gradient(135deg, #ecfdf5 0%, #fff 60%);
+        }
+        .cm-integration-card-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--ies-navy, #1c1c2e);
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .cm-integration-card-desc {
+            font-size: 12px;
+            color: var(--ies-gray-500, #6b7280);
+            line-height: 1.5;
+        }
+        .cm-integration-card-link {
+            font-size: 11px;
+            color: var(--ies-blue, #0047ab);
+            text-decoration: none;
+            opacity: 0.8;
+            display: inline-block;
+            margin-top: 4px;
+        }
+        .cm-integration-card-link:hover { opacity: 1; }
+
+        /* Percentage / currency suffix inside input groups */
+        .cm-input-suffix {
+            flex: 0 0 auto;
+            min-width: 30px;
+            text-align: center;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--gray-500, #6b7a90);
+            padding: 0 4px;
+        }
+        .cm-input-prefix {
+            flex: 0 0 auto;
+            min-width: 20px;
+            text-align: right;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--gray-500, #6b7a90);
+            padding-right: 4px;
+        }
+
+        /* Right-align for numeric table headers & cells */
+        .cm-table th.num, .cm-table td.num {
+            text-align: right;
+        }
+        .cm-table th.ctr, .cm-table td.ctr {
+            text-align: center;
+        }
+
+        /* Field divider between subsections */
+        .cm-field-divider {
+            padding-top: 12px;
+            border-top: 1px solid var(--gray-100, #f0f1f3);
+            margin-top: 8px;
+        }
+
+        /* Help text below fields */
+        .cm-help-text {
+            font-size: 11px;
+            color: var(--ies-gray-400, #9ca3af);
+            margin-top: 4px;
+            line-height: 1.4;
+        }
+
+        /* Empty state / hint text */
+        .cm-empty-hint {
+            padding: 24px;
+            text-align: center;
+            color: var(--ies-gray-400, #9ca3af);
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        /* 6-column grid for seasonality */
+        .cm-input-grid.cols-6 {
+            grid-template-columns: repeat(6, 1fr);
+        }
+
+        /* Standardized input widths */
+        .cm-input.cm-w-sm { max-width: 100px; }
+        .cm-input.cm-w-md { max-width: 140px; }
+        .cm-input.cm-w-lg { max-width: 200px; }
+        .cm-input.cm-w-xl { max-width: 300px; }
+        select.cm-select.cm-w-md { max-width: 140px; }
+        select.cm-select.cm-w-lg { max-width: 200px; }
+        select.cm-select.cm-w-xl { max-width: 300px; }
+
 
 /* ═══════════ FEEDBACK SYSTEM ═══════════ */
 .fb-fab {
@@ -8168,14 +8272,14 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
                 <div class="cm-input-grid cols-2">
                     <div class="cm-field-group">
                         <label class="cm-field-label">Market</label>
-                        <select id="market" class="cm-select" style="max-width:250px;">
+                        <select id="market" class="cm-select" style="max-width:200px;">
                             <option value="">-- Select Market --</option>
                         </select>
                         <span class="cm-field-help">Determines labor rates and facility costs</span>
                     </div>
                     <div class="cm-field-group">
                         <label class="cm-field-label">Environment Type</label>
-                        <select id="environment" class="cm-select" style="max-width:180px;">
+                        <select id="environment" class="cm-select" style="max-width:200px;">
                             <option value="ambient">Ambient</option>
                             <option value="cold">Cold Storage (35-45°F)</option>
                             <option value="frozen">Frozen (-10°F or lower)</option>
@@ -8186,7 +8290,7 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
 
                 <div class="cm-field-group">
                     <label class="cm-field-label">Allowance Profile</label>
-                    <select id="allowanceProfile" class="cm-select" style="max-width:250px;">
+                    <select id="allowanceProfile" class="cm-select" style="max-width:200px;">
                         <option value="">-- Select Profile --</option>
                     </select>
                     <span class="cm-field-help">PFD%, ergonomic adjustments applied to labor calculations</span>
@@ -8280,22 +8384,22 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
                 <div class="cm-input-grid cols-2">
                 <div class="cm-field-group">
                     <label class="cm-field-label">Average Lines per Order</label>
-                    <input type="number" id="linesPerOrder" class="cm-input" placeholder="0" min="0" step="0.1" style="max-width:120px;">
+                    <input type="number" id="linesPerOrder" class="cm-input" placeholder="0" min="0" step="0.1" style="max-width:140px;">
                     <span class="cm-field-help">Total lines / total orders</span>
                 </div>
                 <div class="cm-field-group">
                     <label class="cm-field-label">Average Units per Line</label>
-                    <input type="number" id="unitsPerLine" class="cm-input" placeholder="0" min="0" step="0.1" style="max-width:120px;">
+                    <input type="number" id="unitsPerLine" class="cm-input" placeholder="0" min="0" step="0.1" style="max-width:140px;">
                     <span class="cm-field-help">Total units / total lines</span>
                 </div>
                 <div class="cm-field-group">
                     <label class="cm-field-label">Average Order Weight (lbs)</label>
-                    <input type="number" id="orderWeight" class="cm-input" placeholder="0" min="0" step="0.1" style="max-width:120px;">
+                    <input type="number" id="orderWeight" class="cm-input" placeholder="0" min="0" step="0.1" style="max-width:140px;">
                 </div>
                 <div class="cm-field-group">
                     <label class="cm-field-label">% Single-Line Orders</label>
                     <div class="cm-input-group">
-                        <input type="number" id="singleLineOrderPct" class="cm-input" placeholder="0" min="0" max="100" step="0.1" style="max-width:100px;">
+                        <input type="number" id="singleLineOrderPct" class="cm-input" placeholder="0" min="0" max="100" step="0.1" style="max-width:140px;">
                         <div class="cm-input-group-item" style="flex:0; min-width: 40px;">%</div>
                     </div>
                 </div>
@@ -8319,7 +8423,7 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
             <div class="cm-card">
                 <div class="cm-card-title">Seasonality Profile</div>
                 <p class="cm-card-description">Monthly volume multipliers relative to average. 1.0 = average month, 1.5 = 50% above average (e.g., holiday peak). Used for peak staffing and cash flow timing.</p>
-                <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;" id="seasonalityGrid">
+                <div class="cm-input-grid cols-6" id="seasonalityGrid">
                     <div class="cm-field-group"><label class="cm-field-label">Jan</label><input type="number" class="cm-input cm-seasonality" data-month="0" value="1.0" min="0" max="5" step="0.05" style="width:100%;text-align:center;"></div>
                     <div class="cm-field-group"><label class="cm-field-label">Feb</label><input type="number" class="cm-input cm-seasonality" data-month="1" value="1.0" min="0" max="5" step="0.05" style="width:100%;text-align:center;"></div>
                     <div class="cm-field-group"><label class="cm-field-label">Mar</label><input type="number" class="cm-input cm-seasonality" data-month="2" value="1.0" min="0" max="5" step="0.05" style="width:100%;text-align:center;"></div>
@@ -8375,33 +8479,37 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
                 <div class="cm-input-grid cols-3">
                 <div class="cm-field-group">
                     <label class="cm-field-label">Total Square Footage</label>
-                    <input type="number" id="totalSqft" class="cm-input" placeholder="0" min="0" style="max-width:150px;">
+                    <input type="number" id="totalSqft" class="cm-input" placeholder="0" min="0" style="max-width:140px;">
                     <span class="cm-field-help">Entire facility footprint</span>
                     <span class="cm-field-help cm-text-orange" id="sqftSuggestion" style="display:none;"></span>
                     <a href="#" onclick="cmApp.launchWSC(); return false;" style="font-size:10px;color:var(--ies-blue);text-decoration:none;opacity:.7;display:inline-block;margin-top:2px;">Size with Calculator &rarr;</a>
                 </div>
                 <div class="cm-field-group">
                     <label class="cm-field-label">Clear Height (feet)</label>
-                    <input type="number" id="clearHeight" class="cm-input" placeholder="0" min="0" step="0.1" style="max-width:120px;">
+                    <input type="number" id="clearHeight" class="cm-input" placeholder="0" min="0" step="0.1" style="max-width:140px;">
                     <span class="cm-field-help">Floor to ceiling</span>
                 </div>
                 <div class="cm-field-group">
                     <label class="cm-field-label">Dock Doors</label>
-                    <input type="number" id="dockDoors" class="cm-input" placeholder="0" min="0" step="1" style="max-width:100px;">
+                    <input type="number" id="dockDoors" class="cm-input" placeholder="0" min="0" step="1" style="max-width:140px;">
                 </div>
                 <div class="cm-field-group">
                     <label class="cm-field-label">Staging Area Square Footage</label>
-                    <input type="number" id="stagingSqft" class="cm-input" placeholder="0" min="0" style="max-width:150px;">
+                    <input type="number" id="stagingSqft" class="cm-input" placeholder="0" min="0" style="max-width:140px;">
                 </div>
                 <div class="cm-field-group">
                     <label class="cm-field-label">Office Square Footage</label>
-                    <input type="number" id="officeSqft" class="cm-input" placeholder="0" min="0" style="max-width:150px;">
+                    <input type="number" id="officeSqft" class="cm-input" placeholder="0" min="0" style="max-width:140px;">
                 </div>
                 </div>
             </div>
 
             <div class="cm-card">
                 <div class="cm-card-title">Calculated Space</div>
+                <div class="cm-field-group cm-flex-between">
+                    <span>Total Facility Space</span>
+                    <span class="cm-text-orange" id="totalFacilitySpace">0</span>
+                </div>
                 <div class="cm-field-group cm-flex-between">
                     <span>Warehousing Square Footage</span>
                     <span class="cm-text-orange" id="warehousingSpace">0</span>
@@ -8685,18 +8793,18 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
                 <div class="cm-input-grid cols-3">
                     <div class="cm-field-group">
                         <label class="cm-field-label">Contract Term (years)</label>
-                        <input type="number" id="contractTerm" class="cm-input" placeholder="1" min="1" step="0.1" style="max-width:120px;">
+                        <input type="number" id="contractTerm" class="cm-input" placeholder="1" min="1" step="0.1" style="max-width:140px;">
                     </div>
                     <div class="cm-field-group">
                         <label class="cm-field-label">Target Margin %</label>
                         <div class="cm-input-group">
-                            <input type="number" id="targetMargin" class="cm-input" placeholder="15" min="0" step="0.1" style="max-width:100px;">
+                            <input type="number" id="targetMargin" class="cm-input" placeholder="15" min="0" step="0.1" style="max-width:140px;">
                             <div style="flex:0; min-width: 30px;text-align:center;">%</div>
                         </div>
                     </div>
                     <div class="cm-field-group">
                         <label class="cm-field-label">Pricing Model</label>
-                        <select id="pricingModel" class="cm-select" style="max-width:180px;">
+                        <select id="pricingModel" class="cm-select" style="max-width:200px;">
                             <option value="all-in">All-In</option>
                             <option value="transactional">Transactional</option>
                             <option value="hybrid">Hybrid</option>
