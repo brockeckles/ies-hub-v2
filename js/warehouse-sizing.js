@@ -1738,6 +1738,8 @@ function syncCalcPanelHeight() {
   // Get the right column (second child of the grid)
   var rightCol = row.children[1];
   if (!rightCol) return;
+  // Save scroll position before resizing
+  var savedScroll = panel.scrollTop;
   // Temporarily remove max-height to measure natural height
   panel.style.maxHeight = 'none';
   var rightH = rightCol.offsetHeight;
@@ -1747,6 +1749,8 @@ function syncCalcPanelHeight() {
   if (rightH > 0) {
     panel.style.maxHeight = Math.max(rightH, 400) + 'px';
   }
+  // Restore scroll position so panel doesn't jump to top
+  panel.scrollTop = savedScroll;
 }
 
 // ═════════════════════════════════════════════════════════════
