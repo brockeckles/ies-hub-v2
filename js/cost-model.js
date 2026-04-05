@@ -1065,6 +1065,17 @@ const cmApp = {
                     directLabor.push(l);
                 }
             });
+            // Recalculate adjusted_uph and annual_hours for direct labor (15% PFD default)
+            var defaultAllowancePct = 15;
+            directLabor.forEach(function(line) {
+                if (line.base_uph > 0 && !line.adjusted_uph) {
+                    line.adjusted_uph = line.base_uph * (1 - defaultAllowancePct / 100);
+                }
+                if (line.adjusted_uph > 0 && (!line.annual_hours || line.annual_hours === 0)) {
+                    line.annual_hours = (line.volume || 0) / line.adjusted_uph;
+                }
+            });
+
             this.projectData.laborLines = directLabor;
             this.projectData.indirectLaborLines = indirectLabor;
             this.projectData.equipmentLines = equipment;
