@@ -5039,26 +5039,41 @@ const cmApp = {
             // ── Persist child tables ──
             const pid = this.currentProject.id;
 
+            // Known DB columns per child table (prevents PostgREST unknown-column rejection)
+            var dbColumns = {
+                cost_model_labor: ['project_id','role_name','activity_name','role_category','headcount','hourly_rate','burden_pct','benefits_per_hour','annual_hours','total_annual_cost','source','most_template_id','most_template_name','annual_volume','calculated_uph','notes','uom','complexity_tier','mhe_equipment_id','it_equipment_id','pricing_bucket','volume_line_id','adjusted_uph','base_uph','volume','shift_num'],
+                cost_model_equipment: ['project_id','name','category','quantity','lease_monthly','maintenance_annual','acquisition_cost','lease_rate','maintenance_cost','amortization_years','notes','pricing_bucket'],
+                cost_model_overhead: ['project_id','category','description','monthly_cost','cost_type','scaling_factor','total_annual_cost','notes','annual_cost','scaling_driver','rate','quantity','source','pricing_bucket'],
+                cost_model_vas: ['project_id','service_name','volume','rate','uom','annual_cost','notes','pricing_bucket'],
+                cost_model_volumes: ['project_id','volume_name','name','annual_volume','daily_volume','uom','source','notes','process_area']
+            };
+
             // Helper: delete-then-insert pattern for child tables
-            const persistChildTable = async (tableName, rows) => {
+            var persistChildTable = async function(tableName, rows) {
                 // Delete existing rows for this project
                 try {
-                    const existing = await cmFetchTable(tableName, 'project_id=eq.' + pid);
-                    for (const row of existing) {
-                        await cmApiDelete(tableName, row.id);
+                    var existing = await cmFetchTable(tableName, 'project_id=eq.' + pid);
+                    for (var i = 0; i < existing.length; i++) {
+                        await cmApiDelete(tableName, existing[i].id);
                     }
                 } catch(e) { /* table may be empty */ }
                 // Insert current rows
                 if (rows && rows.length > 0) {
-                    for (const row of rows) {
-                        const clean = Object.assign({}, row);
-                        delete clean.id; // let DB assign new IDs
+                    var allowed = dbColumns[tableName] || [];
+                    for (var j = 0; j < rows.length; j++) {
+                        var clean = {};
+                        var src = rows[j];
+                        // Only copy known DB columns
+                        for (var k = 0; k < allowed.length; k++) {
+                            var col = allowed[k];
+                            if (src[col] !== undefined) clean[col] = src[col];
+                        }
                         clean.project_id = pid;
                         // Map CM UI field names → DB column names for labor
                         if (tableName === 'cost_model_labor') {
-                            if (clean.activity_name) clean.role_name = clean.activity_name;
-                            if (clean.volume != null) clean.annual_volume = clean.volume;
-                            if (clean.base_uph != null) clean.calculated_uph = clean.base_uph;
+                            if (src.activity_name) clean.role_name = src.activity_name;
+                            if (src.volume != null) clean.annual_volume = src.volume;
+                            if (src.base_uph != null) clean.calculated_uph = src.base_uph;
                         }
                         await cmApiPost(tableName, clean);
                     }
