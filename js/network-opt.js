@@ -6679,10 +6679,11 @@ function wscSetView(mode) {
   if (containerElev) containerElev.style.display = 'none';
   dispose3DView();
 
-  // Reset button styles
-  var activeStyle = 'background:rgba(59,130,246,.3);color:#93c5fd;font-weight:600;';
-  var inactiveStyle = 'background:rgba(255,255,255,.06);color:rgba(255,255,255,.5);font-weight:400;';
-  [btn2d, btn3d, btnElev].forEach(function(b) { if (b) b.style.cssText += inactiveStyle; });
+  // Reset button styles (base style + inactive, overwrite to avoid accumulation)
+  var baseStyle = 'font-size:11px;padding:4px 12px;border:none;cursor:pointer;transition:.2s;';
+  var activeStyle = baseStyle + 'background:rgba(59,130,246,.3);color:#93c5fd;font-weight:600;';
+  var inactiveStyle = baseStyle + 'background:rgba(255,255,255,.06);color:rgba(255,255,255,.5);font-weight:400;';
+  [btn2d, btn3d, btnElev].forEach(function(b) { if (b) b.style.cssText = inactiveStyle; });
 
   // Show/hide wall toggle button
   var wallBtn = document.getElementById('wsc-3d-walls-btn');
@@ -6690,17 +6691,17 @@ function wscSetView(mode) {
 
   if (mode === '3d') {
     container3d.style.display = 'block';
-    if (btn3d) btn3d.style.cssText += activeStyle;
+    if (btn3d) btn3d.style.cssText = activeStyle;
     var p = wscLastLayoutParams;
     if (p) render3DLayout(p);
   } else if (mode === 'elevation') {
     if (containerElev) containerElev.style.display = 'block';
-    if (btnElev) btnElev.style.cssText += activeStyle;
+    if (btnElev) btnElev.style.cssText = activeStyle;
     var p = wscLastLayoutParams;
     if (p) renderElevationView(p);
   } else {
     svgEl.style.display = 'block';
-    if (btn2d) btn2d.style.cssText += activeStyle;
+    if (btn2d) btn2d.style.cssText = activeStyle;
   }
 }
 
@@ -6992,26 +6993,26 @@ function _wsc3dBuildSign(scene, text, x, z, color) {
   // Text sprite on the sign — high-res for readability
   var sprite = wsc3dMakeTextSprite(text, 0xffffff);
   sprite.position.set(x, 13, z + 0.3);
-  sprite.scale.set(18, 9, 1);
+  sprite.scale.set(24, 12, 1);
   scene.add(sprite);
 }
 
 // ── Text sprite helper ──
 function wsc3dMakeTextSprite(text, color) {
   var canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 256;
+  canvas.width = 1024;
+  canvas.height = 512;
   var ctx = canvas.getContext('2d');
-  ctx.clearRect(0, 0, 512, 256);
+  ctx.clearRect(0, 0, 1024, 512);
   // Dark semi-transparent background for contrast
-  ctx.fillStyle = 'rgba(0,0,0,0.5)';
-  ctx.fillRect(0, 0, 512, 256);
-  ctx.font = 'bold 38px sans-serif';
+  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.fillRect(0, 0, 1024, 512);
+  ctx.font = 'bold 72px sans-serif';
   ctx.textAlign = 'center';
   ctx.fillStyle = '#' + ('000000' + (color || 0xffffff).toString(16)).slice(-6);
   var lines = text.split('\n');
   for (var i = 0; i < lines.length; i++) {
-    ctx.fillText(lines[i], 256, 80 + i * 55);
+    ctx.fillText(lines[i], 512, 160 + i * 100);
   }
   var tex = new THREE.CanvasTexture(canvas);
   tex.needsUpdate = true;
@@ -7532,7 +7533,7 @@ function render3DLayout(p) {
       var dx = dX + spacing * (di + 1);
       _wsc3dBuildDockDoor(scene, dx, bD, 'bottom');
       if (_wsc3dRand() < 0.6) {
-        _wsc3dBuildTrailer(scene, dx, bD + 3, 'bottom');
+        _wsc3dBuildTrailer(scene, dx, bD + 8, 'bottom');
       }
     }
   }
@@ -7548,7 +7549,7 @@ function render3DLayout(p) {
       var dx2 = dtX + spacing2 * (d2 + 1);
       _wsc3dBuildDockDoor(scene, dx2, 0, 'top');
       if (_wsc3dRand() < 0.6) {
-        _wsc3dBuildTrailer(scene, dx2, -3, 'top');
+        _wsc3dBuildTrailer(scene, dx2, -8, 'top');
       }
     }
   }
@@ -8103,9 +8104,22 @@ function renderElevationView(p) {
   }
 
   // ── EXTERIOR DOCK/TRAILER DIMENSIONS (outside building, near trailer) ──
-  var truckDimX = toX(truckX + 22);
+  var truckDimX = toX(truckX + 24);
   _elevDimV(ctx, truckDimX, toY(0), toY(13.5), "13.5' trailer");
-  _elevDimV(ctx, truckDimX + dimSpacing, toY(0), toY(14), "14' door clr");
+  _elevDimV(ctx, truckDimX + dimSpacing + 10, toY(0), toY(14), "14' door clr");
+
+  // Sprinkler gap dimension (between TOS and sprinkler line)
+  if (storeType !== 'bulk') {
+    var tos = beamH * rackLevels - beamH * 0.25;
+    var sprinklerGap = clearH - tos;
+    if (sprinklerGap > 1) {
+      ctx.save();
+      ctx.setLineDash([4, 3]);
+      ctx.strokeStyle = '#e53935';
+      _elevDimV(ctx, toX(storageStart + rackDepth * 1.5 + aisleW * 0.5), toY(tos), toY(clearH), sprinklerGap.toFixed(1) + "' sprinkler gap");
+      ctx.restore();
+    }
+  }
 
   // ── INTERNAL DIMENSIONS ──
   // Pallet load height (inside first rack bay) — only if >= 4 ft
