@@ -261,7 +261,7 @@ const TourDefinitions = {
       {
         target: '#dt-tabs',
         title: 'Tool Navigation',
-        content: 'Access all 7 design tools from these tabs: Center of Gravity, Network Optimization, Warehouse Sizing, Cost Model Builder, Multi-Site Analyzer, Fleet Modeler, and MOST Standards.',
+        content: 'Access all 7 design tools from these tabs: Center of Gravity, Network Optimization, Warehouse Sizing, Cost Model Builder, Multi-Site Deals, Fleet Modeler, and MOST Standards.',
         padding: 8
       },
       {
@@ -352,11 +352,11 @@ const TourDefinitions = {
   },
 
   multisite: {
-    name: 'Multi-Site Analyzer',
+    name: 'Multi-Site Deals',
     steps: [
       {
         target: '#deal-landing .dt-landing-header',
-        title: 'Multi-Site Analyzer Overview',
+        title: 'Multi-Site Deals Overview',
         content: 'Group multiple cost models into a single deal to see aggregate financials across locations. Perfect for multi-site RFPs where you need a consolidated pricing view.',
         padding: 12
       },

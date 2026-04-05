@@ -347,7 +347,7 @@ function showDesignTool(panelId, tabEl) {
     'dt-network': 'Center of Gravity',
     'dt-netopt': 'Network Optimization',
     'dt-warehouse': 'Warehouse Sizing',
-    'dt-deals': 'Multi-Site Analyzer'
+    'dt-deals': 'Multi-Site Deals'
   };
   if (toolNames[panelId]) {
     dtSyncActiveTab(toolNames[panelId]);
@@ -367,6 +367,8 @@ function showDesignTool(panelId, tabEl) {
   if (panelId === 'dt-network') { netShowLanding(); }
   // If switching to netopt, show landing page
   if (panelId === 'dt-netopt') { netoptShowLanding(); }
+  // If switching to deals, refresh deal list
+  if (panelId === 'dt-deals') { dealApp.loadDeals(); }
 }
 
 // ═══════════ COST MODEL BUILDER JAVASCRIPT ═══════════
@@ -717,7 +719,7 @@ const cmApp = {
                         '<div><span style="font-weight:700;font-size:14px;color:var(--ies-navy);">' + (deal.deal_name || 'Deal') + '</span>' +
                         '<span style="font-size:12px;color:var(--ies-gray-500);margin-left:8px;">' + models.length + ' model' + (models.length > 1 ? 's' : '') + '</span></div>' +
                         '<div style="display:flex;gap:8px;">' +
-                        '<button onclick="navigate(\'designtools\'); setTimeout(function(){ showDesignTool(\'dt-deals\', document.querySelectorAll(\'#dt-tabs .dt-tab\')[2]); setTimeout(function(){ dealApp.openDeal(\'' + dealId + '\'); },100); },50)" style="padding:4px 12px;background:var(--ies-blue);color:#fff;border:none;border-radius:6px;font-family:Montserrat,sans-serif;font-size:11px;font-weight:600;cursor:pointer;">Open in Multi-Site Analyzer</button>' +
+                        '<button onclick="navigate(\'designtools\'); setTimeout(function(){ showDesignTool(\'dt-deals\', document.querySelectorAll(\'#dt-tabs .dt-tab\')[2]); setTimeout(function(){ dealApp.openDeal(\'' + dealId + '\'); },100); },50)" style="padding:4px 12px;background:var(--ies-blue);color:#fff;border:none;border-radius:6px;font-family:Montserrat,sans-serif;font-size:11px;font-weight:600;cursor:pointer;">Open in Multi-Site Deals</button>' +
                         '<button onclick="cmToggleDealGroup(\'' + dealId + '\')" style="padding:4px 12px;background:var(--ies-gray-100);color:var(--ies-gray-600);border:1px solid var(--ies-gray-200);border-radius:6px;font-family:Montserrat,sans-serif;font-size:11px;font-weight:600;cursor:pointer;">Collapse</button>' +
                         '</div></div>';
 
@@ -6303,4 +6305,5 @@ const dealApp = {
 document.addEventListener('DOMContentLoaded', () => {
     cmApp.init();
     fmApp.init();
+    dealApp.loadDeals();
 });

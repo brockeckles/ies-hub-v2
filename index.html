@@ -5387,7 +5387,7 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
     <div class="welcome-feature feature-live" role="button" tabindex="0" onclick="navigate('designtools', document.querySelector('[data-section=designtools]'))" style="cursor:pointer;">
       <div class="welcome-feature-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--ies-orange)" stroke-width="1.5"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg></div>
       <div class="welcome-feature-title">Design Tools</div>
-      <div class="welcome-feature-desc">7 engineering tools — Center of Gravity, Network Optimization, Warehouse Sizing, Cost Model, Multi-Site Analyzer, Fleet Modeler, and MOST Labor Standards.</div>
+      <div class="welcome-feature-desc">7 engineering tools — Center of Gravity, Network Optimization, Warehouse Sizing, Cost Model, Multi-Site Deals, Fleet Modeler, and MOST Labor Standards.</div>
       <div style="margin-top:10px;"><span class="wiki-tag" style="background:rgba(25,135,84,.1);color:var(--ies-green);">LIVE</span></div>
     </div>
     <div class="welcome-feature feature-live" role="button" tabindex="0" onclick="navigate('deals', document.querySelector('[data-section=deals]'))" style="cursor:pointer;">
@@ -5419,7 +5419,7 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
         <ul class="roadmap-items">
           <li>Command Center — KPIs, Signal Feed, Charts, Sector Pulse</li>
           <li>Market Explorer — Interactive map + Data Library</li>
-          <li>Design Tools — 7 tools (Center of Gravity, Network Optimization, Warehouse Sizing, Cost Model, Multi-Site Analyzer, Fleet Modeler, MOST Standards)</li>
+          <li>Design Tools — 7 tools (Center of Gravity, Network Optimization, Warehouse Sizing, Cost Model, Multi-Site Deals, Fleet Modeler, MOST Standards)</li>
           <li>Deal Management — Stage-gated DOS pipeline, activity templates, Hours tracking</li>
           <li>Training Wiki (23+ pages, 12 SCCs)</li>
           <li>Change Management (ADKAR)</li>
@@ -5914,7 +5914,7 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
   <div id="dt-tabs" class="dt-tabs-bar" style="display:flex;gap:10px;margin-bottom:24px;flex-wrap:wrap;">
     <button class="dt-tab active" onclick="showDesignTool('dt-landing',this)">All Tools</button>
     <button class="dt-tab" onclick="showDesignTool('dt-costmodel',this)">Cost Model</button>
-    <button class="dt-tab" onclick="showDesignTool('dt-deals',this)">Multi-Site Analyzer</button>
+    <button class="dt-tab" onclick="showDesignTool('dt-deals',this)">Multi-Site Deals</button>
     <button class="dt-tab" onclick="showDesignTool('dt-warehouse',this)">Warehouse Sizing</button>
     <button class="dt-tab" onclick="showDesignTool('dt-most',this)">MOST Standards</button>
     <button class="dt-tab" onclick="showDesignTool('dt-network',this)">Center of Gravity</button>
@@ -5943,15 +5943,15 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
             Open Cost Model <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </div>
         </div>
-        <!-- Multi-Site Analyzer Card -->
+        <!-- Multi-Site Deals Card -->
         <div class="dt-tool-card" onclick="showDesignTool('dt-deals',document.querySelectorAll('#dt-tabs .dt-tab')[2])">
           <div style="width:48px;height:48px;background:linear-gradient(135deg,var(--ies-blue),#1e5bb8);border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:16px;">
             <svg width="24" height="24" fill="none" viewBox="0 0 24 24"><path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V7M3 7a2 2 0 012-2h14a2 2 0 012 2" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 11v6M15 11v6" stroke="#fff" stroke-width="1.2" opacity=".6"/></svg>
           </div>
-          <div style="font-weight:700;font-size:16px;color:var(--ies-navy);margin-bottom:6px;">Multi-Site Analyzer</div>
+          <div style="font-weight:700;font-size:16px;color:var(--ies-navy);margin-bottom:6px;">Multi-Site Deals</div>
           <div style="font-size:13px;color:var(--ies-gray-600);line-height:1.5;margin-bottom:16px;">Group multiple warehouse sites into deals. Manage client rollups, aggregate financials, and compare multi-location scenarios.</div>
           <div style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--ies-blue);">
-            Open Multi-Site Analyzer <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Open Multi-Site Deals <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </div>
         </div>
       </div>
@@ -7866,7 +7866,7 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
     <div id="deal-landing" class="dt-landing" style="display:block;">
       <div class="dt-landing-header">
         <button class="dt-landing-back-btn" onclick="showDesignTool('dt-landing', document.querySelector('#dt-tabs .dt-tab'))">&#8592; Back to Design Tools</button>
-        <div class="dt-landing-title">Multi-Site Analyzer</div>
+        <div class="dt-landing-title">Multi-Site Deals</div>
         <div class="dt-landing-subtitle">Multi-location warehouse deals with aggregate financials</div>
         <button class="tour-trigger-icon" onclick="startSectionTour('multisite')" title="Start guided tour" style="margin-top:8px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg> Guided Tour</button>
       </div>
@@ -8172,7 +8172,7 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
   <div class="dt-tabs-bar" style="display:flex;gap:10px;margin-bottom:24px;flex-wrap:wrap;">
     <button class="dt-tab" onclick="navigate('designtools', document.querySelector('[data-section=designtools]'))">All Tools</button>
     <button class="dt-tab active" onclick="window.scrollTo(0,0)">Cost Model</button>
-    <button class="dt-tab" onclick="navigate('designtools'); setTimeout(function(){ showDesignTool('dt-deals', document.querySelectorAll('#dt-tabs .dt-tab')[2]); },50)">Multi-Site Analyzer</button>
+    <button class="dt-tab" onclick="navigate('designtools'); setTimeout(function(){ showDesignTool('dt-deals', document.querySelectorAll('#dt-tabs .dt-tab')[2]); },50)">Multi-Site Deals</button>
     <button class="dt-tab" onclick="navigate('designtools'); setTimeout(function(){ showDesignTool('dt-warehouse', document.querySelectorAll('#dt-tabs .dt-tab')[3]); },50)">Warehouse Sizing</button>
     <button class="dt-tab" onclick="showDesignTool('dt-most')">MOST Standards</button>
     <button class="dt-tab" onclick="navigate('designtools'); setTimeout(function(){ showDesignTool('dt-network', document.querySelectorAll('#dt-tabs .dt-tab')[5]); },50)">Center of Gravity</button>
@@ -9284,7 +9284,7 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
   <div class="dt-tabs-bar" style="display:flex;gap:10px;margin-bottom:24px;flex-wrap:wrap;">
     <button class="dt-tab" onclick="navigate('designtools', document.querySelector('[data-section=designtools]'))">All Tools</button>
     <button class="dt-tab" onclick="showDesignTool('dt-costmodel')">Cost Model</button>
-    <button class="dt-tab" onclick="navigate('designtools'); setTimeout(function(){ showDesignTool('dt-deals', document.querySelectorAll('#dt-tabs .dt-tab')[2]); },50)">Multi-Site Analyzer</button>
+    <button class="dt-tab" onclick="navigate('designtools'); setTimeout(function(){ showDesignTool('dt-deals', document.querySelectorAll('#dt-tabs .dt-tab')[2]); },50)">Multi-Site Deals</button>
     <button class="dt-tab" onclick="navigate('designtools'); setTimeout(function(){ showDesignTool('dt-warehouse', document.querySelectorAll('#dt-tabs .dt-tab')[3]); },50)">Warehouse Sizing</button>
     <button class="dt-tab" onclick="showDesignTool('dt-most')">MOST Standards</button>
     <button class="dt-tab" onclick="navigate('designtools'); setTimeout(function(){ showDesignTool('dt-network', document.querySelectorAll('#dt-tabs .dt-tab')[5]); },50)">Center of Gravity</button>
@@ -9561,7 +9561,7 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
   <div class="dt-tabs-bar" style="display:flex;gap:10px;margin-bottom:24px;flex-wrap:wrap;">
     <button class="dt-tab" onclick="navigate('designtools', document.querySelector('[data-section=designtools]'))">All Tools</button>
     <button class="dt-tab" onclick="showDesignTool('dt-costmodel')">Cost Model</button>
-    <button class="dt-tab" onclick="navigate('designtools'); setTimeout(function(){ showDesignTool('dt-deals', document.querySelectorAll('#dt-tabs .dt-tab')[2]); },50)">Multi-Site Analyzer</button>
+    <button class="dt-tab" onclick="navigate('designtools'); setTimeout(function(){ showDesignTool('dt-deals', document.querySelectorAll('#dt-tabs .dt-tab')[2]); },50)">Multi-Site Deals</button>
     <button class="dt-tab" onclick="navigate('designtools'); setTimeout(function(){ showDesignTool('dt-warehouse', document.querySelectorAll('#dt-tabs .dt-tab')[3]); },50)">Warehouse Sizing</button>
     <button class="dt-tab active" onclick="window.scrollTo(0,0)">MOST Standards</button>
     <button class="dt-tab" onclick="navigate('designtools'); setTimeout(function(){ showDesignTool('dt-network', document.querySelectorAll('#dt-tabs .dt-tab')[5]); },50)">Center of Gravity</button>
@@ -10827,7 +10827,7 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
 <!-- Deal Management: pipeline, opportunities, hours, tasks, artifacts -->
 <script src="js/deal-management.js?v=20260404-s4"></script>
 <!-- Design Tools: landing pages, scenario management, section tours -->
-<script src="js/design-tools.js?v=20260405-s2"></script>
+<script src="js/design-tools.js?v=20260405-s16"></script>
 <!-- Center of Gravity: city database, clustering, Leaflet map -->
 <script src="js/center-of-gravity.js?v=20260405-s6"></script>
 <!-- Warehouse Sizing Calculator: layout, 3D, elevation, scenarios -->
@@ -10841,7 +10841,7 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
 <!-- Feedback: idea submission, voting -->
 <script src="js/feedback.js"></script>
 <!-- Cost Model Builder: cmApp, dealApp, financial modeling -->
-<script src="js/cost-model.js?v=20260405-s4"></script>
+<script src="js/cost-model.js?v=20260405-s16"></script>
 <!-- Cost Model Interaction Tests (gated behind __CM_TEST_MODE__) -->
 <script src="js/cost-model-tests.js?v=20260405-s2"></script>
 <!-- Fleet Modeler: fmApp, lane optimization -->
@@ -10853,7 +10853,7 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
 <!-- Admin Panel: reference data CRUD -->
 <script src="js/admin-panel.js?v=20260405-s2"></script>
 <!-- Tour Engine: guided tour system + tour definitions for all sections -->
-<script src="js/tour-engine.js"></script>
+<script src="js/tour-engine.js?v=20260405-s16"></script>
 
 
 
