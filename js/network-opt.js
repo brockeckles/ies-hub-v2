@@ -7902,30 +7902,12 @@ function renderElevationView(p) {
   // ── Zone layout (left to right): Office | Staging | Storage | Staging | Dock ──
   var cursor = 0;
 
-  // Office zone (just label + divider, no rectangle)
+  // Office zone (advance cursor, no label)
   if (officeW > 0) {
-    ctx.fillStyle = '#8b5cf6';
-    ctx.font = '9px system-ui';
-    ctx.textAlign = 'center';
-    ctx.fillText('Office', toX(cursor + officeW / 2), toY(0) - 8);
     cursor += officeW;
-
-    // Divider
-    ctx.strokeStyle = '#aaa';
-    ctx.lineWidth = 1;
-    ctx.setLineDash([3, 3]);
-    ctx.beginPath();
-    ctx.moveTo(toX(cursor), toY(0));
-    ctx.lineTo(toX(cursor), toY(clearH));
-    ctx.stroke();
-    ctx.setLineDash([]);
   }
 
-  // Receiving staging (label only)
-  ctx.fillStyle = '#10b981';
-  ctx.font = '9px system-ui';
-  ctx.textAlign = 'center';
-  ctx.fillText('Recv Staging', toX(cursor + stagingW / 2), toY(0) - 8);
+  // Receiving staging (advance cursor, no label)
   cursor += stagingW;
 
   // ── Storage section (the main event) ──
@@ -7996,7 +7978,7 @@ function renderElevationView(p) {
     var numRacks = Math.max(1, Math.floor(rackW / rackSpacing));
     for (var mr = 0; mr < numRacks; mr++) {
       var rackX = storageStart + mr * rackSpacing;
-      _elevDrawRack(ctx, toX, toY, rackX, rackDepth, rackLevels, beamH, clearH);
+      _elevDrawRack(ctx, toX, toY, rackX, rackDepth, rackLevels, beamH, clearH, storeType);
     }
 
     // Divider
@@ -8033,7 +8015,7 @@ function renderElevationView(p) {
     var numRacks = Math.max(1, Math.floor(storageW / rackSpacing));
     for (var ri = 0; ri < numRacks; ri++) {
       var rackX = storageStart + ri * rackSpacing;
-      _elevDrawRack(ctx, toX, toY, rackX, rackDepth, rackLevels, beamH, clearH);
+      _elevDrawRack(ctx, toX, toY, rackX, rackDepth, rackLevels, beamH, clearH, storeType);
     }
   }
 
@@ -8064,11 +8046,7 @@ function renderElevationView(p) {
     }
   }
 
-  // Shipping staging (label only)
-  ctx.fillStyle = '#f97316';
-  ctx.font = '9px system-ui';
-  ctx.textAlign = 'center';
-  ctx.fillText('Ship Staging', toX(cursor + stagingW / 2), toY(0) - 8);
+  // Shipping staging (advance cursor, no label)
   cursor += stagingW;
 
   // ── BUILDING RIGHT WALL (before exterior area) ──
@@ -8193,34 +8171,110 @@ function renderElevationView(p) {
 }
 
 // ── Elevation helper: draw rack cross-section ──
-function _elevDrawRack(ctx, toX, toY, rackX, rackDepth, rackLevels, beamH, clearH) {
-  // Uprights (blue)
-  ctx.strokeStyle = '#4444cc';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(toX(rackX), toY(0)); ctx.lineTo(toX(rackX), toY(clearH * 0.95));
-  ctx.moveTo(toX(rackX + rackDepth), toY(0)); ctx.lineTo(toX(rackX + rackDepth), toY(clearH * 0.95));
-  ctx.stroke();
+function _elevDrawRack(ctx, toX, toY, rackX, rackDepth, rackLevels, beamH, clearH, storeType) {
+  var unitPx = toX(1) - toX(0);
+  var unitPy = toY(0) - toY(1);
 
-  // Beams and pallets per level
-  for (var lvl = 1; lvl <= rackLevels; lvl++) {
-    var beamY = lvl * beamH;
-    // Beams (orange)
-    ctx.strokeStyle = '#ff8800';
-    ctx.lineWidth = 1.5;
+  if (storeType === 'double') {
+    // Double-deep: two 4ft bays back-to-back sharing center uprights
+    var halfD = rackDepth / 2; // 4ft each side
+
+    // 3 uprights: left, center (back-to-back), right
+    ctx.strokeStyle = '#4444cc';
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(toX(rackX), toY(beamY));
-    ctx.lineTo(toX(rackX + rackDepth), toY(beamY));
+    ctx.moveTo(toX(rackX), toY(0)); ctx.lineTo(toX(rackX), toY(clearH * 0.95));
+    ctx.moveTo(toX(rackX + halfD), toY(0)); ctx.lineTo(toX(rackX + halfD), toY(clearH * 0.95));
+    ctx.moveTo(toX(rackX + rackDepth), toY(0)); ctx.lineTo(toX(rackX + rackDepth), toY(clearH * 0.95));
     ctx.stroke();
 
-    // Pallet load
-    var loadBot = (lvl - 1) * beamH + 0.3;
-    var loadH = beamH * 0.75;
-    ctx.fillStyle = '#DEB887';
-    ctx.fillRect(toX(rackX + 0.3), toY(loadBot + loadH), (rackDepth - 0.6) * (toX(1) - toX(0)), loadH * (toY(0) - toY(1)));
-    ctx.strokeStyle = '#C8A882';
-    ctx.lineWidth = 0.5;
-    ctx.strokeRect(toX(rackX + 0.3), toY(loadBot + loadH), (rackDepth - 0.6) * (toX(1) - toX(0)), loadH * (toY(0) - toY(1)));
+    // X-bracing on both bays (diagonal cross pattern)
+    ctx.strokeStyle = '#7777cc';
+    ctx.lineWidth = 0.6;
+    for (var lvl = 1; lvl <= rackLevels; lvl++) {
+      var bTop = lvl * beamH;
+      var bBot = (lvl - 1) * beamH;
+      // Left bay X
+      ctx.beginPath();
+      ctx.moveTo(toX(rackX), toY(bBot)); ctx.lineTo(toX(rackX + halfD), toY(bTop));
+      ctx.moveTo(toX(rackX + halfD), toY(bBot)); ctx.lineTo(toX(rackX), toY(bTop));
+      ctx.stroke();
+      // Right bay X
+      ctx.beginPath();
+      ctx.moveTo(toX(rackX + halfD), toY(bBot)); ctx.lineTo(toX(rackX + rackDepth), toY(bTop));
+      ctx.moveTo(toX(rackX + rackDepth), toY(bBot)); ctx.lineTo(toX(rackX + halfD), toY(bTop));
+      ctx.stroke();
+    }
+
+    // Beams and pallets per level on both bays
+    for (var lvl = 1; lvl <= rackLevels; lvl++) {
+      var beamY = lvl * beamH;
+      ctx.strokeStyle = '#ff8800';
+      ctx.lineWidth = 1.5;
+      // Left bay beam
+      ctx.beginPath();
+      ctx.moveTo(toX(rackX), toY(beamY)); ctx.lineTo(toX(rackX + halfD), toY(beamY));
+      ctx.stroke();
+      // Right bay beam
+      ctx.beginPath();
+      ctx.moveTo(toX(rackX + halfD), toY(beamY)); ctx.lineTo(toX(rackX + rackDepth), toY(beamY));
+      ctx.stroke();
+
+      // Pallet loads in both bays
+      var loadBot = (lvl - 1) * beamH + 0.3;
+      var loadH = beamH * 0.75;
+      // Left bay pallet
+      ctx.fillStyle = '#DEB887';
+      ctx.fillRect(toX(rackX + 0.3), toY(loadBot + loadH), (halfD - 0.6) * unitPx, loadH * unitPy);
+      ctx.strokeStyle = '#C8A882';
+      ctx.lineWidth = 0.5;
+      ctx.strokeRect(toX(rackX + 0.3), toY(loadBot + loadH), (halfD - 0.6) * unitPx, loadH * unitPy);
+      // Right bay pallet
+      ctx.fillStyle = '#DEB887';
+      ctx.fillRect(toX(rackX + halfD + 0.3), toY(loadBot + loadH), (halfD - 0.6) * unitPx, loadH * unitPy);
+      ctx.strokeStyle = '#C8A882';
+      ctx.lineWidth = 0.5;
+      ctx.strokeRect(toX(rackX + halfD + 0.3), toY(loadBot + loadH), (halfD - 0.6) * unitPx, loadH * unitPy);
+    }
+  } else {
+    // Single-deep: standard rack with 2 uprights
+    ctx.strokeStyle = '#4444cc';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(toX(rackX), toY(0)); ctx.lineTo(toX(rackX), toY(clearH * 0.95));
+    ctx.moveTo(toX(rackX + rackDepth), toY(0)); ctx.lineTo(toX(rackX + rackDepth), toY(clearH * 0.95));
+    ctx.stroke();
+
+    // X-bracing
+    ctx.strokeStyle = '#7777cc';
+    ctx.lineWidth = 0.6;
+    for (var lvl = 1; lvl <= rackLevels; lvl++) {
+      var bTop = lvl * beamH;
+      var bBot = (lvl - 1) * beamH;
+      ctx.beginPath();
+      ctx.moveTo(toX(rackX), toY(bBot)); ctx.lineTo(toX(rackX + rackDepth), toY(bTop));
+      ctx.moveTo(toX(rackX + rackDepth), toY(bBot)); ctx.lineTo(toX(rackX), toY(bTop));
+      ctx.stroke();
+    }
+
+    // Beams and pallets per level
+    for (var lvl = 1; lvl <= rackLevels; lvl++) {
+      var beamY = lvl * beamH;
+      ctx.strokeStyle = '#ff8800';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(toX(rackX), toY(beamY));
+      ctx.lineTo(toX(rackX + rackDepth), toY(beamY));
+      ctx.stroke();
+
+      var loadBot = (lvl - 1) * beamH + 0.3;
+      var loadH = beamH * 0.75;
+      ctx.fillStyle = '#DEB887';
+      ctx.fillRect(toX(rackX + 0.3), toY(loadBot + loadH), (rackDepth - 0.6) * unitPx, loadH * unitPy);
+      ctx.strokeStyle = '#C8A882';
+      ctx.lineWidth = 0.5;
+      ctx.strokeRect(toX(rackX + 0.3), toY(loadBot + loadH), (rackDepth - 0.6) * unitPx, loadH * unitPy);
+    }
   }
 }
 

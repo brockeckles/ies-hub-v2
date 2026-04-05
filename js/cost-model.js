@@ -1191,12 +1191,16 @@ const cmApp = {
         const el = document.getElementById('sqftSuggestion');
         if (!el || (pallets === 0 && orders === 0)) { if (el) el.style.display = 'none'; return; }
 
-        // Heuristic: avg on-hand pallets * 40 sqft + pick slots + staging + office
-        const avgOnHand = pallets / 12; // rough monthly turns
-        const skuSlots = Math.max(500, eaches / 200);
-        const palletArea = avgOnHand * 40;
-        const pickArea = skuSlots * 1.5;
-        const supportArea = (palletArea + pickArea) * 0.20; // 20% for staging, dock, office
+        // Heuristic: estimate facility SF from annual throughput volumes
+        // Assume ~18 inventory turns/yr (moderate velocity DC)
+        const avgOnHand = pallets / 18;
+        // ~20 SF per pallet position (includes aisle allocation, 6-level rack)
+        const palletArea = avgOnHand * 20;
+        // Pick area: ~5 SF per SKU slot (carton flow / pick module)
+        const skuSlots = eaches > 0 ? Math.max(200, eaches / 500) : 0;
+        const pickArea = skuSlots * 5;
+        // Support: staging (15%), dock (5%), office (5%) = 25% uplift
+        const supportArea = (palletArea + pickArea) * 0.25;
         const suggested = Math.round((palletArea + pickArea + supportArea) / 1000) * 1000;
         if (suggested > 5000) {
             el.textContent = '\u2192 Suggested: ~' + suggested.toLocaleString() + ' sqft based on volume inputs';
