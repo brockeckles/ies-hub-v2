@@ -1977,7 +1977,7 @@ function calcWarehouse() { try {
   // Levels = floor(usable height / tier height)
   var tierHeightIn = loadHeightIn + 10;
   var usableHeightIn = (clearHeightFt * 12) - sprinklerClearanceIn;
-  var rackLevels = Math.max(2, Math.floor(usableHeightIn / tierHeightIn));
+  var rackLevels = Math.min(7, Math.max(2, Math.floor(usableHeightIn / tierHeightIn)));
 
   // FIX 3: Display max stacking height (clear height minus sprinkler clearance)
   var maxStackHeightFt = (clearHeightFt * 12 - sprinklerClearanceIn) / 12;
@@ -1998,6 +1998,13 @@ function calcWarehouse() { try {
   var mixTotal = Math.round((pctFullPal + pctCtnPal + pctCtnShelv) * 100);
   var mixEl = document.getElementById('wsc-mix-total');
   if (mixEl) { mixEl.textContent = '(' + mixTotal + '%)'; mixEl.style.color = mixTotal === 100 ? 'var(--ies-blue)' : '#ef4444'; }
+  // Normalize mix percentages if they don't sum to 100%
+  if (mixTotal > 0 && mixTotal !== 100) {
+    var scale = 1 / (pctFullPal + pctCtnPal + pctCtnShelv);
+    pctFullPal *= scale;
+    pctCtnPal *= scale;
+    pctCtnShelv *= scale;
+  }
   document.getElementById('wsc-office-val').textContent = Math.round(officePct * 100) + '%';
 
   // ── INVENTORY → POSITIONS (unit-based model) ──
@@ -2244,9 +2251,9 @@ function calcWarehouse() { try {
   // ── TOTAL FACILITY ──
   var totalSqFt = warehouseOpSF + officeSF;
 
-  // Avg utilization: avg inventory vs designed capacity
-  // Utilization: avg vs peak (scaled by ratio)
-  var utilPct = grossPositions > 0 ? Math.min(100, Math.round(peakToAvgRatio * 100)) : 0;
+  // Avg utilization: avg inventory positions vs designed capacity (before surge)
+  var avgPositions = Math.ceil((avgUnits * pctFullPal / unitsPerPallet) + (avgUnits * pctCtnPal / unitsPerCartonPal / cartonsPerPallet) + (avgUnits * pctCtnShelv / unitsPerCartonShelv / cartonsPerLocation));
+  var utilPct = designedPositions > 0 ? Math.min(100, Math.round((avgPositions / designedPositions) * 100)) : 0;
 
   // SF per pallet position (total facility)
   var sfPerPos = grossPositions > 0 ? fmtNum(totalSqFt / grossPositions, 1) : '—';
@@ -2336,7 +2343,7 @@ function calcWarehouse() { try {
   detailSummary += fullPalPositions.toLocaleString() + ' full pallet pos (' + Math.round(pctFullPal*100) + '%) + ';
   detailSummary += ctnPalPositions.toLocaleString() + ' carton pallet pos (' + Math.round(pctCtnPal*100) + '%) + ';
   detailSummary += shelvPositions.toLocaleString() + ' shelving loc (' + Math.round(pctCtnShelv*100) + '%)';
-  detailSummary += ' \u00b7 ' + hcBufPct + '% honeycomb \u00b7 <strong>' + grossPositions.toLocaleString() + ' gross positions</strong>';
+  detailSummary += ' \u00b7 ' + hcBufPct + '% honeycomb + ' + surgeBufPct + '% surge \u00b7 <strong>' + grossPositions.toLocaleString() + ' gross positions</strong>';
   detailSummary += ' \u00b7 ' + sfPerPos + ' sf/position</span>';
   document.getElementById('wsc-storage-detail').innerHTML = storageDetailHtml + detailSummary;
 
@@ -2415,7 +2422,11 @@ function calcWarehouse() { try {
   // Trigger auto-save if a scenario is loaded
   wscMarkChanged();
   return p;
-} catch(err) { console.error('calcWarehouse error:', err); } }
+} catch(err) {
+  console.error('calcWarehouse error:', err);
+  var errEl = document.getElementById('wsc-storage-detail');
+  if (errEl) errEl.innerHTML = '<div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;padding:16px;color:#991b1b;font-size:13px;"><strong>Calculation Error:</strong> ' + (err.message || 'Unknown error') + '. Check your inputs and try again.</div>';
+} }
 
 function syncCalcPanelHeight() {
   var panel = document.getElementById('wsc-input-panel');
