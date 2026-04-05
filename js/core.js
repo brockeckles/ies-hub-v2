@@ -155,9 +155,13 @@ async function loadMarketPins() {
 }
 
 // ── UNSAVED CHANGES TRACKING ──
-var _unsavedChanges = { dirty: false, toolName: '', onSave: null };
+var _unsavedChanges = { dirty: false, toolName: '', onSave: null, enabled: false };
+
+// Enable dirty tracking only after page fully loads (prevents init triggers)
+window.addEventListener('load', function() { setTimeout(function() { _unsavedChanges.enabled = true; }, 2000); });
 
 function markDirty(toolName, onSaveFn) {
+  if (!_unsavedChanges.enabled) return;
   _unsavedChanges.dirty = true;
   _unsavedChanges.toolName = toolName || 'this tool';
   _unsavedChanges.onSave = onSaveFn || null;
