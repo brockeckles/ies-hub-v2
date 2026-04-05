@@ -107,7 +107,8 @@ function renderLayout(p) {
   var topDH = twoDock ? dockH : 0;
   var topSH = twoDock ? recvStH : 0;
   var botDY = bY+bD-dockH;
-  var botSY = twoDock ? botDY-shipStH : botDY-Math.max(recvStH, shipStH);
+  var dockStagingGap = 6;
+  var botSY = twoDock ? botDY-shipStH-dockStagingGap : botDY-Math.max(recvStH, shipStH)-dockStagingGap;
 
   // ── OFFICE (top-right corner, sized from actual officeSF) ──
   // Estimate storage zone height for capping office depth
@@ -427,8 +428,8 @@ function renderLayout(p) {
       s += '<rect x="'+dx+'" y="'+dy+'" width="'+dW+'" height="4" fill="'+(isIn?C.door.inb:C.door.outb)+'" rx="1"/>';
       if (dW > 5) s += '<text x="'+(dx+dW/2)+'" y="'+(wy+wh/2+2)+'" text-anchor="middle" fill="'+C.dock.text+'" font-size="'+F.door+'" font-family="Montserrat,sans-serif" font-weight="600">'+(isIn?'IN':'OUT')+'</text>';
     }
-    // Place label INSIDE the dock rect (left-aligned) to avoid overlapping staging text
-    s += '<text x="'+(bX+6)+'" y="'+(wy+wh/2+2)+'" text-anchor="start" fill="'+C.dock.text+'" font-size="'+F.detail+'" font-family="Montserrat,sans-serif" font-weight="600" data-zone-label="'+dockZone+'">'+lbl+'</text>';
+    // Place label below the dock rect (left-aligned, outside the zone)
+    s += '<text x="'+(bX+3)+'" y="'+(wy+wh+10)+'" text-anchor="start" fill="'+C.dock.text+'" font-size="'+F.detail+'" font-family="Montserrat,sans-serif" font-weight="600" data-zone-label="'+dockZone+'">'+lbl+'</text>';
   }
 
   if (twoDock) {
@@ -3339,7 +3340,7 @@ function renderElevationView(p) {
   if (storageW < 50) storageW = 50;
 
   // Drawing area
-  var padL = 60, padR = 100, padT = 40, padB = 75;
+  var padL = 60, padR = 100, padT = 40, padB = 110;
   var drawW = W - padL - padR;
   var drawH = H - padT - padB;
 
@@ -3529,6 +3530,13 @@ function renderElevationView(p) {
       var rackX = storageStart + ri * rackSpacing;
       _elevDrawRack(ctx, toX, toY, rackX, rackDepth, rackLevels, beamH, clearH, storeType);
     }
+    // Double-deep indicator label
+    if (storeType === 'double') {
+      ctx.fillStyle = '#cc4444';
+      ctx.font = 'bold 9px system-ui';
+      ctx.textAlign = 'center';
+      ctx.fillText('Double-Deep (back-to-back)', toX(storageStart + storageW / 2), toY(clearH * 0.95) - 6);
+    }
   }
 
   cursor = storageEnd;
@@ -3565,31 +3573,16 @@ function renderElevationView(p) {
   ctx.lineTo(toX(bldgW), toY(clearH + 3));
   ctx.stroke();
 
-  // ── EXTERIOR GRADE LEVEL (4 feet below building floor) ──
-  ctx.fillStyle = '#c8c8c8';
-  ctx.fillRect(toX(bldgW), toY(exteriorGrade), (dockDepth + 10) * scaleX, 4 * scaleY);
-  ctx.strokeStyle = '#999';
-  ctx.lineWidth = 0.5;
-  ctx.strokeRect(toX(bldgW), toY(exteriorGrade), (dockDepth + 10) * scaleX, 4 * scaleY);
-
-  // ── STEP-DOWN from building floor to exterior grade ──
-  ctx.strokeStyle = '#666';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(toX(bldgW), toY(0));
-  ctx.lineTo(toX(bldgW), toY(exteriorGrade));
-  ctx.stroke();
-
-  // ── Dock area with truck trailer profile (OUTSIDE building) ──
+  // ── Dock area (simple platform edge outside building) ──
   var dockStart = bldgW;
   var dockEnd = dockStart + dockDepth;
 
-  // Dock platform: from exterior grade (Y=-4) to building floor (Y=0)
+  // Small dock platform lip (subtle, not large gray blocks)
   ctx.fillStyle = '#d0d0d0';
-  ctx.fillRect(toX(dockStart), toY(0), dockDepth * scaleX, 4 * scaleY);
+  ctx.fillRect(toX(dockStart), toY(0), 8 * scaleX, 4 * scaleY);
   ctx.strokeStyle = '#999';
-  ctx.lineWidth = 1;
-  ctx.strokeRect(toX(dockStart), toY(0), dockDepth * scaleX, 4 * scaleY);
+  ctx.lineWidth = 0.5;
+  ctx.strokeRect(toX(dockStart), toY(0), 8 * scaleX, 4 * scaleY);
 
   // ── RIGHT-SIDE BUILDING DIMENSIONS (stacked outward from building edge) ──
   var roofPeak = 4;
@@ -3646,13 +3639,18 @@ function renderElevationView(p) {
     // Beam height per level (inside storage, offset from pallet load)
     _elevDimV(ctx, toX(storageStart + rackDepth * 2 + aisleW + 2), toY(0), toY(beamH), beamH.toFixed(1) + "' / level");
   }
+  // Aisle width (between first two racks)
+  if (storeType !== 'bulk') {
+    var aisleStart = storageStart + rackDepth;
+    _elevDimH(ctx, toX(aisleStart), toX(aisleStart + aisleW), toY(0) + 35, aisleW + "' aisle");
+  }
   // Storage zone width
-  _elevDimH(ctx, toX(storageStart), toX(storageEnd), toY(0) + 65, Math.round(storageEnd - storageStart) + "' storage");
+  _elevDimH(ctx, toX(storageStart), toX(storageEnd), toY(0) + 55, Math.round(storageEnd - storageStart) + "' storage");
   // Building width (bottom)
-  _elevDimH(ctx, toX(0), toX(bldgW), toY(0) + 35, 'Building Width: ' + Math.round(bldgW) + ' ft');
+  _elevDimH(ctx, toX(0), toX(bldgW), toY(0) + 75, 'Building Width: ' + Math.round(bldgW) + ' ft');
 
   // ── Legend (horizontal strip below floor line) ──
-  _elevDrawLegend(ctx, W, toY(0) + 85);
+  _elevDrawLegend(ctx, W, toY(0) + 95);
 
   // Store resize handler
   if (!window._wscElevResizeHandler) {
@@ -3674,13 +3672,19 @@ function _elevDrawRack(ctx, toX, toY, rackX, rackDepth, rackLevels, beamH, clear
     // Double-deep: two 4ft bays back-to-back sharing center uprights
     var halfD = rackDepth / 2; // 4ft each side
 
-    // 3 uprights: left, center (back-to-back), right
+    // Outer uprights (left + right)
     ctx.strokeStyle = '#4444cc';
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(toX(rackX), toY(0)); ctx.lineTo(toX(rackX), toY(clearH * 0.95));
-    ctx.moveTo(toX(rackX + halfD), toY(0)); ctx.lineTo(toX(rackX + halfD), toY(clearH * 0.95));
     ctx.moveTo(toX(rackX + rackDepth), toY(0)); ctx.lineTo(toX(rackX + rackDepth), toY(clearH * 0.95));
+    ctx.stroke();
+
+    // Center upright (shared back-to-back) — thicker + distinct color for visibility
+    ctx.strokeStyle = '#cc4444';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(toX(rackX + halfD), toY(0)); ctx.lineTo(toX(rackX + halfD), toY(clearH * 0.95));
     ctx.stroke();
 
     // X-bracing on both bays (diagonal cross pattern)
