@@ -7,26 +7,30 @@
 
 // ── WSC Number Input Formatter ──
 // Formats number inputs with commas on blur, strips on focus
+// Listeners attach once (guarded by dataset.wscFmt), but re-format runs every call
 function wscFormatInputs() {
   var ids = ['wsc-peakunits','wsc-avgunits'];
   ids.forEach(function(id) {
     var inp = document.getElementById(id);
-    if (!inp || inp.dataset.wscFmt) return;
-    inp.dataset.wscFmt = '1';
-    inp.type = 'text';
-    inp.style.fontVariantNumeric = 'tabular-nums';
-    // Format initial value
+    if (!inp) return;
+    // Attach listeners only once
+    if (!inp.dataset.wscFmt) {
+      inp.dataset.wscFmt = '1';
+      inp.type = 'text';
+      inp.style.fontVariantNumeric = 'tabular-nums';
+      inp.addEventListener('focus', function() {
+        var n = parseInt(this.value.replace(/,/g,''), 10);
+        this.value = isNaN(n) ? '' : String(n);
+        this.select();
+      });
+      inp.addEventListener('blur', function() {
+        var n = parseInt(this.value.replace(/,/g,''), 10);
+        if (!isNaN(n)) this.value = n.toLocaleString();
+      });
+    }
+    // Always re-format current value (critical for scenario reload)
     var v = parseInt(inp.value.replace(/,/g,''), 10);
     if (!isNaN(v)) inp.value = v.toLocaleString();
-    inp.addEventListener('focus', function() {
-      var n = parseInt(this.value.replace(/,/g,''), 10);
-      this.value = isNaN(n) ? '' : String(n);
-      this.select();
-    });
-    inp.addEventListener('blur', function() {
-      var n = parseInt(this.value.replace(/,/g,''), 10);
-      if (!isNaN(n)) this.value = n.toLocaleString();
-    });
   });
 }
 
@@ -8019,11 +8023,6 @@ function renderElevationView(p) {
     }
   }
 
-  // Storage label
-  ctx.fillStyle = '#2563eb';
-  ctx.font = '9px system-ui';
-  ctx.textAlign = 'center';
-  ctx.fillText('Storage', toX(storageStart + storageW / 2), toY(0) - 8);
   cursor = storageEnd;
 
   // Sprinkler clearance line
@@ -8083,18 +8082,6 @@ function renderElevationView(p) {
   ctx.strokeStyle = '#999';
   ctx.lineWidth = 1;
   ctx.strokeRect(toX(dockStart), toY(0), dockDepth * scaleX, 4 * scaleY);
-  // "DOCK" label on platform
-  ctx.fillStyle = '#666';
-  ctx.font = 'bold 10px system-ui';
-  ctx.textAlign = 'center';
-  ctx.fillText('DOCK', toX(dockStart + dockDepth / 2), toY(-2) + 3);
-
-  // ── EXTERIOR: Dock label only (no trailer) ──
-  // Dock zone label (below dock)
-  ctx.fillStyle = '#0ea5e9';
-  ctx.font = '9px system-ui';
-  ctx.textAlign = 'center';
-  ctx.fillText('Dock', toX(dockStart + dockDepth / 2), toY(exteriorGrade) - 8);
 
   // ── RIGHT-SIDE BUILDING DIMENSIONS (stacked outward from building edge) ──
   var roofPeak = 4;
