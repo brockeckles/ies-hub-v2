@@ -1236,7 +1236,7 @@ const cmApp = {
             // Pre-fill WSC inputs from CM project data if available
             setTimeout(function() {
                 var pd = cmApp.projectData || {};
-                var clearEl = document.getElementById('wsc-clear-height');
+                var clearEl = document.getElementById('wsc-clearht');
                 if (clearEl && pd.clear_height_ft) clearEl.value = pd.clear_height_ft;
             }, 200);
         }, 100);

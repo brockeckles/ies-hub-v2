@@ -1936,19 +1936,19 @@ function calcWarehouse() { try {
   var unitsPerCartonShelv = parseInt(document.getElementById('wsc-upc-shelv').value) || 6;
   var cartonsPerLocation = parseInt(document.getElementById('wsc-cpl').value) || 4;
 
-  var clearHeightFt = parseInt(document.getElementById('wsc-clearht').value);
-  var loadHeightIn = parseInt(document.getElementById('wsc-loadht').value);
+  var clearHeightFt = parseInt(document.getElementById('wsc-clearht').value) || 36;
+  var loadHeightIn = parseInt(document.getElementById('wsc-loadht').value) || 48;
 
   var storeType = document.getElementById('wsc-storetype').value;
   var aisleType = document.getElementById('wsc-aisletype').value;
-  var bulkDepth = parseInt(document.getElementById('wsc-bulkdp').value);
-  var stackHi = parseInt(document.getElementById('wsc-stackhi').value);
-  var mixRackPct = parseInt(document.getElementById('wsc-mixrack').value) / 100;
+  var bulkDepth = parseInt(document.getElementById('wsc-bulkdp').value) || 4;
+  var stackHi = parseInt(document.getElementById('wsc-stackhi').value) || 3;
+  var mixRackPct = (parseInt(document.getElementById('wsc-mixrack').value) || 70) / 100;
 
-  var inPal = parseInt(document.getElementById('wsc-inpal').value);
-  var outPal = parseInt(document.getElementById('wsc-outpal').value);
-  var pdph = parseInt(document.getElementById('wsc-pdph').value);
-  var dockHrs = parseInt(document.getElementById('wsc-dockhr').value);
+  var inPal = parseInt(document.getElementById('wsc-inpal').value) || 200;
+  var outPal = parseInt(document.getElementById('wsc-outpal').value) || 200;
+  var pdph = parseInt(document.getElementById('wsc-pdph').value) || 20;
+  var dockHrs = parseInt(document.getElementById('wsc-dockhr').value) || 8;
 
   var officePct = parseInt(document.getElementById('wsc-office').value) / 100;
 
@@ -2134,8 +2134,9 @@ function calcWarehouse() { try {
   document.getElementById('wsc-rackhi-val').textContent = rackLevels;
 
   // ── DOCK SIZING ──
-  var inDoors = Math.max(2, Math.ceil(inPal / (pdph * dockHrs)));
-  var outDoors = Math.max(2, Math.ceil(outPal / (pdph * dockHrs)));
+  var dockDivisor = Math.max(1, pdph) * Math.max(1, dockHrs);
+  var inDoors = Math.max(2, Math.ceil(inPal / dockDivisor));
+  var outDoors = Math.max(2, Math.ceil(outPal / dockDivisor));
 
   // FIX 1: Dock sizing formula updated - 700 SF per door (accounts for apron depth)
   // FIX 1: Apply 25% buffer to door count for surge tolerance
@@ -2451,11 +2452,12 @@ function wscCollectInputs() {
         'wsc-peakunits','wsc-avgunits',
         'wsc-pct-fullpal','wsc-pct-ctnpal','wsc-pct-ctnshelv',
         'wsc-upp','wsc-upc-pal','wsc-cpp','wsc-upc-shelv','wsc-cpl',
-        'wsc-hcbuf',
+        'wsc-hcbuf','wsc-surge',
         'wsc-clearht','wsc-loadht',
         'wsc-bulkdp','wsc-stackhi','wsc-mixrack',
         'wsc-inpal','wsc-outpal','wsc-pdph','wsc-dockhr','wsc-office',
-        'wsc-fwd-skus','wsc-fwd-days','wsc-ob-units','wsc-op-days'
+        'wsc-fwd-skus','wsc-fwd-days','wsc-ob-units','wsc-op-days',
+        'wsc-fwd-pct','wsc-dock-wall'
     ];
 
     // Map from HTML ID to DB column name
@@ -2464,12 +2466,13 @@ function wscCollectInputs() {
         'wsc-pct-fullpal': 'pct_full_pallet', 'wsc-pct-ctnpal': 'pct_carton_pallet', 'wsc-pct-ctnshelv': 'pct_carton_shelving',
         'wsc-upp': 'units_per_pallet', 'wsc-upc-pal': 'units_per_carton_pal', 'wsc-cpp': 'cartons_per_pallet',
         'wsc-upc-shelv': 'units_per_carton_shelv', 'wsc-cpl': 'cartons_per_level',
-        'wsc-hcbuf': 'headcount_buffer',
+        'wsc-hcbuf': 'headcount_buffer', 'wsc-surge': 'surge_buffer_pct',
         'wsc-clearht': 'clear_height', 'wsc-loadht': 'load_height',
         'wsc-bulkdp': 'bulk_deep', 'wsc-stackhi': 'stack_high', 'wsc-mixrack': 'mix_rack',
         'wsc-inpal': 'inbound_pallets', 'wsc-outpal': 'outbound_pallets', 'wsc-pdph': 'pallets_per_dock_per_hour',
         'wsc-dockhr': 'dock_hours', 'wsc-office': 'office_pct',
-        'wsc-fwd-skus': 'fwd_pick_skus', 'wsc-fwd-days': 'fwd_pick_days', 'wsc-ob-units': 'outbound_units', 'wsc-op-days': 'operating_days'
+        'wsc-fwd-skus': 'fwd_pick_skus', 'wsc-fwd-days': 'fwd_pick_days', 'wsc-ob-units': 'outbound_units', 'wsc-op-days': 'operating_days',
+        'wsc-fwd-pct': 'fwd_pick_pct', 'wsc-dock-wall': 'dock_wall_length'
     };
 
     for (var i = 0; i < numInputIds.length; i++) {
@@ -2483,10 +2486,10 @@ function wscCollectInputs() {
     }
 
     // Dropdowns
-    var dropdownIds = ['wsc-storetype','wsc-aisletype','wsc-rackdir','wsc-dockconfig','wsc-fwd-type'];
+    var dropdownIds = ['wsc-storetype','wsc-aisletype','wsc-rackdir','wsc-dockconfig','wsc-fwd-type','wsc-sprinkler'];
     var dropdownToColumn = {
         'wsc-storetype': 'storage_type', 'wsc-aisletype': 'aisle_type', 'wsc-rackdir': 'rack_direction',
-        'wsc-dockconfig': 'dock_config', 'wsc-fwd-type': 'fwd_pick_type'
+        'wsc-dockconfig': 'dock_config', 'wsc-fwd-type': 'fwd_pick_type', 'wsc-sprinkler': 'sprinkler_clearance_mode'
     };
 
     for (var j = 0; j < dropdownIds.length; j++) {
@@ -2534,7 +2537,7 @@ function wscCollectInputs() {
     var positionsEl = document.getElementById('wsc-r-positions');
     var docksEl = document.getElementById('wsc-r-docks');
 
-    data.result_total_sqft = totalSfEl ? parseFloat(totalSfEl.textContent.replace(/[^0-9.]/g, '')) || 0 : 0;
+    data.facility_sqft = totalSfEl ? parseFloat(totalSfEl.textContent.replace(/[^0-9.]/g, '')) || 0 : 0;
     data.result_positions = positionsEl ? parseFloat(positionsEl.textContent.replace(/[^0-9.]/g, '')) || 0 : 0;
     data.result_dock_doors = docksEl ? parseFloat(docksEl.textContent.replace(/[^0-9.]/g, '')) || 0 : 0;
 
@@ -2551,12 +2554,14 @@ function wscApplyInputs(data) {
         'pct_full_pallet': 'wsc-pct-fullpal', 'pct_carton_pallet': 'wsc-pct-ctnpal', 'pct_carton_shelving': 'wsc-pct-ctnshelv',
         'units_per_pallet': 'wsc-upp', 'units_per_carton_pal': 'wsc-upc-pal', 'cartons_per_pallet': 'wsc-cpp',
         'units_per_carton_shelv': 'wsc-upc-shelv', 'cartons_per_level': 'wsc-cpl',
-        'headcount_buffer': 'wsc-hcbuf',
+        'headcount_buffer': 'wsc-hcbuf', 'surge_buffer_pct': 'wsc-surge',
         'clear_height': 'wsc-clearht', 'load_height': 'wsc-loadht',
         'bulk_deep': 'wsc-bulkdp', 'stack_high': 'wsc-stackhi', 'mix_rack': 'wsc-mixrack',
         'inbound_pallets': 'wsc-inpal', 'outbound_pallets': 'wsc-outpal', 'pallets_per_dock_per_hour': 'wsc-pdph',
         'dock_hours': 'wsc-dockhr', 'office_pct': 'wsc-office',
         'fwd_pick_skus': 'wsc-fwd-skus', 'fwd_pick_days': 'wsc-fwd-days', 'outbound_units': 'wsc-ob-units', 'operating_days': 'wsc-op-days',
+        'fwd_pick_pct': 'wsc-fwd-pct', 'dock_wall_length': 'wsc-dock-wall',
+        'sprinkler_clearance_mode': 'wsc-sprinkler',
         'storage_type': 'wsc-storetype', 'aisle_type': 'wsc-aisletype', 'rack_direction': 'wsc-rackdir',
         'dock_config': 'wsc-dockconfig', 'fwd_pick_type': 'wsc-fwd-type',
         'has_forward_pick': 'wsc-fwd', 'has_vas': 'wsc-vas', 'has_returns': 'wsc-ret',
@@ -2627,11 +2632,9 @@ async function wscSaveScenario(projectId, scenarioName) {
             is_active: true,
             ...inputs
         };
-        // Recalculate to refresh _lastWscParams, then read from the global
+        // facility_sqft already captured by wscCollectInputs() from DOM
+        // Recalculate just in case DOM is stale
         try { calcWarehouse(); } catch(e) {}
-        if (window._lastWscParams && window._lastWscParams.totalSF) {
-            payload.facility_sqft = Math.round(window._lastWscParams.totalSF);
-        }
         if (projectId) payload.project_id = projectId;
 
         var resp = await cmApiPost('warehouse_sizing_scenarios', payload);
