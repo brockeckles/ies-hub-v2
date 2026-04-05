@@ -145,7 +145,7 @@ function netoptImportFromCOG() {
 
     // Get COG demand points
     if (!window.netDemandPoints || netDemandPoints.length === 0) {
-        if (statusEl) { statusEl.textContent = 'No COG demand data found. Please run the Center of Gravity tool first.'; statusEl.style.color = '#dc2626'; }
+        if (statusEl) { statusEl.textContent = 'No COG demand data found. Please run the Center of Gravity tool first.'; statusEl.style.color = 'var(--ies-red)'; }
         return;
     }
 
@@ -159,7 +159,7 @@ function netoptImportFromCOG() {
     }
 
     if (geoPoints.length < 1) {
-        if (statusEl) { statusEl.textContent = 'No geocodable demand points found in COG tool.'; statusEl.style.color = '#dc2626'; }
+        if (statusEl) { statusEl.textContent = 'No geocodable demand points found in COG tool.'; statusEl.style.color = 'var(--ies-red)'; }
         return;
     }
 
@@ -248,7 +248,7 @@ function netoptImportFromCOG() {
     // Mark COG-sourced facilities in the table
     if (statusEl) {
         statusEl.textContent = 'Imported ' + clusters.length + ' COG-optimized locations + ' + (facilities.length - clusters.length) + ' nearby candidates, and ' + demands.length + ' demand points. Switch to Facilities tab to review.';
-        statusEl.style.color = '#059669';
+        statusEl.style.color = 'var(--ies-green)';
     }
 
     // Auto-switch to facilities tab after a brief delay

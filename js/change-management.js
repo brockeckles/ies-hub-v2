@@ -424,7 +424,7 @@ async function cmRenderActivities(init) {
 
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'cm-btn cm-btn-small cm-btn-secondary';
-    deleteBtn.style.cssText = 'margin-top: 0.75rem; background: rgba(239, 68, 68, 0.1); color: #dc2626; width: 100%;';
+    deleteBtn.style.cssText = 'margin-top: 0.75rem; background: rgba(220, 53, 69, 0.1); color: var(--ies-red); width: 100%;';
     deleteBtn.textContent = 'Delete';
     deleteBtn.onclick = () => cmDeleteActivity(act.id).then(() => cmRenderActivities(init)).catch(function(e){ console.error('Failed to delete activity:', e); });
 
@@ -533,8 +533,8 @@ function cmRenderFlowcharts(init) {
 
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'cm-btn cm-btn-small cm-btn-secondary';
-    deleteBtn.style.background = 'rgba(239, 68, 68, 0.1)';
-    deleteBtn.style.color = '#dc2626';
+    deleteBtn.style.background = 'rgba(220, 53, 69, 0.1)';
+    deleteBtn.style.color = 'var(--ies-red)';
     deleteBtn.textContent = 'Delete';
     deleteBtn.onclick = (e) => {
       e.stopPropagation();

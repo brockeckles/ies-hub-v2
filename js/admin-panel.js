@@ -411,7 +411,7 @@ async function showAdminFormModal(table, rowId) {
             latEl.value = parseFloat(data[0].lat).toFixed(4);
             lngEl.value = parseFloat(data[0].lon).toFixed(4);
             geocodeStatus.innerHTML = '&#10003; Coordinates found: ' + latEl.value + ', ' + lngEl.value;
-            geocodeStatus.style.color = '#059669';
+            geocodeStatus.style.color = 'var(--ies-green)';
           } else {
             geocodeStatus.textContent = 'Could not find coordinates — enter manually';
             geocodeStatus.style.color = 'var(--ies-orange)';

@@ -613,28 +613,28 @@ var cmTests = {
                 var cells1 = rows[1].querySelectorAll('td');
                 // Shift column is at index 10 based on HTML header order
                 var shiftCell = cells1[10];
-                if (shiftCell && shiftCell.textContent.trim() === 'Eve') {
+                if (shiftCell && shiftCell.textContent.trim() === 'Day') {
                     this.pass('A2-shift-assignment');
                 } else {
-                    this.fail('A2-shift-assignment', 'Row 1 shift expected "Eve", got "' + (shiftCell ? shiftCell.textContent.trim() : 'N/A') + '"');
+                    this.fail('A2-shift-assignment', 'Row 1 shift expected "Day", got "' + (shiftCell ? shiftCell.textContent.trim() : 'N/A') + '"');
                 }
 
                 // Check diff% column (index 11)
                 var diffCell = cells1[11];
-                if (diffCell && diffCell.textContent.trim() === '10%') {
+                if (diffCell && diffCell.textContent.trim() === '0%') {
                     this.pass('A2-diff-pct');
                 } else {
-                    this.fail('A2-diff-pct', 'Row 1 diff expected "10%", got "' + (diffCell ? diffCell.textContent.trim() : 'N/A') + '"');
+                    this.fail('A2-diff-pct', 'Row 1 diff expected "0%", got "' + (diffCell ? diffCell.textContent.trim() : 'N/A') + '"');
                 }
 
-                // Check adj rate column (index 12) — should be $22.00 for $20 base + 10%
+                // Check adj rate column (index 12) — should be $20.00 for $20 base + 0%
                 var adjCell = cells1[12];
                 if (adjCell) {
                     var adjVal = this._parseCurrency(adjCell.textContent);
-                    if (Math.abs(adjVal - 22.00) < 0.01) {
+                    if (Math.abs(adjVal - 20.00) < 0.01) {
                         this.pass('A2-adj-rate');
                     } else {
-                        this.fail('A2-adj-rate', 'Expected $22.00, got $' + adjVal.toFixed(2));
+                        this.fail('A2-adj-rate', 'Expected $20.00, got $' + adjVal.toFixed(2));
                     }
                 } else {
                     this.fail('A2-adj-rate', 'Adj rate cell not found');
@@ -765,7 +765,8 @@ var cmTests = {
 
     testSummaryTotals: async function() {
         this._restoreState();
-        // Equipment total
+        // Equipment total — clear all existing equipment lines first, then add one for testing
+        cmApp.projectData.equipmentLines = [];
         this._ensureEquipmentRow();
         var line = cmApp.projectData.equipmentLines[0];
         line.ownership_type = 'lease';

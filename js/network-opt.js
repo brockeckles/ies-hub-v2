@@ -5,6 +5,31 @@
 // Extracted from index.html
 // ============================================================================
 
+// ── WSC Number Input Formatter ──
+// Formats number inputs with commas on blur, strips on focus
+function wscFormatInputs() {
+  var ids = ['wsc-peakunits','wsc-avgunits','wsc-inpal','wsc-outpal'];
+  ids.forEach(function(id) {
+    var inp = document.getElementById(id);
+    if (!inp || inp.dataset.wscFmt) return;
+    inp.dataset.wscFmt = '1';
+    inp.type = 'text';
+    inp.style.fontVariantNumeric = 'tabular-nums';
+    // Format initial value
+    var v = parseInt(inp.value.replace(/,/g,''), 10);
+    if (!isNaN(v)) inp.value = v.toLocaleString();
+    inp.addEventListener('focus', function() {
+      var n = parseInt(this.value.replace(/,/g,''), 10);
+      this.value = isNaN(n) ? '' : String(n);
+      this.select();
+    });
+    inp.addEventListener('blur', function() {
+      var n = parseInt(this.value.replace(/,/g,''), 10);
+      if (!isNaN(n)) this.value = n.toLocaleString();
+    });
+  });
+}
+
 // ═══════════════════════════════════════════════════════════════
 // CENTER OF GRAVITY / NETWORK OPTIMIZATION TOOL
 // ═══════════════════════════════════════════════════════════════
@@ -1461,7 +1486,7 @@ function toggleLayoutMode() {
 
   if (wscManualMode) {
     knob.style.left = '18px';
-    knob.style.background = '#3b82f6';
+    knob.style.background = 'var(--ies-blue)';
     if (comparePanel) comparePanel.style.display = 'block';
     captureAutoPositions();
     enableManualHandlers();
@@ -1914,15 +1939,15 @@ function exportCalculatorSummary() {
   if (navigator.clipboard) {
     navigator.clipboard.writeText(text).then(function() {
       var btn = document.querySelector('.wsc-action-btn[onclick*="export"]');
-      if (btn) { var orig = btn.innerHTML; btn.innerHTML = '<svg width="13" height="13" fill="none" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Copied!'; btn.style.color='#10b981'; btn.style.borderColor='#10b981'; setTimeout(function() { btn.innerHTML = orig; btn.style.color=''; btn.style.borderColor=''; }, 2000); }
+      if (btn) { var orig = btn.innerHTML; btn.innerHTML = '<svg width="13" height="13" fill="none" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Copied!'; btn.style.color='var(--ies-green)'; btn.style.borderColor='var(--ies-green)'; setTimeout(function() { btn.innerHTML = orig; btn.style.color=''; btn.style.borderColor=''; }, 2000); }
     }).catch(function(e){ console.error('Clipboard write failed:', e); });
   }
 }
 
 function calcWarehouse() { try {
   // ── READ INPUTS ──
-  var peakUnits = parseInt(document.getElementById('wsc-peakunits').value, 10) || 500000;
-  var avgUnits = parseInt(document.getElementById('wsc-avgunits').value, 10) || 350000;
+  var peakUnits = parseInt(document.getElementById('wsc-peakunits').value.replace(/,/g,''), 10) || 500000;
+  var avgUnits = parseInt(document.getElementById('wsc-avgunits').value.replace(/,/g,''), 10) || 350000;
 
   // Storage mix percentages
   var pctFullPal = (parseInt(document.getElementById('wsc-pct-fullpal').value, 10) || 0) / 100;
@@ -1945,8 +1970,8 @@ function calcWarehouse() { try {
   var stackHi = parseInt(document.getElementById('wsc-stackhi').value, 10) || 3;
   var mixRackPct = (parseInt(document.getElementById('wsc-mixrack').value, 10) || 70) / 100;
 
-  var inPal = parseInt(document.getElementById('wsc-inpal').value, 10) || 200;
-  var outPal = parseInt(document.getElementById('wsc-outpal').value, 10) || 200;
+  var inPal = parseInt(document.getElementById('wsc-inpal').value.replace(/,/g,''), 10) || 200;
+  var outPal = parseInt(document.getElementById('wsc-outpal').value.replace(/,/g,''), 10) || 200;
   var pdph = parseInt(document.getElementById('wsc-pdph').value, 10) || 20;
   var dockHrs = parseInt(document.getElementById('wsc-dockhr').value, 10) || 8;
 
@@ -1997,7 +2022,7 @@ function calcWarehouse() { try {
   // Storage mix total indicator
   var mixTotal = Math.round((pctFullPal + pctCtnPal + pctCtnShelv) * 100);
   var mixEl = document.getElementById('wsc-mix-total');
-  if (mixEl) { mixEl.textContent = '(' + mixTotal + '%)'; mixEl.style.color = mixTotal === 100 ? 'var(--ies-blue)' : '#ef4444'; }
+  if (mixEl) { mixEl.textContent = '(' + mixTotal + '%)'; mixEl.style.color = mixTotal === 100 ? 'var(--ies-blue)' : 'var(--ies-red)'; }
   // Normalize mix percentages if they don't sum to 100%
   if (mixTotal > 0 && mixTotal !== 100) {
     var scale = 1 / (pctFullPal + pctCtnPal + pctCtnShelv);
@@ -2421,6 +2446,7 @@ function calcWarehouse() { try {
   syncCalcPanelHeight();
 
   // Trigger auto-save if a scenario is loaded
+  wscFormatInputs();
   wscMarkChanged();
   return p;
 } catch(err) {
@@ -2491,7 +2517,7 @@ function wscCollectInputs() {
         var id = numInputIds[i];
         var el = document.getElementById(id);
         if (el) {
-            var val = parseFloat(el.value) || 0;
+            var val = parseFloat(el.value.replace(/,/g,'')) || 0;
             var colName = idToColumn[id] || id.replace('wsc-', '').replace(/-/g, '_');
             data[colName] = val;
         }
@@ -2626,6 +2652,7 @@ function wscApplyInputs(data) {
     toggleFwdPick();
     toggleOptInputs();
     calcWarehouse();
+    wscFormatInputs();
 }
 
 // Save current WSC state to Supabase
@@ -3280,7 +3307,7 @@ async function netoptFetchFreightRates() {
     if (el && datContract && datContract.wow_change != null) {
       var chg = parseFloat(datContract.wow_change);
       el.textContent = (chg >= 0 ? '▲' : '▼') + ' ' + fmtNum(Math.abs(chg), 1) + '% WoW';
-      el.style.color = chg >= 0 ? '#059669' : '#dc2626';
+      el.style.color = chg >= 0 ? 'var(--ies-green)' : 'var(--ies-red)';
     }
 
     el = document.getElementById('netopt-rate-dat-spot');
@@ -3289,7 +3316,7 @@ async function netoptFetchFreightRates() {
     if (el && datSpot && datSpot.wow_change != null) {
       var chg2 = parseFloat(datSpot.wow_change);
       el.textContent = (chg2 >= 0 ? '▲' : '▼') + ' ' + fmtNum(Math.abs(chg2), 1) + '% WoW';
-      el.style.color = chg2 >= 0 ? '#059669' : '#dc2626';
+      el.style.color = chg2 >= 0 ? 'var(--ies-green)' : 'var(--ies-red)';
     }
 
     el = document.getElementById('netopt-rate-diesel');
@@ -3298,7 +3325,7 @@ async function netoptFetchFreightRates() {
     if (el && diesel && diesel.week_over_week_change != null) {
       var chg3 = parseFloat(diesel.week_over_week_change);
       el.textContent = (chg3 >= 0 ? '▲' : '▼') + ' ' + fmtNum(Math.abs(chg3), 3, '$') + ' WoW';
-      el.style.color = chg3 >= 0 ? '#dc2626' : '#059669'; // Red = higher fuel cost
+      el.style.color = chg3 >= 0 ? 'var(--ies-red)' : 'var(--ies-green)'; // Red = higher fuel cost
     }
 
     el = document.getElementById('netopt-rate-fsc');
@@ -3308,7 +3335,7 @@ async function netoptFetchFreightRates() {
     if (freshEl && netoptMarketRates.lastUpdated) {
       var d = new Date(netoptMarketRates.lastUpdated);
       freshEl.textContent = 'Updated ' + d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-      freshEl.style.color = '#059669';
+      freshEl.style.color = 'var(--ies-green)';
     }
 
     // Auto-populate rate fields if in market mode
@@ -3318,7 +3345,7 @@ async function netoptFetchFreightRates() {
 
   } catch(err) {
     console.error('Failed to fetch freight rates:', err);
-    if (freshEl) { freshEl.textContent = 'Failed to load'; freshEl.style.color = '#dc2626'; }
+    if (freshEl) { freshEl.textContent = 'Failed to load'; freshEl.style.color = 'var(--ies-red)'; }
   }
 }
 
@@ -3585,7 +3612,7 @@ function netoptParseRateCSV(mode, input) {
         }
         if (weights.length === 0) {
           status.textContent = 'No valid rows found' + (parseErrors.length ? ': ' + parseErrors[0] : '');
-          status.style.color = '#dc2626';
+          status.style.color = 'var(--ies-red)';
           return;
         }
         // Verify weights are ascending
@@ -3600,7 +3627,7 @@ function netoptParseRateCSV(mode, input) {
         var msg = weights.length + ' rows loaded';
         if (parseErrors.length) msg += ' (' + parseErrors.length + ' skipped)';
         status.textContent = msg;
-        status.style.color = parseErrors.length ? '#d97706' : '#059669';
+        status.style.color = parseErrors.length ? 'var(--ies-orange)' : 'var(--ies-green)';
       } else if (mode === 'tl' && lines.length > 1) {
         // Simple avg: take mean of rate column
         var total = 0, count = 0;
@@ -3612,16 +3639,16 @@ function netoptParseRateCSV(mode, input) {
         if (count > 0) {
           document.getElementById('netopt-tl-rate').value = (total / count).toFixed(2);
           status.textContent = count + ' lanes, avg ' + fmtNum(total / count, 2, '$') + '/mi';
-          status.style.color = '#059669';
+          status.style.color = 'var(--ies-green)';
         }
       } else if (mode === 'ltl' && lines.length > 1) {
         status.textContent = (lines.length - 1) + ' rate entries loaded';
-        status.style.color = '#059669';
+        status.style.color = 'var(--ies-green)';
       }
       netoptRecalcAllCosts();
     } catch(err) {
       status.textContent = 'Parse error: ' + err.message;
-      status.style.color = '#dc2626';
+      status.style.color = 'var(--ies-red)';
     }
   };
   reader.readAsText(file);
@@ -4428,7 +4455,7 @@ function netoptGenerateDemoDemand() {
 
   if (status) {
     status.textContent = 'Generated ' + demandPoints.length + ' demand points (' + fmtNum(totalVolume / 1000000, 1) + 'M units). Mode mix set to ' + arch.modeMix.tl + '/' + arch.modeMix.ltl + '/' + arch.modeMix.parcel + ' (TL/LTL/Parcel).';
-    status.style.color = '#059669';
+    status.style.color = 'var(--ies-green)';
   }
 
   // Auto-switch to Demand tab after 1.5s
@@ -6890,45 +6917,63 @@ function _wsc3dBuildRackRow(scene, x, z, length, rackLevels, clearHeight, direct
   }
 }
 
-// ── Build dock door with frame, leveler, bumpers ──
+// ── Build dock door with frame, leveler, bumpers, dock platform ──
 function _wsc3dBuildDockDoor(scene, x, z, facing) {
   var frameMat = new THREE.MeshStandardMaterial({ color: 0x666666, roughness: 0.5 });
   var levelerMat = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.3, roughness: 0.4 });
   var bumperMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.8 });
+  var dockMat = new THREE.MeshStandardMaterial({ color: 0xbbbbbb, roughness: 0.7, metalness: 0.1 });
   var zDir = facing === 'top' ? -1 : 1;
 
-  // Top beam
+  // Dock platform (4ft high concrete pad extending outside building)
+  var platDepth = 8;
+  scene.add(_wsc3dMakeMesh(new THREE.BoxGeometry(14, 4, platDepth), dockMat, [x, 2, z + (platDepth / 2 + 1) * zDir]));
+
+  // Top beam (door frame at 14ft)
   scene.add(_wsc3dMakeMesh(new THREE.BoxGeometry(12, 1, 1), frameMat, [x, 14, z]));
-  // Side posts
+  // Side posts (from dock height to top beam)
   scene.add(_wsc3dMakeMesh(new THREE.BoxGeometry(1, 14, 1), frameMat, [x - 5.5, 7, z]));
   scene.add(_wsc3dMakeMesh(new THREE.BoxGeometry(1, 14, 1), frameMat, [x + 5.5, 7, z]));
-  // Dock leveler
-  scene.add(_wsc3dMakeMesh(new THREE.BoxGeometry(10, 0.3, 6), levelerMat, [x, 3.5, z + 3 * zDir]));
-  // Bumpers
-  scene.add(_wsc3dMakeMesh(new THREE.BoxGeometry(1, 2, 0.5), bumperMat, [x - 4, 3.5, z + 0.3 * zDir]));
-  scene.add(_wsc3dMakeMesh(new THREE.BoxGeometry(1, 2, 0.5), bumperMat, [x + 4, 3.5, z + 0.3 * zDir]));
+  // Dock leveler (at building floor level, extending outward)
+  scene.add(_wsc3dMakeMesh(new THREE.BoxGeometry(10, 0.3, 6), levelerMat, [x, 4.15, z + 3 * zDir]));
+  // Bumpers (at dock face, at dock height)
+  scene.add(_wsc3dMakeMesh(new THREE.BoxGeometry(1, 2, 0.5), bumperMat, [x - 4, 3, z + 0.3 * zDir]));
+  scene.add(_wsc3dMakeMesh(new THREE.BoxGeometry(1, 2, 0.5), bumperMat, [x + 4, 3, z + 0.3 * zDir]));
 }
 
-// ── Build truck trailer ──
+// ── Build truck trailer (on exterior grade, 4ft below building floor) ──
 function _wsc3dBuildTrailer(scene, x, z, facing) {
   var bodyMat = new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.4 });
   var wheelMat = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.8 });
+  var chassisMat = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.6 });
   // Trailer extends AWAY from building: bottom dock → +z, top dock → -z
   var zDir = (facing === 'bottom') ? 1 : -1;
-
-  var body = _wsc3dMakeMesh(new THREE.BoxGeometry(8, 12, 40), bodyMat, [x, 9, z + 25 * zDir]);
+  // Exterior grade is 4ft below building floor (Y=0), so grade = Y=-4
+  // Trailer floor at Y=0 (backed up level with dock), body extends up
+  var body = _wsc3dMakeMesh(new THREE.BoxGeometry(8, 9.5, 40), bodyMat, [x, 4.75, z + 25 * zDir]);
   scene.add(body);
+  // Chassis/undercarriage
+  scene.add(_wsc3dMakeMesh(new THREE.BoxGeometry(6, 1, 42), chassisMat, [x, -2.5, z + 25 * zDir]));
 
-  // Rear wheels
+  // Rear wheels (on exterior grade, Y=-4 + wheel radius)
   var wGeo = new THREE.CylinderGeometry(1.5, 1.5, 0.8, 8);
   var w1 = new THREE.Mesh(wGeo, wheelMat);
   w1.rotation.z = Math.PI / 2;
-  w1.position.set(x - 4.5, 1.5, z + 35 * zDir);
+  w1.position.set(x - 4.5, -2.5, z + 35 * zDir);
   scene.add(w1);
   var w2 = new THREE.Mesh(wGeo, wheelMat);
   w2.rotation.z = Math.PI / 2;
-  w2.position.set(x + 4.5, 1.5, z + 35 * zDir);
+  w2.position.set(x + 4.5, -2.5, z + 35 * zDir);
   scene.add(w2);
+  // Front wheels
+  var w3 = new THREE.Mesh(wGeo, wheelMat);
+  w3.rotation.z = Math.PI / 2;
+  w3.position.set(x - 4.5, -2.5, z + 12 * zDir);
+  scene.add(w3);
+  var w4 = new THREE.Mesh(wGeo, wheelMat);
+  w4.rotation.z = Math.PI / 2;
+  w4.position.set(x + 4.5, -2.5, z + 12 * zDir);
+  scene.add(w4);
 }
 
 // ── Build forklift ──
@@ -7139,8 +7184,8 @@ function render3DLayout(p) {
   fillLight.position.set(-bW * 0.5, clearH * 2, -bD * 0.3);
   scene.add(fillLight);
 
-  // ── Floor (concrete) ──
-  var floorGeo = new THREE.PlaneGeometry(bW + 100, bD + 100);
+  // ── Building floor (concrete slab at Y=0) ──
+  var floorGeo = new THREE.PlaneGeometry(bW, bD);
   var floorMat = new THREE.MeshStandardMaterial({ color: 0xd0d0d0, roughness: 0.8, metalness: 0.1 });
   var floor = new THREE.Mesh(floorGeo, floorMat);
   floor.rotation.x = -Math.PI / 2;
@@ -7148,9 +7193,25 @@ function render3DLayout(p) {
   floor.receiveShadow = true;
   scene.add(floor);
 
-  // Grid
+  // ── Exterior ground (asphalt at Y=-4, 4ft below building floor) ──
+  var extGeo = new THREE.PlaneGeometry(bW + 200, bD + 200);
+  var extMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.9, metalness: 0.05 });
+  var extFloor = new THREE.Mesh(extGeo, extMat);
+  extFloor.rotation.x = -Math.PI / 2;
+  extFloor.position.set(bW / 2, -4, bD / 2);
+  extFloor.receiveShadow = true;
+  scene.add(extFloor);
+
+  // ── Building slab edge (shows 4ft elevation) ──
+  var slabEdgeMat = new THREE.MeshStandardMaterial({ color: 0xaaaaaa, roughness: 0.7 });
+  // Front slab edge
+  scene.add(_wsc3dMakeMesh(new THREE.BoxGeometry(bW, 4, 1), slabEdgeMat, [bW / 2, -2, bD + 0.5]));
+  // Back slab edge
+  scene.add(_wsc3dMakeMesh(new THREE.BoxGeometry(bW, 4, 1), slabEdgeMat, [bW / 2, -2, -0.5]));
+
+  // Grid on exterior grade
   var gridHelper = new THREE.GridHelper(Math.max(bW, bD) + 100, 40, 0xbbbbbb, 0xcccccc);
-  gridHelper.position.set(bW / 2, 0.1, bD / 2);
+  gridHelper.position.set(bW / 2, -3.9, bD / 2);
   scene.add(gridHelper);
 
   // ── Walls (solid, light gray) — tagged for hide/show toggle ──
@@ -7508,19 +7569,31 @@ function render3DLayout(p) {
           var numPairs = Math.max(1, Math.floor((effW - aisleW) / pairStep));
           for (var rv = 0; rv < numPairs; rv++) {
             var rx = x3d + aisleW + rv * pairStep;
-            // Row A (facing left aisle)
             _wsc3dBuildRackRow(scene, rx, z3d + 4, effD - 8, rackLevels, clearH * 0.9, 'vertical', rackDepth);
-            // Row B (back-to-back, facing right aisle)
             _wsc3dBuildRackRow(scene, rx + rackDepth + 0.5, z3d + 4, effD - 8, rackLevels, clearH * 0.9, 'vertical', rackDepth);
+            // Aisle label (floor-level sign between rack pairs)
+            if (rv < numPairs - 1) {
+              var aisleCenter = rx + modDepth + aisleW / 2;
+              var aisleLabelSprite = wsc3dMakeTextSprite('Aisle ' + (rv + 1) + '\n' + aisleW + "' wide", 0x2563EB);
+              aisleLabelSprite.position.set(aisleCenter, 1.5, z3d + effD / 2);
+              aisleLabelSprite.scale.set(16, 8, 1);
+              scene.add(aisleLabelSprite);
+            }
           }
         } else {
           var numPairs = Math.max(1, Math.floor((effD - aisleW) / pairStep));
           for (var rh = 0; rh < numPairs; rh++) {
             var rz = z3d + aisleW + rh * pairStep;
-            // Row A (facing top aisle)
             _wsc3dBuildRackRow(scene, x3d + 4, rz, effW - 8, rackLevels, clearH * 0.9, 'horizontal', rackDepth);
-            // Row B (back-to-back, facing bottom aisle)
             _wsc3dBuildRackRow(scene, x3d + 4, rz + rackDepth + 0.5, effW - 8, rackLevels, clearH * 0.9, 'horizontal', rackDepth);
+            // Aisle label
+            if (rh < numPairs - 1) {
+              var aisleCenter = rz + modDepth + aisleW / 2;
+              var aisleLabelSprite = wsc3dMakeTextSprite('Aisle ' + (rh + 1) + '\n' + aisleW + "' wide", 0x2563EB);
+              aisleLabelSprite.position.set(x3d + effW / 2, 1.5, aisleCenter);
+              aisleLabelSprite.scale.set(16, 8, 1);
+              scene.add(aisleLabelSprite);
+            }
           }
         }
       }
@@ -7739,7 +7812,8 @@ function renderElevationView(p) {
   var twoDock = p.dockConfig === 'two';
   var dockFaceW = Math.max((twoDock ? Math.max(p.inDoors || 0, p.outDoors || 0) : (p.totalDoors || 10)) * 14, 120);
   var bldgW = Math.max(dockFaceW, Math.ceil(Math.sqrt((p.totalSF || 50000) * 2.2)));
-  var maxHeight = clearH + 4;
+  var maxHeight = clearH + 5;
+  var exteriorGrade = -4;
 
   // Zone widths (approximate proportions from SF)
   var officeSF = p.officeSF || 0;
@@ -7747,18 +7821,22 @@ function renderElevationView(p) {
   var officeW = officeSF > 0 ? Math.ceil(officeSF / bldgD) : 0;
   var dockDepth = 40;
   var stagingW = 30;
-  var storageW = bldgW - officeW - dockDepth - stagingW * 2;
+  // Dock is now OUTSIDE, so don't include it in building width
+  var storageW = bldgW - officeW - stagingW * 2;
   if (storageW < 50) storageW = 50;
 
-  // Drawing area
-  var padL = 60, padR = 80, padT = 40, padB = 55;
+  // Drawing area with wider right padding for exterior elements
+  var padL = 60, padR = 140, padT = 40, padB = 75;
   var drawW = W - padL - padR;
   var drawH = H - padT - padB;
-  var scaleX = bldgW > 0 ? drawW / bldgW : 1;
-  var scaleY = maxHeight > 0 ? drawH / maxHeight : 1;
+
+  // Scale to accommodate building + dock/trailer outside
+  var totalExtent = bldgW + dockDepth + 25;
+  var scaleX = totalExtent > 0 ? drawW / totalExtent : 1;
+  var scaleY = (maxHeight - exteriorGrade) > 0 ? drawH / (maxHeight - exteriorGrade) : 1;
 
   function toX(ft) { return padL + ft * scaleX; }
-  function toY(ft) { return padT + drawH - ft * scaleY; }
+  function toY(ft) { return padT + drawH - (ft - exteriorGrade) * scaleY; }
 
   // ── Background ──
   ctx.fillStyle = '#fafafa';
@@ -7931,10 +8009,10 @@ function renderElevationView(p) {
       }
       // Aisle label
       if (cr < numRacks - 1) {
-        ctx.fillStyle = '#888';
-        ctx.font = '8px system-ui';
+        ctx.fillStyle = '#2563eb';
+        ctx.font = '10px system-ui';
         ctx.textAlign = 'center';
-        ctx.fillText('Aisle', toX(rackX + rackDepth + aisleW / 2), toY(0) - 5);
+        ctx.fillText('Aisle ' + aisleW + "'", toX(rackX + rackDepth + aisleW / 2), toY(0) - 5);
       }
     }
     ctx.fillStyle = '#2563eb';
@@ -7954,10 +8032,10 @@ function renderElevationView(p) {
       var rackX = storageStart + mr * rackSpacing;
       _elevDrawRack(ctx, toX, toY, rackX, rackDepth, rackLevels, beamH, clearH);
       if (mr < numRacks - 1) {
-        ctx.fillStyle = '#888';
-        ctx.font = '8px system-ui';
+        ctx.fillStyle = '#2563eb';
+        ctx.font = '10px system-ui';
         ctx.textAlign = 'center';
-        ctx.fillText('Aisle', toX(rackX + rackDepth + aisleW / 2), toY(0) - 5);
+        ctx.fillText('Aisle ' + aisleW + "'", toX(rackX + rackDepth + aisleW / 2), toY(0) - 5);
       }
     }
 
@@ -7997,10 +8075,10 @@ function renderElevationView(p) {
       var rackX = storageStart + ri * rackSpacing;
       _elevDrawRack(ctx, toX, toY, rackX, rackDepth, rackLevels, beamH, clearH);
       if (ri < numRacks - 1) {
-        ctx.fillStyle = '#888';
-        ctx.font = '8px system-ui';
+        ctx.fillStyle = '#2563eb';
+        ctx.font = '10px system-ui';
         ctx.textAlign = 'center';
-        ctx.fillText('Aisle', toX(rackX + rackDepth + aisleW / 2), toY(0) - 5);
+        ctx.fillText('Aisle ' + aisleW + "'", toX(rackX + rackDepth + aisleW / 2), toY(0) - 5);
       }
     }
   }
@@ -8050,64 +8128,83 @@ function renderElevationView(p) {
   ctx.fillText('Ship Staging', toX(cursor + stagingW / 2), toY(0) - 8);
   cursor += stagingW;
 
-  // ── Dock area with truck trailer profile ──
-  var dockStart = cursor;
-  // Dock platform (elevated ~4ft)
+  // ── BUILDING RIGHT WALL (before exterior area) ──
+  ctx.strokeStyle = '#555';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(toX(bldgW), toY(0));
+  ctx.lineTo(toX(bldgW), toY(clearH + 3));
+  ctx.stroke();
+
+  // ── EXTERIOR GRADE LEVEL (4 feet below building floor) ──
+  ctx.fillStyle = '#c8c8c8';
+  ctx.fillRect(toX(bldgW), toY(exteriorGrade), (dockDepth + 25) * scaleX, 4 * scaleY);
+  ctx.strokeStyle = '#999';
+  ctx.lineWidth = 0.5;
+  ctx.strokeRect(toX(bldgW), toY(exteriorGrade), (dockDepth + 25) * scaleX, 4 * scaleY);
+
+  // ── STEP-DOWN from building floor to exterior grade ──
+  ctx.strokeStyle = '#666';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(toX(bldgW), toY(0));
+  ctx.lineTo(toX(bldgW), toY(exteriorGrade));
+  ctx.stroke();
+
+  // ── Dock area with truck trailer profile (OUTSIDE building) ──
+  var dockStart = bldgW;
+  var dockEnd = dockStart + dockDepth;
+
+  // Dock platform: from exterior grade (Y=-4) to building floor (Y=0)
   ctx.fillStyle = '#d0d0d0';
-  ctx.fillRect(toX(dockStart), toY(4), dockDepth * scaleX, 4 * scaleY);
+  ctx.fillRect(toX(dockStart), toY(0), dockDepth * scaleX, 4 * scaleY);
   ctx.strokeStyle = '#999';
   ctx.lineWidth = 1;
-  ctx.strokeRect(toX(dockStart), toY(4), dockDepth * scaleX, 4 * scaleY);
-  // "DOCK" label inside platform
+  ctx.strokeRect(toX(dockStart), toY(0), dockDepth * scaleX, 4 * scaleY);
+  // "DOCK" label on platform
   ctx.fillStyle = '#666';
   ctx.font = 'bold 10px system-ui';
   ctx.textAlign = 'center';
-  ctx.fillText('DOCK', toX(dockStart + dockDepth / 2), toY(2) + 3);
+  ctx.fillText('DOCK', toX(dockStart + dockDepth / 2), toY(-2) + 3);
 
-  // Building edge wall line (thick dark vertical at dock outer face)
-  ctx.strokeStyle = '#333';
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.moveTo(toX(dockStart + dockDepth), toY(0));
-  ctx.lineTo(toX(dockStart + dockDepth), toY(clearH));
-  ctx.stroke();
-
-  // Dock door opening (in the wall)
+  // Dock door opening: in the building wall (Y=0 to Y=14)
   ctx.fillStyle = '#fff';
-  ctx.fillRect(toX(dockStart + dockDepth - 2), toY(14), 2 * scaleX, 14 * scaleY);
+  ctx.fillRect(toX(bldgW - 1), toY(14), 2 * scaleX, 14 * scaleY);
   ctx.strokeStyle = '#444';
   ctx.lineWidth = 2;
-  ctx.strokeRect(toX(dockStart + dockDepth - 2), toY(14), 2 * scaleX, 14 * scaleY);
+  ctx.strokeRect(toX(bldgW - 1), toY(14), 2 * scaleX, 14 * scaleY);
 
-  // Truck trailer profile (outside, backed up to dock)
-  var truckX = dockStart + dockDepth;
+  // Truck trailer profile (on exterior grade, behind dock)
+  var trailerStart = dockEnd;
+  var trailerWidth = 53;
   ctx.fillStyle = '#e8e0d8';
-  ctx.fillRect(toX(truckX), toY(13.5), 20 * scaleX, 9.5 * scaleY);
+  ctx.fillRect(toX(trailerStart), toY(13.5), trailerWidth * scaleX, 13.5 * scaleY);
   ctx.strokeStyle = '#888';
   ctx.lineWidth = 1.5;
-  ctx.strokeRect(toX(truckX), toY(13.5), 20 * scaleX, 9.5 * scaleY);
+  ctx.strokeRect(toX(trailerStart), toY(13.5), trailerWidth * scaleX, 13.5 * scaleY);
   // "TRAILER" label inside
   ctx.fillStyle = '#777';
   ctx.font = 'bold 10px system-ui';
   ctx.textAlign = 'center';
-  ctx.fillText('TRAILER', toX(truckX + 10), toY(8));
-  // Wheels
+  ctx.fillText('TRAILER', toX(trailerStart + trailerWidth / 2), toY(7));
+  // Wheels on exterior grade (Y=-4)
   ctx.fillStyle = '#333';
   ctx.beginPath();
-  ctx.arc(toX(truckX + 15), toY(0) - 3, 4, 0, Math.PI * 2);
+  ctx.arc(toX(trailerStart + 15), toY(exteriorGrade), 3, 0, Math.PI * 2);
   ctx.fill();
   ctx.beginPath();
-  ctx.arc(toX(truckX + 18), toY(0) - 3, 4, 0, Math.PI * 2);
+  ctx.arc(toX(trailerStart + trailerWidth - 15), toY(exteriorGrade), 3, 0, Math.PI * 2);
   ctx.fill();
 
-  // Dock zone label (bottom)
+  // Dock zone label (below dock)
   ctx.fillStyle = '#0ea5e9';
   ctx.font = '9px system-ui';
   ctx.textAlign = 'center';
-  ctx.fillText('Dock', toX(dockStart + dockDepth / 2), toY(0) - 8);
+  ctx.fillText('Dock', toX(dockStart + dockDepth / 2), toY(exteriorGrade) - 8);
 
-  // Dock height dimension (4' dock elevation)
-  _elevDimV(ctx, toX(dockStart + dockDepth) + 8, toY(0), toY(4), "4' dock ht");
+  // Dock height dimension (4' from exterior grade to dock surface)
+  _elevDimV(ctx, toX(dockEnd) + 8, toY(exteriorGrade), toY(0), "4' dock ht");
 
   // ── RIGHT-SIDE BUILDING DIMENSIONS (stacked outward from building edge) ──
   var roofPeak = 4;
@@ -8121,10 +8218,10 @@ function renderElevationView(p) {
       rightDims.push({ y1: tos, y2: clearH, label: (clearH - tos).toFixed(1) + "' gap", dash: true, color: '#e53935' });
     }
   }
-  // Sort by endpoint height (shortest first = closest to building)
+  // Sort by endpoint height (y2) ascending for cleaner spacing
   rightDims.sort(function(a, b) { return a.y2 - b.y2; });
   var baseX = toX(bldgW) + 20;
-  var dimSpacing = 55;
+  var dimSpacing = 45;  // Reduced from 55 for tighter spacing
   for (var di = 0; di < rightDims.length; di++) {
     rightDims[di].x = baseX + di * dimSpacing;
   }
@@ -8142,9 +8239,9 @@ function renderElevationView(p) {
   }
 
   // ── EXTERIOR DOCK/TRAILER DIMENSIONS (outside building, near trailer) ──
-  var truckDimX = toX(truckX + 24);
+  var truckDimX = toX(trailerStart + trailerWidth + 10);
   _elevDimV(ctx, truckDimX, toY(0), toY(13.5), "13.5' trailer");
-  _elevDimV(ctx, truckDimX + dimSpacing + 10, toY(0), toY(14), "14' door clr");
+  _elevDimV(ctx, truckDimX + dimSpacing, toY(0), toY(14), "14' door clr");
 
   // Sprinkler gap dimension (between TOS and sprinkler line)
   if (storeType !== 'bulk') {
