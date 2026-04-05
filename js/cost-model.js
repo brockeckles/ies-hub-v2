@@ -2317,7 +2317,7 @@ const cmApp = {
               'oninput="cmApp._updateLine(\'' + arr + '\',' + idx + ',\'' + key + '\',this.value,\'' + type + '\')"'
             : 'onchange="cmApp._updateLine(\'' + arr + '\',' + idx + ',\'' + key + '\',this.value,\'' + type + '\')" ' +
               'onblur="cmApp._updateLine(\'' + arr + '\',' + idx + ',\'' + key + '\',this.value,\'' + type + '\')"';
-        return '<input type="' + type + '" class="cm-input" style="width:' + w + 'px;padding:4px 6px;font-size:12px;" ' +
+        return '<input type="' + type + '" class="cm-input" style="width:' + w + 'px;padding:5px 8px;font-size:13px;" ' +
             'value="' + (val === 0 && type === 'number' ? '' : (val || '').toString().replace(/"/g, '&quot;')) + '" placeholder="' + ph + '" ' +
             (step ? 'step="' + step + '" ' : '') +
             events + '>';
@@ -2447,7 +2447,7 @@ const cmApp = {
     _mostSelectHtml(idx, currentId) {
         var templates = (this.refData.mostTemplates || []).filter(function(t) { return t.is_active !== false; });
         var html = '<div style="display:flex;align-items:center;gap:4px;">';
-        html += '<select class="cm-input" style="width:115px;padding:4px 6px;font-size:11px;" onchange="cmApp._updateLine(\'laborLines\',' + idx + ',\'most_template_id\',this.value,\'text\');cmApp._applyMostTemplate(' + idx + ',this.value)">';
+        html += '<select class="cm-input" style="width:130px;padding:5px 6px;font-size:12px;" onchange="cmApp._updateLine(\'laborLines\',' + idx + ',\'most_template_id\',this.value,\'text\');cmApp._applyMostTemplate(' + idx + ',this.value)">';
         html += '<option value="">— Select —</option>';
         // Group by process_area
         var groups = {};
@@ -2601,7 +2601,7 @@ const cmApp = {
 
     _equipSelectHtml(category, idx, currentId, fieldKey) {
         var catalog = (this.refData.equipmentCatalog || []).filter(function(e) { return e.category === category; });
-        var html = '<select class="cm-input" style="width:120px;padding:4px 6px;font-size:11px;" onchange="cmApp._updateLine(\'laborLines\',' + idx + ',\'' + fieldKey + '\',this.value,\'text\')">';
+        var html = '<select class="cm-input" style="width:120px;padding:5px 6px;font-size:12px;" onchange="cmApp._updateLine(\'laborLines\',' + idx + ',\'' + fieldKey + '\',this.value,\'text\')">';
         html += '<option value="">— None —</option>';
         // Group by subcategory
         var groups = {};
@@ -2625,7 +2625,7 @@ const cmApp = {
 
     _uomSelectHtml(idx, current) {
         var uoms = ['each','case','carton','pallet','order','line','unit','lb','cu ft'];
-        var html = '<select class="cm-input" style="width:70px;padding:4px 4px;font-size:11px;" onchange="cmApp._updateLine(\'laborLines\',' + idx + ',\'uom\',this.value,\'text\')">';
+        var html = '<select class="cm-input" style="width:75px;padding:5px 4px;font-size:12px;" onchange="cmApp._updateLine(\'laborLines\',' + idx + ',\'uom\',this.value,\'text\')">';
         html += '<option value="">—</option>';
         uoms.forEach(function(u) {
             html += '<option value="' + u + '"' + (u === current ? ' selected' : '') + '>' + u + '</option>';
@@ -2635,7 +2635,7 @@ const cmApp = {
     },
 
     _volumeSourceSelectHtml(idx, currentId) {
-        let html = '<select class="cm-input" style="width:100px;padding:4px 4px;font-size:11px;" onchange="cmApp.onVolumeSourceChange(' + idx + ', this.value)">';
+        let html = '<select class="cm-input" style="width:115px;padding:5px 4px;font-size:12px;" onchange="cmApp.onVolumeSourceChange(' + idx + ', this.value)">';
         html += '<option value="">-- Manual --</option>';
         this.projectData.volumeLines.forEach(vl => {
             const sel = (vl.name === currentId) ? ' selected' : '';
@@ -2661,7 +2661,7 @@ const cmApp = {
 
     _complexitySelectHtml(idx, current) {
         var tiers = [{v:'low',l:'Low'},{v:'medium',l:'Med'},{v:'high',l:'High'}];
-        var html = '<select class="cm-input" style="width:60px;padding:4px 4px;font-size:11px;" onchange="cmApp._updateLine(\'laborLines\',' + idx + ',\'complexity_tier\',this.value,\'text\')">';
+        var html = '<select class="cm-input" style="width:70px;padding:5px 4px;font-size:12px;" onchange="cmApp._updateLine(\'laborLines\',' + idx + ',\'complexity_tier\',this.value,\'text\')">';
         tiers.forEach(function(t) {
             html += '<option value="' + t.v + '"' + (t.v === (current || 'medium') ? ' selected' : '') + '>' + t.l + '</option>';
         });
@@ -2713,12 +2713,12 @@ const cmApp = {
 
             const row = document.createElement('tr');
             row.innerHTML =
-                '<td>' + this._cmInp('text', line.activity_name, idx, 'laborLines', 'activity_name', {w:100, ph:'Activity'}) + '</td>' +
-                '<td>' + this._mostSelectHtml(idx, line.most_template_id) + '</td>' +
+                '<td style="min-width:160px;">' + this._cmInp('text', line.activity_name, idx, 'laborLines', 'activity_name', {w:150, ph:'Activity'}) + '</td>' +
+                '<td style="min-width:130px;">' + this._mostSelectHtml(idx, line.most_template_id) + '</td>' +
                 '<td>' + this._uomSelectHtml(idx, line.uom) + '</td>' +
-                '<td>' + volumeSourceHtml + '</td>' +
+                '<td style="min-width:120px;">' + volumeSourceHtml + '</td>' +
                 '<td class="cm-table-number" id="labor-vol-' + idx + '">' + Math.round(line.volume || 0).toLocaleString('en-US') + '</td>' +
-                '<td><div style="display:flex;align-items:center;gap:2px;">' + this._cmInp('number', line.base_uph, idx, 'laborLines', 'base_uph', {w:55, step:'1', ph:'UPH'}) + uomLabel + '</div></td>' +
+                '<td><div style="display:flex;align-items:center;gap:2px;">' + this._cmInp('number', line.base_uph, idx, 'laborLines', 'base_uph', {w:60, step:'1', ph:'UPH'}) + uomLabel + '</div></td>' +
                 '<td class="cm-table-number" id="labor-auph-' + idx + '">' + Math.round(line.adjusted_uph || 0).toLocaleString('en-US') + '</td>' +
                 '<td>' + this._complexitySelectHtml(idx, line.complexity_tier) + '</td>' +
                 '<td class="cm-table-number" id="labor-hrs-' + idx + '">' + (line.annual_hours || 0).toLocaleString('en-US', {minimumFractionDigits:1, maximumFractionDigits:1}) + '</td>' +
@@ -2726,9 +2726,9 @@ const cmApp = {
                 '<td style="text-align:center;font-size:11px;">' + esc(shiftLabel) + '</td>' +
                 '<td class="cm-table-number" style="font-size:11px;">' + fmtNum(diffPct * 100, 0) + '%</td>' +
                 '<td class="cm-table-number" style="font-size:11px;">' + fmtNum(adjRate, 2, '$') + '</td>' +
-                '<td>' + this._equipSelectHtml('MHE', idx, line.mhe_equipment_id, 'mhe_equipment_id') + '</td>' +
-                '<td>' + this._equipSelectHtml('Systems', idx, line.it_equipment_id, 'it_equipment_id') + '</td>' +
-                '<td>' + this._cmInp('number', line.hourly_rate, idx, 'laborLines', 'hourly_rate', {w:60, ph:'$/hr'}) + '</td>' +
+                '<td style="min-width:110px;">' + this._equipSelectHtml('MHE', idx, line.mhe_equipment_id, 'mhe_equipment_id') + '</td>' +
+                '<td style="min-width:110px;">' + this._equipSelectHtml('Systems', idx, line.it_equipment_id, 'it_equipment_id') + '</td>' +
+                '<td>' + this._cmInp('number', line.hourly_rate, idx, 'laborLines', 'hourly_rate', {w:70, ph:'$/hr'}) + '</td>' +
                 '<td class="cm-table-number" id="labor-cost-' + idx + '" style="font-weight:600;">$' + annualCost.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0}) + uomWarning + '</td>' +
                 '<td>' + this.bucketSelectHtml('labor', idx, line.pricing_bucket) + '</td>' +
                 '<td class="cm-table-actions"><button class="cm-btn-small cm-btn-small-danger" onclick="cmApp.deleteLaborLine(' + idx + ')">Delete</button></td>';
@@ -2752,9 +2752,9 @@ const cmApp = {
             const annualCost = hrs * (line.hourly_rate || 0) * (1 + (line.burden_pct || 0) / 100);
             const row = document.createElement('tr');
             row.innerHTML =
-                '<td>' + this._cmInp('text', line.role_name, idx, 'indirectLaborLines', 'role_name', {w:120, ph:'Role'}) + '</td>' +
-                '<td>' + this._cmInp('number', line.headcount, idx, 'indirectLaborLines', 'headcount', {w:50, step:'1', ph:'#'}) + '</td>' +
-                '<td>' + this._cmInp('number', line.hourly_rate, idx, 'indirectLaborLines', 'hourly_rate', {w:60, ph:'$/hr'}) + '</td>' +
+                '<td>' + this._cmInp('text', line.role_name, idx, 'indirectLaborLines', 'role_name', {w:160, ph:'Role'}) + '</td>' +
+                '<td>' + this._cmInp('number', line.headcount, idx, 'indirectLaborLines', 'headcount', {w:60, step:'1', ph:'#'}) + '</td>' +
+                '<td>' + this._cmInp('number', line.hourly_rate, idx, 'indirectLaborLines', 'hourly_rate', {w:70, ph:'$/hr'}) + '</td>' +
                 '<td class="cm-table-number" id="indirect-cost-' + idx + '" style="font-weight:600;">$' + annualCost.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0}) + '</td>' +
                 '<td>' + this.bucketSelectHtml('indirect', idx, line.pricing_bucket) + '</td>' +
                 '<td class="cm-table-actions"><button class="cm-btn-small cm-btn-small-danger" onclick="cmApp.deleteIndirectLaborLine(' + idx + ')">Delete</button></td>';
@@ -2780,19 +2780,19 @@ const cmApp = {
             }
             const row = document.createElement('tr');
             row.innerHTML =
-                '<td>' + this._cmInp('text', line.equipment_name, idx, 'equipmentLines', 'equipment_name', {w:110, ph:'Equipment'}) + '</td>' +
-                '<td>' + this._cmInp('text', line.category, idx, 'equipmentLines', 'category', {w:80, ph:'Category'}) + '</td>' +
-                '<td>' + this._cmInp('number', line.quantity, idx, 'equipmentLines', 'quantity', {w:45, step:'1', ph:'Qty'}) + '</td>' +
-                '<td><select class="cm-input" style="width:75px;font-size:12px;" onchange="cmApp._updateField(\'equipmentLines\',' + idx + ',\'ownership_type\',this.value);cmApp.renderEquipmentTable();">' +
+                '<td style="min-width:160px;">' + this._cmInp('text', line.equipment_name, idx, 'equipmentLines', 'equipment_name', {w:150, ph:'Equipment'}) + '</td>' +
+                '<td style="min-width:120px;">' + this._cmInp('text', line.category, idx, 'equipmentLines', 'category', {w:110, ph:'Category'}) + '</td>' +
+                '<td>' + this._cmInp('number', line.quantity, idx, 'equipmentLines', 'quantity', {w:50, step:'1', ph:'Qty'}) + '</td>' +
+                '<td><select class="cm-input" style="width:90px;font-size:13px;padding:5px 4px;" onchange="cmApp._updateField(\'equipmentLines\',' + idx + ',\'ownership_type\',this.value);cmApp.renderEquipmentTable();">' +
                     '<option value="lease"' + (ownType === 'lease' ? ' selected' : '') + '>Lease</option>' +
                     '<option value="purchase"' + (ownType === 'purchase' ? ' selected' : '') + '>Purchase</option>' +
                 '</select></td>' +
-                '<td>' + this._cmInp('number', line.monthly_cost, idx, 'equipmentLines', 'monthly_cost', {w:65, ph:'$/mo'}) + '</td>' +
-                '<td>' + this._cmInp('number', line.monthly_maintenance, idx, 'equipmentLines', 'monthly_maintenance', {w:65, ph:'Maint'}) + '</td>' +
-                '<td>' + this._cmInp('number', line.acquisition_cost, idx, 'equipmentLines', 'acquisition_cost', {w:70, ph:'$0'}) + '</td>' +
-                '<td>' + this._cmInp('number', line.amort_years, idx, 'equipmentLines', 'amort_years', {w:45, step:'1', ph:'5'}) + '</td>' +
+                '<td>' + this._cmInp('number', line.monthly_cost, idx, 'equipmentLines', 'monthly_cost', {w:80, ph:'$/mo'}) + '</td>' +
+                '<td>' + this._cmInp('number', line.monthly_maintenance, idx, 'equipmentLines', 'monthly_maintenance', {w:80, ph:'Maint/mo'}) + '</td>' +
+                '<td>' + this._cmInp('number', line.acquisition_cost, idx, 'equipmentLines', 'acquisition_cost', {w:85, ph:'$0'}) + '</td>' +
+                '<td>' + this._cmInp('number', line.amort_years, idx, 'equipmentLines', 'amort_years', {w:50, step:'1', ph:'5'}) + '</td>' +
                 '<td class="cm-table-number" id="equip-cost-' + idx + '" style="font-weight:600;">$' + annualCost.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</td>' +
-                '<td>' + this._cmInp('text', line.driven_by, idx, 'equipmentLines', 'driven_by', {w:80, ph:'Driver'}) + '</td>' +
+                '<td>' + this._cmInp('text', line.driven_by, idx, 'equipmentLines', 'driven_by', {w:100, ph:'Driver'}) + '</td>' +
                 '<td>' + this.bucketSelectHtml('equipment', idx, line.pricing_bucket) + '</td>' +
                 '<td class="cm-table-actions"><button class="cm-btn-small cm-btn-small-danger" onclick="cmApp.deleteEquipmentLine(' + idx + ')">Delete</button></td>';
             tbody.appendChild(row);
@@ -3776,7 +3776,7 @@ const cmApp = {
         const opts = this.projectData.pricingBuckets.map(b =>
             '<option value="' + b.id + '"' + (currentBucket === b.id ? ' selected' : '') + '>' + b.name + '</option>'
         ).join('');
-        return '<select class="cm-input" style="padding:2px 4px;font-size:11px;width:120px;" ' +
+        return '<select class="cm-input" style="padding:5px 4px;font-size:12px;width:120px;" ' +
             'onchange="cmApp.setBucketForLine(\'' + lineType + '\',' + idx + ',this.value)">' +
             opts + '<option value=""' + (!currentBucket ? ' selected' : '') + '>(none)</option></select>';
     },
@@ -4505,7 +4505,7 @@ const cmApp = {
 
     _volumeUomSelectHtml(idx, currentUom) {
         const uoms = ['each', 'case', 'carton', 'pallet', 'order', 'line', 'unit', 'lb', 'cu ft'];
-        let html = '<select class="cm-input" style="width:100px;padding:4px 4px;font-size:11px;" onchange="cmApp._updateLine(\'volumeLines\',' + idx + ',\'uom\',this.value,\'text\'); cmApp.renderLaborTable(); cmApp.markChanged();">';
+        let html = '<select class="cm-input" style="width:100px;padding:5px 4px;font-size:12px;" onchange="cmApp._updateLine(\'volumeLines\',' + idx + ',\'uom\',this.value,\'text\'); cmApp.renderLaborTable(); cmApp.markChanged();">';
         uoms.forEach(u => {
             const sel = u === currentUom ? ' selected' : '';
             html += '<option value="' + u + '"' + sel + '>' + u + '</option>';

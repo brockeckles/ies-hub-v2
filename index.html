@@ -8621,25 +8621,25 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
                 </div>
                 <div style="font-size:11px;color:var(--ies-gray-400);margin-top:12px;text-align:right;">Scroll right for Complexity, MHE, IT Equipment, Hourly Rate, Annual Cost, and Bucket columns &rarr; &nbsp;or use <strong>Expand</strong></div>
                 <div style="overflow-x:auto;margin:0 -20px;padding:0 20px;margin-top:4px;">
-                <table class="cm-table" style="min-width:1400px;">
+                <table class="cm-table" style="min-width:1800px;">
                     <thead>
                         <tr>
-                            <th>Activity</th>
-                            <th>MOST Template</th>
+                            <th style="min-width:160px;">Activity</th>
+                            <th style="min-width:130px;">MOST Template</th>
                             <th>UOM</th>
-                            <th>Volume Source</th>
+                            <th style="min-width:120px;">Volume Source</th>
                             <th style="text-align:right;">Volume</th>
                             <th>Base UPH</th>
                             <th>Adj UPH</th>
                             <th>Complexity</th>
-                            <th style="text-align:right;">Annual Hours</th>
+                            <th style="text-align:right;">Annual Hrs</th>
                             <th style="text-align:right;">FTEs</th>
                             <th style="text-align:center;">Shift</th>
                             <th style="text-align:right;">Diff %</th>
                             <th style="text-align:right;">Adj Rate</th>
-                            <th>MHE</th>
-                            <th>IT Equipment</th>
-                            <th style="text-align:right;">Hourly Rate</th>
+                            <th style="min-width:110px;">MHE</th>
+                            <th style="min-width:110px;">IT Equip</th>
+                            <th style="text-align:right;">Rate</th>
                             <th style="text-align:right;">Annual Cost</th>
                             <th>Bucket</th>
                             <th style="text-align:center;">Action</th>
@@ -8712,11 +8712,12 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
             </div>
 
             <div class="cm-card">
-                <table class="cm-table">
+                <div style="overflow-x:auto;margin:0 -20px;padding:0 20px;">
+                <table class="cm-table" style="min-width:1300px;">
                     <thead>
                         <tr>
-                            <th>Equipment</th>
-                            <th>Category</th>
+                            <th style="min-width:160px;">Equipment</th>
+                            <th style="min-width:120px;">Category</th>
                             <th style="text-align:right;">Qty</th>
                             <th>Ownership</th>
                             <th style="text-align:right;">Monthly/Unit</th>
@@ -8732,6 +8733,7 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
                     <tbody id="equipmentTable">
                     </tbody>
                 </table>
+                </div>
                 <div class="cm-mt-16">
                     <button class="cm-btn cm-btn-secondary" onclick="cmApp.showEquipmentCatalog()">+ Add Equipment</button>
                 </div>
