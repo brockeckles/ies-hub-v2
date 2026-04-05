@@ -1032,8 +1032,10 @@ const fmApp = {
   },
 
   async saveScenario() {
-    const name = prompt('Scenario name:');
-    if (!name) return;
+    var nameInput = document.getElementById('fm-scenario-name');
+    var name = nameInput ? nameInput.value.trim() : '';
+    if (!name) { name = 'Fleet Scenario ' + new Date().toLocaleDateString(); }
+
 
     try {
       // Save scenario to Supabase

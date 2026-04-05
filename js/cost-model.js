@@ -5162,11 +5162,14 @@ const dealApp = {
             const siteCount = sites.length;
             let totalCost = 0;
 
-            sites.forEach(site => {
+            sites.forEach(function(site) {
+                var siteCost = parseFloat(site.total_annual_cost) || 0;
                 if (site.metadata && site.metadata.projections && site.metadata.projections.length > 0) {
-                    const y1 = site.metadata.projections[0];
-                    totalCost += (parseFloat(y1.totalCost) || 0);
+                    var y1 = site.metadata.projections[0];
+                    var projCost = parseFloat(y1.totalCost) || 0;
+                    if (projCost > 0) siteCost = projCost;
                 }
+                totalCost += siteCost;
             });
 
             const siteEl = document.getElementById(`card-sites-${dealId}`);

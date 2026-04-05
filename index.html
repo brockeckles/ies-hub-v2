@@ -9547,7 +9547,8 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
 
     <!-- SCENARIOS TAB -->
     <div id="fm-tab-scenarios" class="fm-tab-content" style="display:none;">
-      <div style="display:flex;gap:12px;margin-bottom:16px;">
+      <div style="display:flex;gap:12px;margin-bottom:16px;align-items:center;">
+        <input type="text" id="fm-scenario-name" placeholder="Scenario name..." style="flex:1;padding:8px 14px;border:1px solid var(--ies-gray-300);border-radius:8px;font-family:Montserrat,sans-serif;font-size:13px;font-weight:500;color:var(--ies-navy);outline:none;transition:border .2s;" onfocus="this.style.borderColor='var(--ies-blue)'" onblur="this.style.borderColor='var(--ies-gray-300)'" />
         <button class="fm-btn-primary" onclick="fmSaveScenario()">Save Scenario</button>
         <button class="fm-btn-secondary" onclick="fmClearScenario()">Clear All</button>
       </div>
@@ -10859,11 +10860,11 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
 <!-- Feedback: idea submission, voting -->
 <script src="js/feedback.js"></script>
 <!-- Cost Model Builder: cmApp, dealApp, financial modeling -->
-<script src="js/cost-model.js?v=20260405-s22"></script>
+<script src="js/cost-model.js?v=20260405-s23"></script>
 <!-- Cost Model Interaction Tests (gated behind __CM_TEST_MODE__) -->
 <script src="js/cost-model-tests.js?v=20260405-s2"></script>
 <!-- Fleet Modeler: fmApp, lane optimization -->
-<script src="js/fleet-modeler.js?v=20260405-s20"></script>
+<script src="js/fleet-modeler.js?v=20260405-s23"></script>
 <!-- MOST Labor Standards: template library, analysis -->
 <script src="js/most-standards.js?v=20260405-s2"></script>
 <!-- Deck Generator: PptxGenJS presentation automation -->
