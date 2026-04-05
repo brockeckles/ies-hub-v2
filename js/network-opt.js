@@ -2022,8 +2022,23 @@ function netoptDrawServiceZones(openFacilities) {
     { day: 1, color: '#059669', fill: '#a7f3d0', label: '1 Day' }
   ];
 
-  // Draw outermost first, inner zones overlay on top
+  // Draw 5+ day zone as full CONUS background first
+  var fivePlusStyle = zoneStyles.find(function(z) { return z.day === 5; });
+  if (fivePlusStyle) {
+    var conusPoly = L.polygon(CONUS_BOUNDARY, {
+      fillColor: fivePlusStyle.fill,
+      fillOpacity: 0.5,
+      color: fivePlusStyle.color,
+      weight: 2,
+      opacity: 0.8
+    }).addTo(netoptState.netoptMap);
+    conusPoly.bindPopup(fivePlusStyle.label + ' delivery zone (remainder of CONUS)');
+    netoptState.zoneLayers.push(conusPoly);
+  }
+
+  // Draw days 4 → 1 zones on top (inner zones overlay the CONUS background)
   zoneStyles.forEach(function(zs) {
+    if (zs.day === 5) return; // already drawn as CONUS fill
     var th = thresholds.find(function(t) { return t.day === zs.day; });
     if (!th || th.maxMiles <= 0) return;
 
