@@ -1221,6 +1221,7 @@ function exportCalculatorSummary() {
 }
 
 function calcWarehouse() { try {
+  if (typeof markDirty === 'function') markDirty('Warehouse Sizing');
   // ── READ INPUTS ──
   var peakUnits = parseInt(document.getElementById('wsc-peakunits').value.replace(/,/g,''), 10) || 500000;
   var avgUnits = parseInt(document.getElementById('wsc-avgunits').value.replace(/,/g,''), 10) || 350000;
@@ -1970,6 +1971,7 @@ async function wscSaveScenario(projectId, scenarioName) {
             setTimeout(function() { saveBtn.innerHTML = orig; saveBtn.style.borderColor = ''; saveBtn.style.color = ''; }, 2000);
         }
 
+        if (typeof markClean === 'function') markClean();
         // Refresh scenario list
         wscRefreshScenarioList(projectId);
     } catch(error) {

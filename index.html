@@ -8189,7 +8189,7 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
   <!-- Tool navigation tabs (mirrors dt-tabs from Design Tools) -->
   <div class="dt-tabs-bar" style="display:flex;gap:10px;margin-bottom:24px;flex-wrap:wrap;">
     <button class="dt-tab" onclick="navigate('designtools', document.querySelector('[data-section=designtools]'))">All Tools</button>
-    <button class="dt-tab active" onclick="window.scrollTo(0,0)">Cost Model</button>
+    <button class="dt-tab active" style="cursor:default;pointer-events:none;">Cost Model</button>
     <button class="dt-tab" onclick="navigate('designtools'); setTimeout(function(){ showDesignTool('dt-deals', document.querySelectorAll('#dt-tabs .dt-tab')[2]); },50)">Multi-Site Deals</button>
     <button class="dt-tab" onclick="navigate('designtools'); setTimeout(function(){ showDesignTool('dt-warehouse', document.querySelectorAll('#dt-tabs .dt-tab')[3]); },50)">Warehouse Sizing</button>
     <button class="dt-tab" onclick="showDesignTool('dt-most')">MOST Standards</button>
@@ -9307,7 +9307,7 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
     <button class="dt-tab" onclick="showDesignTool('dt-most')">MOST Standards</button>
     <button class="dt-tab" onclick="navigate('designtools'); setTimeout(function(){ showDesignTool('dt-network', document.querySelectorAll('#dt-tabs .dt-tab')[5]); },50)">Center of Gravity</button>
     <button class="dt-tab" onclick="navigate('designtools'); setTimeout(function(){ showDesignTool('dt-netopt', document.querySelectorAll('#dt-tabs .dt-tab')[6]); },50)">Network Optimization</button>
-    <button class="dt-tab active" onclick="window.scrollTo(0,0)">Fleet Modeler</button>
+    <button class="dt-tab active" style="cursor:default;pointer-events:none;">Fleet Modeler</button>
   </div>
 
   <!-- FLEET MODELER LANDING PAGE -->
@@ -9581,7 +9581,7 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
     <button class="dt-tab" onclick="showDesignTool('dt-costmodel')">Cost Model</button>
     <button class="dt-tab" onclick="navigate('designtools'); setTimeout(function(){ showDesignTool('dt-deals', document.querySelectorAll('#dt-tabs .dt-tab')[2]); },50)">Multi-Site Deals</button>
     <button class="dt-tab" onclick="navigate('designtools'); setTimeout(function(){ showDesignTool('dt-warehouse', document.querySelectorAll('#dt-tabs .dt-tab')[3]); },50)">Warehouse Sizing</button>
-    <button class="dt-tab active" onclick="window.scrollTo(0,0)">MOST Standards</button>
+    <button class="dt-tab active" style="cursor:default;pointer-events:none;">MOST Standards</button>
     <button class="dt-tab" onclick="navigate('designtools'); setTimeout(function(){ showDesignTool('dt-network', document.querySelectorAll('#dt-tabs .dt-tab')[5]); },50)">Center of Gravity</button>
     <button class="dt-tab" onclick="navigate('designtools'); setTimeout(function(){ showDesignTool('dt-netopt', document.querySelectorAll('#dt-tabs .dt-tab')[6]); },50)">Network Optimization</button>
     <button class="dt-tab" onclick="showDesignTool('dt-fleet')">Fleet Modeler</button>
@@ -10835,7 +10835,7 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
 <!-- ═══════════════════ JAVASCRIPT ═══════════════════ -->
 <!-- ═══════════════════ JAVASCRIPT MODULES ═══════════════════ -->
 <!-- Core: Supabase init, navigation, search, tour, utilities -->
-<script src="js/core.js?v=20260405-s17"></script>
+<script src="js/core.js?v=20260405-s20"></script>
 <!-- Wiki & security page content -->
 <script src="js/wiki-content.js"></script>
 <!-- Command Center: charts, signal feed, sector pulse -->
@@ -10847,11 +10847,11 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
 <!-- Design Tools: landing pages, scenario management, section tours -->
 <script src="js/design-tools.js?v=20260405-s16"></script>
 <!-- Center of Gravity: city database, clustering, Leaflet map -->
-<script src="js/center-of-gravity.js?v=20260405-s6"></script>
+<script src="js/center-of-gravity.js?v=20260405-s20"></script>
 <!-- Warehouse Sizing Calculator: layout, 3D, elevation, scenarios -->
-<script src="js/warehouse-sizing.js?v=20260405-s12"></script>
+<script src="js/warehouse-sizing.js?v=20260405-s20"></script>
 <!-- Enterprise Network Optimization: GLPK solver, heatmap, service zones -->
-<script src="js/network-opt.js?v=20260405-s17"></script>
+<script src="js/network-opt.js?v=20260405-s20"></script>
 <!-- Change Management: ADKAR initiatives, activities, flowcharts -->
 <script src="js/change-management.js?v=20260405-s2"></script>
 <!-- Analytics: session tracking, dashboard -->
@@ -10859,11 +10859,11 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
 <!-- Feedback: idea submission, voting -->
 <script src="js/feedback.js"></script>
 <!-- Cost Model Builder: cmApp, dealApp, financial modeling -->
-<script src="js/cost-model.js?v=20260405-s19"></script>
+<script src="js/cost-model.js?v=20260405-s20"></script>
 <!-- Cost Model Interaction Tests (gated behind __CM_TEST_MODE__) -->
 <script src="js/cost-model-tests.js?v=20260405-s2"></script>
 <!-- Fleet Modeler: fmApp, lane optimization -->
-<script src="js/fleet-modeler.js?v=20260404-s4"></script>
+<script src="js/fleet-modeler.js?v=20260405-s20"></script>
 <!-- MOST Labor Standards: template library, analysis -->
 <script src="js/most-standards.js?v=20260405-s2"></script>
 <!-- Deck Generator: PptxGenJS presentation automation -->

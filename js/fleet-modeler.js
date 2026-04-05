@@ -338,11 +338,13 @@ const fmApp = {
       distance_miles: null
     });
     this.renderLanesTable();
+    if (typeof markDirty === 'function') markDirty('Fleet Modeler');
   },
 
   removeLane(idx) {
     this.lanes.splice(idx, 1);
     this.renderLanesTable();
+    if (typeof markDirty === 'function') markDirty('Fleet Modeler');
   },
 
   loadDemoData() {
@@ -1071,6 +1073,7 @@ const fmApp = {
         created_at: new Date().toLocaleString()
       });
       this.renderScenariosListLocal();
+      if (typeof markClean === 'function') markClean();
       this.showToast(`Scenario "${name}" saved`);
     } catch (e) {
       console.error('Error saving scenario:', e);

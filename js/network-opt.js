@@ -702,6 +702,7 @@ function netoptAddFacility() {
 
 // Add demand row
 function netoptAddDemandPoint() {
+  if (typeof markDirty === 'function') markDirty('Network Optimization');
   var id = 'dem-' + Date.now();
   netoptState.demands.push({
     id: id,
@@ -2806,6 +2807,7 @@ async function netoptSaveScenario(projectId, scenarioName) {
             setTimeout(function() { saveBtn.innerHTML = orig; saveBtn.style.borderColor = ''; saveBtn.style.color = ''; }, 2000);
         }
 
+        if (typeof markClean === 'function') markClean();
         netoptRefreshScenarioList(projectId);
     } catch(error) {
         console.error('Netopt save error:', error);

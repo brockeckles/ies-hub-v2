@@ -320,6 +320,8 @@ function dtSyncActiveTab(toolName) {
 }
 
 function showDesignTool(panelId, tabEl) {
+  // Check for unsaved changes before switching tools
+  if (typeof checkUnsavedChanges === 'function' && !checkUnsavedChanges()) return;
   // Cost model and fleet modeler redirect to their dedicated sections
   if (panelId === 'dt-costmodel') {
     dtSyncActiveTab('Cost Model');
@@ -4800,6 +4802,7 @@ const cmApp = {
 
     markChanged() {
         if (this.saveTimeout) clearTimeout(this.saveTimeout);
+        if (typeof markDirty === 'function') markDirty('Cost Model');
 
         const indicator = document.getElementById('saveIndicator');
         indicator.textContent = 'Saving...';
@@ -5043,6 +5046,7 @@ const cmApp = {
 
             const indicator = document.getElementById('saveIndicator');
             indicator.textContent = 'Saved';
+            if (typeof markClean === 'function') markClean();
             setTimeout(() => { indicator.textContent = ''; }, 2000);
 
         } catch (error) {
@@ -5409,8 +5413,9 @@ const dealApp = {
 
         // A) Aggregate Cost Breakdown — bar chart + numbers
         var aggregateEl = document.getElementById('dealSummaryCostBreakdown');
-        var totalCost = agg.totalLabor + agg.totalEquipment + agg.totalOverhead + agg.totalVas;
-        if (totalCost === 0) totalCost = agg.totalCost || 1;
+        var childCostTotal = agg.totalLabor + agg.totalEquipment + agg.totalOverhead + agg.totalVas;
+        var hasChildData = childCostTotal > 0;
+        var totalCost = hasChildData ? childCostTotal : (agg.totalCost || 1);
 
         var breakdownItems = [
             { label: 'Labor (Direct + Indirect)', cost: agg.totalLabor, color: '#2563eb' },
@@ -5420,29 +5425,40 @@ const dealApp = {
         ];
 
         var aggHtml = '<div style="margin-bottom:20px;"><h3 style="font-size:13px;font-weight:600;color:var(--ies-navy);margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid var(--ies-gray-200);">Aggregate Cost Breakdown</h3>';
-        aggHtml += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:16px;"><div>';
 
-        // Bar chart
-        aggHtml += '<div style="margin-bottom:12px;"><strong style="font-size:12px;color:var(--ies-gray-700);">Distribution</strong></div>';
-        breakdownItems.forEach(function(item) {
-            var pct = (item.cost / totalCost * 100).toFixed(1);
-            aggHtml += '<div style="margin-bottom:10px;">' +
-                '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--ies-gray-600);margin-bottom:3px;">' +
-                '<span>' + item.label + '</span><span style="font-weight:600;">' + pct + '%</span></div>' +
-                '<div style="background:var(--ies-gray-100);border-radius:4px;height:8px;overflow:hidden;">' +
-                '<div style="background:' + item.color + ';height:100%;width:' + pct + '%;border-radius:4px;"></div></div></div>';
-        });
-        aggHtml += '</div><div style="padding-left:12px;border-left:1px solid var(--ies-gray-200);">';
+        if (!hasChildData && agg.totalCost > 0) {
+            // Graceful fallback when child tables are empty
+            aggHtml += '<div style="background:linear-gradient(135deg,#f8fafc,#eef2ff);border:1px solid var(--ies-gray-200);border-radius:10px;padding:24px;text-align:center;">' +
+                '<div style="font-size:28px;font-weight:700;color:var(--ies-navy);margin-bottom:6px;">' + self.fmt.currency(agg.totalCost) + '</div>' +
+                '<div style="font-size:12px;color:var(--ies-gray-500);margin-bottom:16px;">Total Annual Cost Across All Sites</div>' +
+                '<div style="display:inline-flex;align-items:center;gap:6px;background:rgba(251,146,60,0.1);color:rgb(194,108,35);padding:6px 14px;border-radius:6px;font-size:11px;font-weight:600;">' +
+                '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>' +
+                'Category breakdown available when cost models are fully itemized</div></div></div>';
+        } else {
+            aggHtml += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:16px;"><div>';
 
-        // Numbers
-        aggHtml += '<div style="margin-bottom:12px;"><strong style="font-size:12px;color:var(--ies-gray-700);">Annual Cost</strong></div>';
-        breakdownItems.forEach(function(item) {
-            var pct = (item.cost / totalCost * 100).toFixed(1);
-            aggHtml += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:12px;">' +
-                '<span style="color:var(--ies-gray-600);">' + item.label + '</span>' +
-                '<span style="font-weight:600;color:var(--ies-navy);">' + self.fmt.currency(item.cost) + ' (' + pct + '%)</span></div>';
-        });
-        aggHtml += '</div></div></div>';
+            // Bar chart
+            aggHtml += '<div style="margin-bottom:12px;"><strong style="font-size:12px;color:var(--ies-gray-700);">Distribution</strong></div>';
+            breakdownItems.forEach(function(item) {
+                var pct = (item.cost / totalCost * 100).toFixed(1);
+                aggHtml += '<div style="margin-bottom:10px;">' +
+                    '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--ies-gray-600);margin-bottom:3px;">' +
+                    '<span>' + item.label + '</span><span style="font-weight:600;">' + pct + '%</span></div>' +
+                    '<div style="background:var(--ies-gray-100);border-radius:4px;height:8px;overflow:hidden;">' +
+                    '<div style="background:' + item.color + ';height:100%;width:' + pct + '%;border-radius:4px;"></div></div></div>';
+            });
+            aggHtml += '</div><div style="padding-left:12px;border-left:1px solid var(--ies-gray-200);">';
+
+            // Numbers
+            aggHtml += '<div style="margin-bottom:12px;"><strong style="font-size:12px;color:var(--ies-gray-700);">Annual Cost</strong></div>';
+            breakdownItems.forEach(function(item) {
+                var pct = (item.cost / totalCost * 100).toFixed(1);
+                aggHtml += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:12px;">' +
+                    '<span style="color:var(--ies-gray-600);">' + item.label + '</span>' +
+                    '<span style="font-weight:600;color:var(--ies-navy);">' + self.fmt.currency(item.cost) + ' (' + pct + '%)</span></div>';
+            });
+            aggHtml += '</div></div></div>';
+        }
 
         // B) Per-Site Cost Breakdown Table
         aggHtml += '<div style="margin-top:24px;"><h3 style="font-size:13px;font-weight:600;color:var(--ies-navy);margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid var(--ies-gray-200);">Per-Site Cost Breakdown</h3>';
@@ -5493,14 +5509,15 @@ const dealApp = {
         });
         aggHtml += '<td style="padding:10px;text-align:right;font-weight:700;">' + self.fmt.currency(vasTotal) + '</td></tr>';
 
-        // Totals row
+        // Totals row — use parent total_annual_cost when child data is empty
         var rowTotal = 0;
         aggHtml += '<tr style="background:var(--ies-gray-50);font-weight:700;">';
         aggHtml += '<td style="padding:10px;">TOTAL</td>';
         sites.forEach(function(s) {
-            var siteTotal = s.laborCost + s.equipmentCost + s.overheadCost + s.vasCost;
-            aggHtml += '<td style="padding:10px;text-align:right;">' + self.fmt.currency(siteTotal) + '</td>';
-            rowTotal += siteTotal;
+            var siteChildTotal = s.laborCost + s.equipmentCost + s.overheadCost + s.vasCost;
+            var siteDisplayTotal = siteChildTotal > 0 ? siteChildTotal : s.cost;
+            aggHtml += '<td style="padding:10px;text-align:right;">' + self.fmt.currency(siteDisplayTotal) + '</td>';
+            rowTotal += siteDisplayTotal;
         });
         aggHtml += '<td style="padding:10px;text-align:right;">' + self.fmt.currency(rowTotal) + '</td></tr>';
 

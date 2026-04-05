@@ -154,10 +154,37 @@ async function loadMarketPins() {
   }
 }
 
+// ── UNSAVED CHANGES TRACKING ──
+var _unsavedChanges = { dirty: false, toolName: '', onSave: null };
+
+function markDirty(toolName, onSaveFn) {
+  _unsavedChanges.dirty = true;
+  _unsavedChanges.toolName = toolName || 'this tool';
+  _unsavedChanges.onSave = onSaveFn || null;
+}
+
+function markClean() {
+  _unsavedChanges.dirty = false;
+  _unsavedChanges.toolName = '';
+  _unsavedChanges.onSave = null;
+}
+
+function checkUnsavedChanges() {
+  if (!_unsavedChanges.dirty) return true;
+  var msg = 'You have unsaved changes in ' + _unsavedChanges.toolName + '. Leave without saving?';
+  if (confirm(msg)) {
+    markClean();
+    return true;
+  }
+  return false;
+}
+
 // ── NAVIGATION ──
 var _navSections = null;
 var _navItems = null;
 function navigate(section, el) {
+  // Check for unsaved changes before navigating
+  if (!checkUnsavedChanges()) return;
   if (!_navSections) _navSections = document.querySelectorAll('.section');
   if (!_navItems) _navItems = document.querySelectorAll('.nav-item');
   _navSections.forEach(s => { s.classList.remove('active'); s.style.display = ''; });

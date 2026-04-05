@@ -322,6 +322,7 @@ function setNetDCs(n) {
 
 // ── MAIN OPTIMIZATION & RENDER ──
 function runNetworkOptimization() {
+  if (typeof markDirty === 'function') markDirty('Center of Gravity');
   // Geocode all demand points
   var geoPoints = [];
   for (var i = 0; i < netDemandPoints.length; i++) {
@@ -851,6 +852,7 @@ async function netSaveScenario(projectId, scenarioName) {
             setTimeout(function() { saveBtn.innerHTML = orig; saveBtn.style.borderColor = ''; saveBtn.style.color = ''; }, 2000);
         }
 
+        if (typeof markClean === 'function') markClean();
         // Refresh scenario list
         netRefreshScenarioList(projectId);
     } catch(error) {
