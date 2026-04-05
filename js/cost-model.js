@@ -1038,6 +1038,7 @@ const cmApp = {
             netoptRefreshScenarioList(id);
 
             this.switchSection('setup');
+            this._bindFinancialInputs();
 
         } catch (error) {
             console.error('Error opening project:', error);
