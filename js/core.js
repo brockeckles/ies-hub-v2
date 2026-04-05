@@ -160,7 +160,7 @@ var _navItems = null;
 function navigate(section, el) {
   if (!_navSections) _navSections = document.querySelectorAll('.section');
   if (!_navItems) _navItems = document.querySelectorAll('.nav-item');
-  _navSections.forEach(s => s.classList.remove('active'));
+  _navSections.forEach(s => { s.classList.remove('active'); s.style.display = ''; });
   _navItems.forEach(n => n.classList.remove('active'));
   var secEl = document.getElementById('sec-' + section);
   if (secEl) secEl.classList.add('active');
