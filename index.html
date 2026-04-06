@@ -9353,13 +9353,33 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
       <button class="fm-btn-secondary" onclick="fmShowLanding()" style="padding:6px 14px;font-size:13px;font-weight:600;white-space:nowrap;">← Back to Models</button>
       <button class="fm-btn-primary" id="fm-calc-btn-top" onclick="fmCalculateFleet()" style="padding:8px 20px;font-size:13px;font-weight:700;white-space:nowrap;">▶ Calculate Fleet Requirements</button>
     </div>
+
+    <!-- SCENARIO BAR (mirrors NetOpt) -->
+    <div id="fm-scenario-bar" style="background:#fff;border-radius:10px;border:1px solid var(--ies-gray-200);padding:10px 20px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+      <input type="text" id="fm-scenario-name" class="wsc-input" placeholder="Fleet scenario name..." style="flex:1;min-width:200px;padding:6px 10px;border:1px solid var(--ies-gray-300);border-radius:6px;font-size:12px;" />
+      <select id="fm-scenario-select" onchange="if(this.value) fmLoadScenarioBar(this.value)" style="flex:1;min-width:160px;padding:6px 8px;border:1px solid var(--ies-gray-300);border-radius:6px;font-size:12px;background:#fff;color:var(--ies-gray-800);cursor:pointer;">
+        <option value="">-- Select scenario --</option>
+      </select>
+      <button class="wsc-action-btn" onclick="fmSaveScenarioBar()" title="Save scenario">
+        <svg width="13" height="13" fill="none" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><polyline points="17 21 17 13 7 13 7 21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><polyline points="7 3 7 8 15 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Save
+      </button>
+      <button class="wsc-action-btn" onclick="fmSaveAsScenarioBar()" title="Save as new">
+        <svg width="13" height="13" fill="none" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Save As
+      </button>
+      <button class="wsc-action-btn" onclick="fmDeleteScenarioBar()" title="Delete scenario">
+        <svg width="13" height="13" fill="none" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Delete
+      </button>
+    </div>
+
     <!-- Tab Navigation -->
     <div style="display:flex;gap:8px;border-bottom:2px solid var(--ies-gray-200);overflow-x:auto;">
       <button class="fm-tab active" onclick="fmShowTab('lanes')">Lanes</button>
       <button class="fm-tab" onclick="fmShowTab('config')">Configuration</button>
       <button class="fm-tab" onclick="fmShowTab('results')">Results</button>
       <button class="fm-tab" onclick="fmShowTab('map')">Map</button>
-      <button class="fm-tab" onclick="fmShowTab('scenarios')">Scenarios</button>
     </div>
 
     <!-- LANES TAB -->
@@ -9436,13 +9456,6 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
     <!-- RESULTS TAB -->
     <div id="fm-tab-results" class="fm-tab-content" style="display:none;">
       <div id="fm-results-content" style="display:none;">
-        <!-- Save bar -->
-        <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;padding:12px 14px;background:#fff;border:1px solid var(--ies-gray-200);border-radius:10px;">
-          <span style="font-size:12px;color:var(--ies-gray-700);font-weight:600;">Save these results:</span>
-          <input type="text" id="fm-scenario-name-results" placeholder="Scenario name..." style="flex:1;padding:7px 12px;border:1px solid var(--ies-gray-300);border-radius:6px;font-size:12px;" />
-          <button class="fm-btn-primary" onclick="document.getElementById('fm-scenario-name').value=document.getElementById('fm-scenario-name-results').value; fmSaveScenario();" style="padding:7px 16px;font-size:12px;">Save Scenario</button>
-          <span style="font-size:11px;color:var(--ies-gray-500);">Auto-saved locally — formal save persists to DB</span>
-        </div>
         <!-- Fleet Summary -->
         <div style="background:linear-gradient(135deg, #0a1628, #0d1f3c, #0a1628);border-radius:10px;padding:24px;color:#fff;margin-bottom:20px;box-shadow:0 4px 12px rgba(0,0,0,.15);">
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:20px;">
@@ -9568,22 +9581,6 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
       </div>
     </div>
 
-    <!-- SCENARIOS TAB -->
-    <div id="fm-tab-scenarios" class="fm-tab-content" style="display:none;">
-      <div style="display:flex;gap:12px;margin-bottom:16px;align-items:center;">
-        <input type="text" id="fm-scenario-name" placeholder="Scenario name..." style="flex:1;padding:8px 14px;border:1px solid var(--ies-gray-300);border-radius:8px;font-family:Montserrat,sans-serif;font-size:13px;font-weight:500;color:var(--ies-navy);outline:none;transition:border .2s;" onfocus="this.style.borderColor='var(--ies-blue)'" onblur="this.style.borderColor='var(--ies-gray-300)'" />
-        <button class="fm-btn-primary" onclick="fmSaveScenario()">Save Scenario</button>
-        <button class="fm-btn-secondary" onclick="fmClearScenario()">Clear All</button>
-      </div>
-
-      <div style="background:#fff;border-radius:10px;border:1px solid var(--ies-gray-200);padding:20px;">
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
-          <span style="font-weight:600;color:var(--ies-navy);">Saved Scenarios</span>
-          <span id="fm-scenario-count" style="font-size:12px;background:var(--ies-orange);color:#fff;padding:2px 8px;border-radius:12px;">0</span>
-        </div>
-        <div id="fm-scenarios-list" style="display:flex;flex-direction:column;gap:12px;"></div>
-      </div>
-    </div>
   </div>
 </div>
 
@@ -10887,7 +10884,7 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
 <!-- Cost Model Interaction Tests (gated behind __CM_TEST_MODE__) -->
 <script src="js/cost-model-tests.js?v=20260405-s31"></script>
 <!-- Fleet Modeler: fmApp, lane optimization -->
-<script src="js/fleet-modeler.js?v=20260406-s3"></script>
+<script src="js/fleet-modeler.js?v=20260406-s6"></script>
 <!-- MOST Labor Standards: template library, analysis -->
 <script src="js/most-standards.js?v=20260405-s2"></script>
 <!-- Deck Generator: PptxGenJS presentation automation -->

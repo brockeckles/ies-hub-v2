@@ -3,6 +3,9 @@
    Extracted from index.html — all symbols kept as globals.
    ═══════════════════════════════════════════════════════════════════ */
 
+/* ── Active scenario tracking ── */
+var fmActiveScenarioId = null;
+
 /* ── Landing / Tool toggle helpers ── */
 
 async function fmShowLanding() {
@@ -18,6 +21,131 @@ async function fmShowTool() {
   var tool = document.getElementById('fm-tool');
   if (landing) landing.style.display = 'none';
   if (tool) tool.style.display = 'block';
+  await fmRefreshScenarioBar();
+}
+
+/* ── Scenario bar (mirrors NetOpt) ── */
+async function fmRefreshScenarioBar() {
+  try {
+    var scenarios = await cmFetchTable('fleet_scenarios', 'order=created_at.desc');
+    var sel = document.getElementById('fm-scenario-select');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">-- Select scenario --</option>';
+    (scenarios || []).forEach(function(s) {
+      var opt = document.createElement('option');
+      opt.value = s.id;
+      opt.textContent = s.name || 'Untitled';
+      if (String(s.id) === String(fmActiveScenarioId)) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  } catch (e) { console.warn('fmRefreshScenarioBar', e); }
+}
+
+async function fmLoadScenarioBar(id) {
+  try {
+    await fmLoadFleetScenario(id);
+    fmActiveScenarioId = id;
+    await fmRefreshScenarioBar();
+  } catch (e) { console.error(e); }
+}
+
+async function fmSaveScenarioBar() {
+  // Save = upsert: update active if loaded, otherwise create new
+  var nameInput = document.getElementById('fm-scenario-name');
+  var name = nameInput ? nameInput.value.trim() : '';
+  if (!name) { name = 'Fleet Scenario ' + new Date().toLocaleDateString(); nameInput.value = name; }
+  try {
+    var payload = {
+      name: name,
+      notes: (fmApp.config && fmApp.config.description) || '',
+      config: JSON.parse(JSON.stringify(fmApp.config)),
+      results: fmApp.results ? JSON.parse(JSON.stringify(fmApp.results)) : null
+    };
+    if (fmActiveScenarioId) {
+      // Update existing
+      await fetch(SUPABASE_URL + '/rest/v1/fleet_scenarios?id=eq.' + fmActiveScenarioId, {
+        method: 'PATCH',
+        headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
+        body: JSON.stringify(payload)
+      });
+      // Replace lanes
+      await fetch(SUPABASE_URL + '/rest/v1/fleet_lanes?scenario_id=eq.' + fmActiveScenarioId, {
+        method: 'DELETE',
+        headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY }
+      });
+      await fmInsertLanes(fmActiveScenarioId);
+      fmFlashSaveBtn();
+      if (typeof showToast === 'function') showToast('Scenario "' + name + '" saved');
+    } else {
+      var saved = await cmApiPost('fleet_scenarios', payload);
+      if (!saved || !saved[0]) { alert('Save failed'); return; }
+      fmActiveScenarioId = saved[0].id;
+      await fmInsertLanes(fmActiveScenarioId);
+      fmFlashSaveBtn();
+      if (typeof showToast === 'function') showToast('Scenario "' + name + '" created');
+    }
+    if (typeof markClean === 'function') markClean();
+    await fmRefreshScenarioBar();
+  } catch (e) {
+    console.error('fmSaveScenarioBar', e);
+    alert('Save error: ' + e.message);
+  }
+}
+
+async function fmSaveAsScenarioBar() {
+  // Always create new
+  var current = (document.getElementById('fm-scenario-name') || {}).value || '';
+  var name = prompt('Save as new scenario — name:', current ? current + ' (copy)' : '');
+  if (!name) return;
+  document.getElementById('fm-scenario-name').value = name;
+  fmActiveScenarioId = null;
+  await fmSaveScenarioBar();
+}
+
+async function fmDeleteScenarioBar() {
+  var sel = document.getElementById('fm-scenario-select');
+  var id = sel ? sel.value : null;
+  if (!id) { alert('Select a scenario from the dropdown to delete'); return; }
+  if (!confirm('Delete this scenario?')) return;
+  try {
+    await fetch(SUPABASE_URL + '/rest/v1/fleet_lanes?scenario_id=eq.' + id, {
+      method: 'DELETE', headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY }
+    });
+    await fetch(SUPABASE_URL + '/rest/v1/fleet_scenarios?id=eq.' + id, {
+      method: 'DELETE', headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY }
+    });
+    if (String(fmActiveScenarioId) === String(id)) fmActiveScenarioId = null;
+    document.getElementById('fm-scenario-name').value = '';
+    await fmRefreshScenarioBar();
+    if (typeof showToast === 'function') showToast('Scenario deleted');
+  } catch (e) { console.error(e); alert('Delete error: ' + e.message); }
+}
+
+async function fmInsertLanes(scenarioId) {
+  if (!fmApp.lanes || fmApp.lanes.length === 0) return;
+  var rows = fmApp.lanes.map(function(l) {
+    return {
+      scenario_id: scenarioId,
+      origin: l.origin || '',
+      destination: l.destination || '',
+      weekly_shipments: parseInt(l.weekly_shipments) || parseInt(l.weeklyShipments) || 0,
+      avg_weight_lbs: parseFloat(l.avg_weight) || parseFloat(l.avg_weight_lbs) || parseFloat(l.avgWeight) || 0,
+      avg_cube_ft3: parseFloat(l.avg_cube) || parseFloat(l.avg_cube_ft3) || parseFloat(l.avgCube) || 0,
+      delivery_window: l.delivery_window || l.deliveryWindow || '',
+      distance_miles: parseFloat(l.distance_miles) || parseFloat(l.distance) || 0
+    };
+  });
+  await cmApiPost('fleet_lanes', rows);
+}
+
+function fmFlashSaveBtn() {
+  var btn = document.querySelector('#fm-scenario-bar .wsc-action-btn');
+  if (!btn) return;
+  var orig = btn.innerHTML;
+  btn.innerHTML = '<svg width="13" height="13" fill="none" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" stroke="var(--ies-green)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Saved!';
+  btn.style.borderColor = 'var(--ies-green)';
+  btn.style.color = 'var(--ies-green)';
+  setTimeout(function() { btn.innerHTML = orig; btn.style.borderColor = ''; btn.style.color = ''; }, 1800);
 }
 
 async function fmLoadScenariosList() {
@@ -54,11 +182,19 @@ async function fmLoadScenariosList() {
 }
 
 function fmNewScenario() {
-  // Reset fleet modeler for new scenario (if function exists)
+  fmActiveScenarioId = null;
+  fmApp.lanes = [];
+  fmApp.results = null;
   if (typeof fmClearAllScenarios === 'function') {
     fmClearAllScenarios();
   }
+  var n = document.getElementById('fm-scenario-name'); if (n) n.value = '';
   fmShowTool();
+  setTimeout(function() {
+    fmApp.renderLanesTable();
+    if (document.getElementById('fm-no-results')) document.getElementById('fm-no-results').style.display = 'block';
+    if (document.getElementById('fm-results-content')) document.getElementById('fm-results-content').style.display = 'none';
+  }, 50);
 }
 
 async function fmLoadFleetScenario(id) {
@@ -67,6 +203,9 @@ async function fmLoadFleetScenario(id) {
     var scenarios = await cmFetchTable('fleet_scenarios', 'id=eq.' + id);
     if (!scenarios || scenarios.length === 0) { showToast('Scenario not found', 'error'); return; }
     var scenario = scenarios[0];
+    fmActiveScenarioId = scenario.id;
+    var nameInput = document.getElementById('fm-scenario-name');
+    if (nameInput) nameInput.value = scenario.name || '';
     var lanes = await cmFetchTable('fleet_lanes', 'scenario_id=eq.' + id + '&order=id.asc');
 
     // Map Supabase lanes into fmApp lane format (snake_case to match renderLanesTable)
@@ -90,10 +229,18 @@ async function fmLoadFleetScenario(id) {
 
     // Re-render lanes table
     fmApp.renderLanesTable();
-    fmApp.results = null;
-    document.getElementById('fm-no-results').style.display = 'block';
-    document.getElementById('fm-results-content').style.display = 'none';
-    fmShowTab('lanes');
+    // Restore saved results if present
+    fmApp.results = scenario.results || null;
+    if (fmApp.results) {
+      try { fmApp.renderResults(); } catch(_) {}
+      document.getElementById('fm-no-results').style.display = 'none';
+      document.getElementById('fm-results-content').style.display = 'block';
+      fmShowTab('results');
+    } else {
+      document.getElementById('fm-no-results').style.display = 'block';
+      document.getElementById('fm-results-content').style.display = 'none';
+      fmShowTab('lanes');
+    }
 
     showToast('Loaded scenario: ' + (scenario.scenario_name || scenario.name || 'Untitled'), 'success');
   } catch (e) {
@@ -1123,7 +1270,9 @@ const fmApp = {
 
   renderScenariosListLocal() {
     const container = document.getElementById('fm-scenarios-list');
-    document.getElementById('fm-scenario-count').textContent = this.scenarios.length;
+    if (!container) return; // Scenarios tab removed — bar handles list now
+    var countEl = document.getElementById('fm-scenario-count');
+    if (countEl) countEl.textContent = this.scenarios.length;
 
     if (this.scenarios.length === 0) {
       container.innerHTML = '<div style="color:var(--ies-gray-600);padding:20px;text-align:center;">No scenarios saved yet</div>';
