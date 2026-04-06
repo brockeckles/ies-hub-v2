@@ -1,0 +1,2413 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>IES Analytics Hub</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+  :root{
+    --bg:#0b1220; --panel:#111a2e; --panel2:#16223b; --ink:#e6ecf5; --muted:#97a3b8;
+    --accent:#ff6a00; --accent2:#ffa257; --line:#22304d; --ok:#4ade80; --warn:#fbbf24; --bad:#f87171;
+    --r-sm:6px; --r:10px; --r-lg:14px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 -apple-system,Segoe UI,Roboto,sans-serif}
+  a{color:var(--accent2)}
+  .app{display:grid;grid-template-columns:240px 1fr;min-height:100vh}
+  .side{background:var(--panel);border-right:1px solid var(--line);padding:18px 14px}
+  .brand{font-weight:800;font-size:16px;letter-spacing:.3px;margin-bottom:4px}
+  .brand span{color:var(--accent)}
+  .tag{font-size:11px;color:var(--muted);margin-bottom:18px}
+  .navitem{display:block;padding:10px 12px;border-radius:var(--r);color:var(--ink);text-decoration:none;cursor:pointer;margin-bottom:4px;font-size:13px}
+  .navitem:hover{background:var(--panel2)}
+  .navitem.active{background:var(--panel2);border-left:3px solid var(--accent);padding-left:9px}
+  .section-label{font-size:10px;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);margin:14px 0 6px}
+  .main{padding:28px 36px;max-width:1400px}
+  h1{margin:0 0 4px;font-size:22px}
+  .sub{color:var(--muted);margin-bottom:22px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);padding:20px;margin-bottom:18px}
+  .grid{display:grid;gap:14px}
+  .grid-2{grid-template-columns:1fr 1fr}
+  .grid-4{grid-template-columns:repeat(4,1fr)}
+  .btn{background:var(--accent);color:#0b1220;border:0;padding:10px 16px;border-radius:var(--r);font-weight:700;cursor:pointer;font-size:13px}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
+  .btn.sm{padding:5px 10px;font-size:11px}
+  .drop{border:2px dashed var(--line);border-radius:var(--r-lg);padding:36px;text-align:center;color:var(--muted);cursor:pointer;transition:.15s}
+  .drop:hover,.drop.hover{border-color:var(--accent);color:var(--ink);background:var(--panel2)}
+  .file-row{display:flex;justify-content:space-between;align-items:center;padding:12px;border:1px solid var(--line);border-radius:var(--r);margin-top:10px;background:var(--panel2)}
+  .pill{display:inline-block;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700}
+  .pill.ok{background:rgba(74,222,128,.15);color:var(--ok)}
+  .pill.warn{background:rgba(251,191,36,.15);color:var(--warn)}
+  .pill.bad{background:rgba(248,113,113,.15);color:var(--bad)}
+  .pill.mute{background:var(--panel2);color:var(--muted)}
+  .kpi{padding:14px;background:var(--panel2);border:1px solid var(--line);border-radius:var(--r)}
+  .kpi .v{font-size:15px;font-weight:800;word-break:break-word}
+  .kpi .l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+  th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+  .hidden{display:none}
+  .prov{font-size:11px;color:var(--muted);font-style:italic;margin-top:6px}
+  .finding{padding:12px;border-left:3px solid var(--line);margin-bottom:10px;background:var(--panel2);border-radius:0 var(--r) var(--r) 0}
+  .finding.crit{border-left-color:var(--bad)}
+  .finding.warn{border-left-color:var(--warn)}
+  .finding.ok{border-left-color:var(--ok)}
+  .finding h4{margin:0 0 4px;font-size:13px}
+  .finding p{margin:0;font-size:12px;color:var(--muted)}
+  select,input[type=text]{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:var(--r-sm);padding:6px 8px;font-size:12px}
+  .mapping-row{display:grid;grid-template-columns:1.2fr 1fr 1fr 80px;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
+  .mapping-row .src{font-family:ui-monospace,monospace;font-size:12px;color:var(--accent2)}
+  .conf-h{color:var(--ok);font-weight:700}
+  .conf-m{color:var(--warn);font-weight:700}
+  .conf-l{color:var(--bad);font-weight:700}
+  .sample{font-size:10px;color:var(--muted);font-family:ui-monospace,monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+  /* ---------- MOST shim: minimum CSS classes + vars ported from IES Hub ---------- */
+  :root{
+    --ies-orange:#ff6a00; --ies-orange-dark:#cc5500; --ies-navy:#0b1220; --ies-navy-light:#111a2e;
+    --ies-gray-50:#f8fafc; --ies-gray-100:#f1f5f9; --ies-gray-200:#e2e8f0; --ies-gray-300:#cbd5e1;
+    --ies-gray-400:#94a3b8; --ies-gray-500:#64748b; --ies-gray-600:#475569; --ies-gray-700:#334155;
+    --ies-gray-800:#1e293b; --ies-gray-900:#0f172a;
+  }
+  .dt-landing{padding:0}
+  .dt-landing-header{margin-bottom:20px}
+  .dt-landing-title{font-size:22px;font-weight:800;color:var(--ink)}
+  .dt-landing-subtitle{color:var(--muted);font-size:13px;margin-top:4px}
+  .dt-landing-back-btn{background:transparent;border:1px solid var(--line);color:var(--ink);padding:6px 12px;border-radius:var(--r-sm);cursor:pointer;font-size:12px;margin-bottom:12px}
+  .tour-trigger-icon{background:transparent;border:1px solid var(--line);color:var(--muted);padding:5px 10px;border-radius:var(--r-sm);cursor:pointer;font-size:11px;display:inline-flex;align-items:center;gap:6px}
+  .hub-btn{background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:var(--r-sm);cursor:pointer;padding:6px 14px;font-size:12px}
+  .hub-btn:hover{background:#1d2b48}
+  .cm-input,.cm-select{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:var(--r-sm);padding:6px 10px;font-size:13px}
+  .cm-table{width:100%;border-collapse:collapse;font-size:12px}
+  .cm-table th,.cm-table td{text-align:left;padding:6px 10px;border-bottom:1px solid var(--line)}
+  .cm-table th{color:var(--muted);font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.5px}
+  #toast{position:fixed;bottom:20px;right:20px;background:var(--panel2);border:1px solid var(--line);color:var(--ink);padding:12px 18px;border-radius:var(--r);box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:9999;display:none;font-size:13px}
+  #toast.show{display:block}
+</style>
+</head>
+<body>
+<div id="auth-gate" style="position:fixed;inset:0;z-index:99999;background:#0d0f14;display:flex;align-items:center;justify-content:center;font-family:Montserrat,sans-serif;">
+  <div style="text-align:center;max-width:400px;padding:40px;">
+    <div style="font-size:22px;font-weight:800;color:#fff;margin-bottom:6px;">IES <span style="background:linear-gradient(135deg,#ff6a00,#ffa257);-webkit-background-clip:text;color:transparent;">Analytics Hub</span></div>
+    <div style="font-size:13px;color:rgba(255,255,255,.5);margin-bottom:22px;">Enter team access code</div>
+    <input id="auth-input" type="password" placeholder="Access code" autofocus
+      style="width:100%;padding:12px 16px;border-radius:8px;border:1.5px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:#fff;font-size:15px;text-align:center;outline:none;box-sizing:border-box;"
+      onkeydown="if(event.key==='Enter')checkAuth()">
+    <button onclick="checkAuth()" style="margin-top:12px;width:100%;padding:12px;border:none;border-radius:8px;background:linear-gradient(135deg,#ff6a00,#ffa257);color:#fff;font-weight:700;font-size:14px;cursor:pointer;">Enter</button>
+    <div id="auth-error" style="color:#ef4444;font-size:12px;margin-top:10px;display:none;">Incorrect access code</div>
+  </div>
+</div>
+<script>
+function checkAuth(){
+  var i=document.getElementById('auth-input'),g=document.getElementById('auth-gate'),e=document.getElementById('auth-error');
+  var c=i.value.trim().toLowerCase();
+  if(c==='ies206'||c==='ies2026'||c==='ieshub'){g.style.display='none';sessionStorage.setItem('ies-analytics-auth','1');}
+  else{e.style.display='block';i.style.borderColor='#ef4444';setTimeout(function(){e.style.display='none';i.style.borderColor='rgba(255,255,255,.15)';},2000);}
+}
+if(sessionStorage.getItem('ies-analytics-auth')==='1'){document.getElementById('auth-gate').style.display='none';}
+</script>
+<div class="app">
+  <aside class="side">
+    <div class="brand">IES <span>Analytics</span> Hub</div>
+    <div class="tag">Solutions Design · GXO</div>
+    <div class="section-label">Tools</div>
+    <a class="navitem active" data-view="assess">Data Assessment</a>
+    <a class="navitem" data-view="most">MOST Labor Standards</a>
+    <div class="section-label">Session</div>
+    <a class="navitem" data-view="settings">Settings</a>
+    <a class="navitem" data-view="about">About</a>
+  </aside>
+
+  <main class="main">
+    <section id="view-assess">
+      <h1>Data Assessment</h1>
+      <div class="sub">Drop customer files as you received them. We'll detect the type, sniff the header row, fuzzy-map columns to our canonical schema, and flag anything we're not sure about for you to confirm.</div>
+
+      <div class="card">
+        <div id="drop" class="drop">
+          <div style="font-size:15px;font-weight:600;color:var(--ink)">Drop files here or click to browse</div>
+          <div style="margin-top:6px">Item master · Inbound history · Outbound history · Inventory snapshots</div>
+          <div style="margin-top:6px;font-size:11px">.xlsx · .xls · .csv · .tsv · any sheet layout · wide or long inventory</div>
+          <input id="fileInput" type="file" multiple accept=".xlsx,.xls,.csv,.tsv" class="hidden" />
+        </div>
+        <div id="fileList"></div>
+        <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn" id="runBtn" disabled>Run Assessment</button>
+          <button class="btn" id="ridgelineBtn" style="background:linear-gradient(135deg,#ff6a00,#ffa257)">★ Load Ridgeline (Full Demo)</button>
+          <button class="btn ghost" id="demoBtn">Quick Clean Demo</button>
+          <button class="btn ghost" id="messyDemoBtn">MESSY SAP Demo</button>
+          <button class="btn ghost" id="clearBtn">Clear</button>
+        </div>
+      </div>
+
+      <div id="mappingPanel" class="hidden"></div>
+
+      <div id="results" class="hidden">
+        <div class="card">
+          <h3 style="margin:0 0 12px">Report Card</h3>
+          <div id="reportCard" class="grid grid-4"></div>
+        </div>
+        <div class="card" id="vizCard">
+          <h3 style="margin:0 0 4px">Visual Report</h3>
+          <div class="prov" style="margin-bottom:14px">Data quality scorecard, Pareto, seasonality, DOH, velocity mix, and pick UOM — computed live from the canonical dataset.</div>
+          <div id="vizContent"></div>
+        </div>
+        <div class="card">
+          <h3 style="margin:0 0 12px">Findings</h3>
+          <div id="findings"></div>
+        </div>
+        <div class="card">
+          <h3 style="margin:0 0 12px">Cross-File Diagnostics</h3>
+          <div id="crossFile"></div>
+        </div>
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <h3 style="margin:0">Senior Analyst Narrative</h3>
+            <button class="btn" id="narrateBtn">Generate Narrative</button>
+          </div>
+          <div id="narrative"><p class="prov">Click "Generate Narrative" to have Claude read the findings and write a senior-analyst commentary: what's concerning, what to ask the customer, and what you should and shouldn't commit to from this data.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="view-settings" class="hidden">
+      <h1>Settings</h1>
+      <div class="sub">Bring-your-own-key. Your Anthropic API key is stored in your browser only — it never leaves your machine except in the direct call to the narrate edge function, which forwards it to Anthropic.</div>
+      <div class="card">
+        <label style="display:block;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Anthropic API Key</label>
+        <input type="password" id="apiKeyInput" class="cm-input" placeholder="sk-ant-..." style="width:100%;max-width:560px" />
+        <div style="margin-top:10px;display:flex;gap:10px">
+          <button class="btn" id="saveKeyBtn">Save Key</button>
+          <button class="btn ghost" id="clearKeyBtn">Clear</button>
+          <button class="btn ghost" id="testKeyBtn">Test Connection</button>
+        </div>
+        <div class="prov" id="keyStatus" style="margin-top:10px"></div>
+      </div>
+      <div class="card">
+        <label style="display:block;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Model</label>
+        <select id="modelSelect" class="cm-select" style="width:260px">
+          <option value="claude-sonnet-4-6" selected>Claude Sonnet 4.6 (recommended)</option>
+          <option value="claude-opus-4-6">Claude Opus 4.6 (slower, deeper)</option>
+          <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5 (fastest)</option>
+        </select>
+      </div>
+    </section>
+
+    <section id="view-most" class="hidden">
+  <div id="mostLandingPage" class="dt-landing">
+    <div class="dt-landing-header">
+      <button class="dt-landing-back-btn" onclick="document.querySelector('.navitem[data-view=assess]').click()">&#8592; Back to Design Tools</button>
+      <div class="dt-landing-title">MOST Labor Standards</div>
+      <div class="dt-landing-subtitle">Browse, manage, and analyze engineered time standards for warehouse operations</div>
+      <button class="tour-trigger-icon" onclick="showToast('Guided tours coming in a later build')" title="Start guided tour" style="margin-top:8px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg> Guided Tour</button>
+    </div>
+
+    <!-- Mode selector tabs -->
+    <div id="mostModeTabs" style="display:flex;gap:8px;margin-bottom:24px;">
+      <button class="hub-btn" id="mostModeLibrary" onclick="mostApp.switchMode('library')" style="padding:8px 20px;font-size:13px;font-weight:600;">Template Library</button>
+      <button class="hub-btn" id="mostModeAnalysis" onclick="mostApp.switchMode('analysis')" style="padding:8px 20px;font-size:13px;font-weight:600;opacity:0.5;">Quick Labor Analysis</button>
+      <button class="hub-btn" id="mostModeComposer" onclick="mostApp.switchMode('composer')" style="padding:8px 20px;font-size:13px;font-weight:600;opacity:0.5;">Workflow Composer</button>
+    </div>
+
+    <!-- ═══ TEMPLATE LIBRARY VIEW ═══ -->
+    <div id="mostLibraryView">
+      <!-- Filter/Search bar -->
+      <div style="display:flex;gap:12px;align-items:center;margin-bottom:20px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:200px;">
+          <input type="text" id="mostSearchInput" class="cm-input" placeholder="Search templates by name, process area, equipment..." oninput="mostApp.filterTemplates()" style="width:100%;max-width:400px;">
+        </div>
+        <select id="mostFilterArea" class="cm-select" onchange="mostApp.filterTemplates()" style="min-width:160px;">
+          <option value="">All Process Areas</option>
+          <option value="Receiving">Receiving</option>
+          <option value="Putaway">Putaway</option>
+          <option value="Replenishment">Replenishment</option>
+          <option value="Picking">Picking</option>
+          <option value="Packing">Packing</option>
+          <option value="Shipping">Shipping</option>
+        </select>
+        <select id="mostFilterUOM" class="cm-select" onchange="mostApp.filterTemplates()" style="min-width:120px;">
+          <option value="">All UOMs</option>
+          <option value="pallet">Pallet</option>
+          <option value="case">Case</option>
+          <option value="each">Each</option>
+          <option value="order">Order</option>
+        </select>
+        <select id="mostFilterCategory" class="cm-select" onchange="mostApp.filterTemplates()" style="min-width:140px;">
+          <option value="">All Categories</option>
+          <option value="manual">Manual</option>
+          <option value="mhe">MHE</option>
+          <option value="hybrid">Hybrid</option>
+        </select>
+        <div style="font-size:12px;color:var(--ies-gray-400);" id="mostTemplateCount">30 templates</div>
+        <button class="hub-btn" onclick="mostApp.showEditor(null)" style="padding:6px 16px;font-size:12px;font-weight:600;background:var(--ies-orange);color:#fff;border:none;border-radius:6px;cursor:pointer;">+ New Template</button>
+      </div>
+
+      <!-- Template cards grid -->
+      <div id="mostTemplateGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;"></div>
+    </div>
+
+    <!-- ═══ TEMPLATE DETAIL VIEW ═══ -->
+    <div id="mostDetailView" style="display:none;">
+      <button class="dt-landing-back-btn" onclick="mostApp.backToLibrary()" style="margin-bottom:16px;">&#8592; Back to Template Library</button>
+      <div id="mostDetailContent"></div>
+    </div>
+
+    <!-- ═══ TEMPLATE EDITOR VIEW ═══ -->
+    <div id="mostEditorView" style="display:none;">
+      <button class="dt-landing-back-btn" onclick="mostApp.cancelEditor()" style="margin-bottom:16px;">&#8592; Cancel</button>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+        <div style="font-size:20px;font-weight:700;color:var(--ies-navy);" id="mostEditorTitle">New Template</div>
+        <div style="display:flex;gap:8px;">
+          <button class="hub-btn" id="mostDeleteBtn" onclick="mostApp.deleteTemplate()" style="padding:6px 16px;font-size:12px;font-weight:600;background:#fee2e2;color:#dc2626;border:1px solid #fecaca;border-radius:6px;cursor:pointer;display:none;">Delete</button>
+          <button class="hub-btn" onclick="mostApp.saveTemplate()" style="padding:6px 20px;font-size:12px;font-weight:600;background:var(--ies-orange);color:#fff;border:none;border-radius:6px;cursor:pointer;">Save Template</button>
+        </div>
+      </div>
+
+      <!-- Metadata fields -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;">
+        <div>
+          <label style="font-size:12px;font-weight:600;color:var(--ies-gray-500);display:block;margin-bottom:4px;">Activity Name <span style="color:#dc2626;">*</span></label>
+          <input type="text" id="mostEdActivity" class="cm-input" placeholder="e.g., Receive Pallet — Floor Load" style="width:100%;">
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:var(--ies-gray-500);display:block;margin-bottom:4px;">Process Area <span style="color:#dc2626;">*</span></label>
+          <select id="mostEdArea" class="cm-select" style="width:100%;">
+            <option value="">Select...</option>
+            <option value="Receiving">Receiving</option>
+            <option value="Putaway">Putaway</option>
+            <option value="Replenishment">Replenishment</option>
+            <option value="Picking">Picking</option>
+            <option value="Packing">Packing</option>
+            <option value="Shipping">Shipping</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:var(--ies-gray-500);display:block;margin-bottom:4px;">UOM <span style="color:#dc2626;">*</span></label>
+          <select id="mostEdUOM" class="cm-select" style="width:100%;">
+            <option value="each">Each</option>
+            <option value="case">Case</option>
+            <option value="pallet">Pallet</option>
+            <option value="order">Order</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:var(--ies-gray-500);display:block;margin-bottom:4px;">Equipment Type</label>
+          <input type="text" id="mostEdEquipment" class="cm-input" placeholder="e.g., Reach Truck, RF Scanner" style="width:100%;">
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:var(--ies-gray-500);display:block;margin-bottom:4px;">WMS Transaction</label>
+          <input type="text" id="mostEdWMS" class="cm-input" placeholder="e.g., RF Receiving, Pick to Tote" style="width:100%;">
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:var(--ies-gray-500);display:block;margin-bottom:4px;">Pick Method</label>
+          <input type="text" id="mostEdPickMethod" class="cm-input" placeholder="e.g., Discrete, Batch, Cluster" style="width:100%;">
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:var(--ies-gray-500);display:block;margin-bottom:4px;">Labor Category</label>
+          <select id="mostEdCategory" class="cm-select" style="width:100%;">
+            <option value="manual">Manual</option>
+            <option value="mhe">MHE (Material Handling Equipment)</option>
+            <option value="hybrid">Hybrid</option>
+          </select>
+        </div>
+        <div style="grid-column:1/-1;">
+          <label style="font-size:12px;font-weight:600;color:var(--ies-gray-500);display:block;margin-bottom:4px;">Description</label>
+          <textarea id="mostEdDescription" class="cm-input" rows="2" placeholder="Brief description of this activity template..." style="width:100%;resize:vertical;font-family:inherit;"></textarea>
+        </div>
+      </div>
+
+      <!-- Computed metrics bar -->
+      <div id="mostEdMetrics" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;">
+        <div style="background:var(--ies-gray-50);border-radius:10px;padding:12px;text-align:center;">
+          <div style="font-size:20px;font-weight:700;color:var(--ies-orange);" id="mostEdUPH">0.0</div>
+          <div style="font-size:11px;color:var(--ies-gray-400);">UPH</div>
+        </div>
+        <div style="background:var(--ies-gray-50);border-radius:10px;padding:12px;text-align:center;">
+          <div style="font-size:20px;font-weight:700;color:var(--ies-navy);" id="mostEdTotalTMU">0</div>
+          <div style="font-size:11px;color:var(--ies-gray-400);">Total TMU</div>
+        </div>
+        <div style="background:var(--ies-gray-50);border-radius:10px;padding:12px;text-align:center;">
+          <div style="font-size:20px;font-weight:700;color:var(--ies-navy);" id="mostEdCycleTime">0.0s</div>
+          <div style="font-size:11px;color:var(--ies-gray-400);">Cycle Time</div>
+        </div>
+        <div style="background:var(--ies-gray-50);border-radius:10px;padding:12px;text-align:center;">
+          <div style="font-size:20px;font-weight:700;color:var(--ies-navy);" id="mostEdElCount">0</div>
+          <div style="font-size:11px;color:var(--ies-gray-400);">Elements</div>
+        </div>
+      </div>
+
+      <!-- Element sequence editor -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <div style="font-size:16px;font-weight:700;color:var(--ies-navy);">MOST Element Sequence</div>
+        <button class="hub-btn" onclick="mostApp.addElementRow()" style="padding:5px 14px;font-size:12px;font-weight:600;background:var(--ies-blue);color:#fff;border:none;border-radius:6px;cursor:pointer;">+ Add Element</button>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="cm-table" style="width:100%;font-size:12px;" id="mostEdTable">
+          <thead><tr>
+            <th style="width:30px;">#</th>
+            <th style="min-width:180px;">Element Name <span style="color:#dc2626;">*</span></th>
+            <th style="min-width:150px;">MOST Sequence <span style="color:#dc2626;">*</span></th>
+            <th style="min-width:120px;">Sequence Type</th>
+            <th style="width:80px;text-align:right;">TMU <span style="color:#dc2626;">*</span></th>
+            <th style="width:60px;text-align:center;">Variable</th>
+            <th style="min-width:130px;">Driver</th>
+            <th style="min-width:130px;">Formula</th>
+            <th style="width:60px;text-align:center;">Notes</th>
+            <th style="width:80px;text-align:center;">Actions</th>
+          </tr></thead>
+          <tbody id="mostEdTableBody"></tbody>
+        </table>
+      </div>
+      <div id="mostEdValidation" style="display:none;margin-top:12px;padding:10px 14px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;font-size:12px;color:#dc2626;"></div>
+    </div>
+
+    <!-- ═══ QUICK LABOR ANALYSIS VIEW ═══ -->
+    <div id="mostAnalysisView" style="display:none;">
+
+      <!-- Setup panel -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:24px;">
+        <div>
+          <label style="font-size:12px;font-weight:600;color:var(--ies-gray-500);display:block;margin-bottom:4px;">Shift Hours per Day</label>
+          <input type="number" id="qlaShiftHours" class="cm-input" value="8" min="1" max="24" step="0.5" style="width:100%;" onchange="mostApp.recalcAnalysis()">
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:var(--ies-gray-500);display:block;margin-bottom:4px;">Allowance Profile</label>
+          <select id="qlaAllowance" class="cm-select" style="width:100%;" onchange="mostApp.recalcAnalysis()">
+            <option value="0">None (0%)</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:var(--ies-gray-500);display:block;margin-bottom:4px;">Blended Hourly Rate ($)</label>
+          <input type="number" id="qlaHourlyRate" class="cm-input" value="18.50" min="0" step="0.25" style="width:100%;" onchange="mostApp.recalcAnalysis()">
+        </div>
+      </div>
+
+      <!-- Add activity row -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <div style="font-size:16px;font-weight:700;color:var(--ies-navy);">Activity Lines</div>
+        <div style="display:flex;gap:8px;">
+          <button class="hub-btn" onclick="mostApp.addAnalysisLine()" style="padding:5px 14px;font-size:12px;font-weight:600;background:var(--ies-blue);color:#fff;border:none;border-radius:6px;cursor:pointer;">+ Add Activity</button>
+          <button class="hub-btn" onclick="mostApp.clearAnalysis()" style="padding:5px 14px;font-size:12px;font-weight:600;background:var(--ies-gray-100);color:var(--ies-gray-600);border:1px solid var(--ies-gray-200);border-radius:6px;cursor:pointer;">Clear All</button>
+        </div>
+      </div>
+
+      <!-- Activity lines table -->
+      <div style="overflow-x:auto;margin-bottom:24px;">
+        <table class="cm-table" style="width:100%;font-size:12px;" id="qlaTable">
+          <thead><tr>
+            <th style="min-width:200px;">MOST Template</th>
+            <th style="width:90px;text-align:right;">Base UPH</th>
+            <th style="width:90px;text-align:right;">Adj. UPH</th>
+            <th style="width:100px;text-align:right;">Daily Volume</th>
+            <th style="width:90px;text-align:right;">Hours/Day</th>
+            <th style="width:80px;text-align:right;">FTEs</th>
+            <th style="width:100px;text-align:right;">Daily Cost</th>
+            <th style="width:50px;text-align:center;"><!--delete--></th>
+          </tr></thead>
+          <tbody id="qlaTableBody">
+            <tr><td colspan="8" style="text-align:center;padding:24px;color:var(--ies-gray-400);font-size:13px;">Click "+ Add Activity" to start modeling labor requirements.</td></tr>
+          </tbody>
+          <tfoot id="qlaTableFoot" style="display:none;">
+            <tr style="font-weight:700;border-top:2px solid var(--ies-gray-200);">
+              <td>TOTAL</td>
+              <td></td><td></td>
+              <td style="text-align:right;" id="qlaTotalVolume">—</td>
+              <td style="text-align:right;" id="qlaTotalHours">—</td>
+              <td style="text-align:right;color:var(--ies-orange);" id="qlaTotalFTEs">—</td>
+              <td style="text-align:right;color:var(--ies-orange);" id="qlaTotalCost">—</td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <!-- Results summary cards -->
+      <div id="qlaResults" style="display:none;">
+        <div style="font-size:16px;font-weight:700;color:var(--ies-navy);margin-bottom:12px;">Analysis Summary</div>
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:24px;">
+          <div style="background:var(--ies-gray-50);border-radius:10px;padding:16px;text-align:center;">
+            <div style="font-size:28px;font-weight:700;color:var(--ies-orange);" id="qlaResFTEs">0.0</div>
+            <div style="font-size:11px;color:var(--ies-gray-400);margin-top:4px;">Total FTEs</div>
+          </div>
+          <div style="background:var(--ies-gray-50);border-radius:10px;padding:16px;text-align:center;">
+            <div style="font-size:28px;font-weight:700;color:var(--ies-navy);" id="qlaResHeadcount">0</div>
+            <div style="font-size:11px;color:var(--ies-gray-400);margin-top:4px;">Headcount</div>
+          </div>
+          <div style="background:var(--ies-gray-50);border-radius:10px;padding:16px;text-align:center;">
+            <div style="font-size:28px;font-weight:700;color:var(--ies-navy);" id="qlaResHours">0.0</div>
+            <div style="font-size:11px;color:var(--ies-gray-400);margin-top:4px;">Hours/Day</div>
+          </div>
+          <div style="background:var(--ies-gray-50);border-radius:10px;padding:16px;text-align:center;">
+            <div style="font-size:28px;font-weight:700;color:var(--ies-navy);" id="qlaResDailyCost">$0</div>
+            <div style="font-size:11px;color:var(--ies-gray-400);margin-top:4px;">Daily Cost</div>
+          </div>
+          <div style="background:var(--ies-gray-50);border-radius:10px;padding:16px;text-align:center;">
+            <div style="font-size:28px;font-weight:700;color:var(--ies-navy);" id="qlaResAnnualCost">$0</div>
+            <div style="font-size:11px;color:var(--ies-gray-400);margin-top:4px;">Annual Cost (260d)</div>
+          </div>
+        </div>
+
+        <!-- Scenario comparison -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <div style="font-size:14px;font-weight:700;color:var(--ies-navy);">Scenario Comparison</div>
+          <button class="hub-btn" onclick="mostApp.saveScenario()" style="padding:5px 14px;font-size:12px;font-weight:600;background:var(--ies-orange);color:#fff;border:none;border-radius:6px;cursor:pointer;">Save as Scenario</button>
+        </div>
+        <div id="qlaScenariosGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;"></div>
+      </div>
+
+    </div>
+
+    <!-- ═══ WORKFLOW COMPOSER VIEW ═══ -->
+    <div id="mostComposerView" style="display:none;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+        <div>
+          <div style="font-size:18px;font-weight:700;color:var(--ies-navy);">Workflow Composer</div>
+          <div style="font-size:12px;color:var(--ies-gray-500);margin-top:2px;">Chain MOST templates into end-to-end warehouse workflows to identify bottlenecks and total throughput</div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="hub-btn" onclick="mostApp.addComposerStep()" style="padding:6px 16px;font-size:12px;font-weight:600;background:var(--ies-blue);color:#fff;border:none;border-radius:6px;cursor:pointer;">+ Add Step</button>
+          <button class="hub-btn" onclick="mostApp.clearComposer()" style="padding:6px 16px;font-size:12px;font-weight:600;background:var(--ies-gray-100);color:var(--ies-gray-600);border:1px solid var(--ies-gray-200);border-radius:6px;cursor:pointer;">Clear</button>
+        </div>
+      </div>
+
+      <!-- Workflow configuration -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:16px;margin-bottom:24px;">
+        <div>
+          <label style="font-size:12px;font-weight:600;color:var(--ies-gray-500);display:block;margin-bottom:4px;">Workflow Name</label>
+          <input type="text" id="wcWorkflowName" class="cm-input" value="Standard Warehouse Flow" style="width:100%;">
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:var(--ies-gray-500);display:block;margin-bottom:4px;">Target Volume / Day</label>
+          <input type="number" id="wcTargetVolume" class="cm-input" value="5000" min="1" step="100" style="width:100%;" onchange="mostApp.recalcComposer()">
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:var(--ies-gray-500);display:block;margin-bottom:4px;">Shift Hours</label>
+          <input type="number" id="wcShiftHours" class="cm-input" value="8" min="1" max="24" step="0.5" style="width:100%;" onchange="mostApp.recalcComposer()">
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:var(--ies-gray-500);display:block;margin-bottom:4px;">PFD Allowance (%)</label>
+          <input type="number" id="wcPFD" class="cm-input" value="15" min="0" max="50" step="1" style="width:100%;" onchange="mostApp.recalcComposer()">
+        </div>
+      </div>
+
+      <!-- Workflow steps (visual pipeline) -->
+      <div id="wcStepsContainer" style="margin-bottom:24px;">
+        <div style="text-align:center;padding:40px;color:var(--ies-gray-400);font-size:13px;border:2px dashed var(--ies-gray-200);border-radius:10px;">Click "+ Add Step" to build your warehouse workflow pipeline.</div>
+      </div>
+
+      <!-- Workflow results -->
+      <div id="wcResults" style="display:none;">
+        <div style="font-size:16px;font-weight:700;color:var(--ies-navy);margin-bottom:12px;">Workflow Analysis</div>
+
+        <!-- Summary cards -->
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:24px;" id="wcSummaryCards"></div>
+
+        <!-- Bottleneck alert -->
+        <div id="wcBottleneckAlert" style="display:none;margin-bottom:20px;padding:14px 16px;background:rgba(239,68,68,0.06);border-radius:10px;border-left:3px solid #ef4444;"></div>
+
+        <!-- Throughput bar chart -->
+        <div style="margin-bottom:24px;">
+          <div style="font-size:14px;font-weight:700;color:var(--ies-navy);margin-bottom:12px;">Step Throughput Comparison (UPH)</div>
+          <div id="wcBarChart" style="display:flex;align-items:flex-end;gap:8px;height:200px;padding:12px 0;"></div>
+        </div>
+
+        <!-- Labor breakdown by category -->
+        <div style="margin-bottom:24px;">
+          <div style="font-size:14px;font-weight:700;color:var(--ies-navy);margin-bottom:12px;">Labor Breakdown by Category</div>
+          <div id="wcCategoryBreakdown" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;"></div>
+        </div>
+
+        <!-- Detailed step table -->
+        <div>
+          <div style="font-size:14px;font-weight:700;color:var(--ies-navy);margin-bottom:12px;">Step-by-Step Detail</div>
+          <div style="overflow-x:auto;">
+            <table class="cm-table" style="width:100%;font-size:12px;" id="wcDetailTable">
+              <thead><tr>
+                <th style="width:30px;">#</th>
+                <th>Step Name</th>
+                <th>Template</th>
+                <th style="text-align:center;">Category</th>
+                <th style="text-align:right;">Base UPH</th>
+                <th style="text-align:right;">Adj. UPH</th>
+                <th style="text-align:right;">Cycle (sec)</th>
+                <th style="text-align:right;">FTEs Needed</th>
+                <th style="text-align:right;">Hours/Day</th>
+                <th style="text-align:center;">Bottleneck?</th>
+              </tr></thead>
+              <tbody id="wcDetailBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+    </section>
+
+    <section id="view-about" class="hidden">
+      <h1>About</h1>
+      <div class="sub">IES Analytics Hub — narrow-scope sister product to the IES Intelligence Hub.</div>
+      <div class="card">
+        <p><strong>Data Assessment</strong> turns raw customer data extracts into design-ready diagnostics. <strong>MOST Labor Standards</strong> provides predetermined motion time analysis.</p>
+        <p class="prov">GXO IES Solutions Design · v0.2 scaffold · 2026-04-06</p>
+      </div>
+    </section>
+  </main>
+</div>
+<div id="toast"></div>
+<script>
+/* ---------- Supabase + shim helpers for ported MOST module ---------- */
+var SUPABASE_URL = 'https://dklnwcshrpamzsybjlzb.supabase.co';
+var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRrbG53Y3NocnBhbXpzeWJqbHpiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3MTU3NzksImV4cCI6MjA5MDI5MTc3OX0.mj9TIj_rwxfbb9e2vBnA6hNYot5MX8-k1BbGfddAeJs';
+var sb = null;
+try { sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); } catch(e) { console.warn('Supabase init failed:', e); }
+function esc(str){ if(str==null) return ''; return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+function escAttr(s){ return esc(s); }
+function stripHtml(s){ if(!s) return ''; return String(s).replace(/<[^>]*>/g,''); }
+function fmtNum(n){ if(n==null||isNaN(n)) return '—'; return Number(n).toLocaleString(); }
+function showToast(msg){ var t=document.getElementById('toast'); if(!t) return; t.textContent=msg; t.classList.add('show'); clearTimeout(window.__toastT); window.__toastT=setTimeout(function(){t.classList.remove('show');},2500); }
+function startSectionTour(){ showToast('Guided tours coming in a later build'); }
+function navigate(){}
+function showSectionError(){}
+</script>
+<script>
+/* ============================================================
+   IES Analytics Hub v0.2
+   Phase 2 ingest pipeline: sheet pick → header sniff → file-type classify
+   → column fuzzy-map → content sniff → normalize → wide→long → confirm UI
+   ============================================================ */
+
+/* ---------- tiny utils ---------- */
+const norm = s => (s==null?'':s.toString()).toLowerCase().replace(/[^a-z0-9]/g,'');
+const tokens = s => (s==null?'':s.toString()).toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+const isNum = v => v!=null && v!=='' && !isNaN(+v);
+const isDateLike = v => {
+  if(v instanceof Date) return true;
+  if(typeof v==='number' && v>20000 && v<80000) return true; // excel serial
+  if(typeof v==='string'){
+    if(/^\d{4}-\d{1,2}-\d{1,2}/.test(v)) return true;
+    if(/^\d{1,2}\/\d{1,2}\/\d{2,4}/.test(v)) return true;
+    if(/^\d{1,2}-[a-z]{3}-\d{2,4}$/i.test(v)) return true;
+  }
+  return false;
+};
+const isZip = v => typeof v==='string' ? /^\d{5}(-\d{4})?$/.test(v.trim()) : (typeof v==='number' && v>=501 && v<=99999);
+
+/* ============================================================
+   CANONICAL SCHEMA + SYNONYMS
+   ============================================================ */
+const CANONICAL = {
+  item: {
+    label:'Item Master',
+    required:['sku','each_cube','each_weight','case_pack'],
+    fields:{
+      sku:         ['sku','item','itemnumber','itemid','itemno','itemcode','material','materialnumber','matnr','partnumber','partno','stockcode','article','productcode','prodcode'],
+      description: ['description','desc','itemdesc','productname','prodname','materialdesc','maktx','name','longdesc'],
+      gtin:        ['gtin','upc','ean','barcode','eancode'],
+      each_cube:   ['cube','cuft','cubicfeet','cubicfoot','volume','eachcube','unitcube','cf','cbm'],
+      each_length: ['length','itemlength','unitlength','lengthin'],
+      each_width:  ['width','itemwidth','unitwidth','widthin'],
+      each_height: ['height','itemheight','unitheight','heightin','depth'],
+      each_weight: ['weight','wt','itemweight','unitweight','eachweight','grossweight','gewei','lbs','kg','pounds'],
+      case_pack:   ['casepack','casesize','packsize','innerpack','unitspercase','eachespercase','pieces_per_case','qty_per_case','ti','hi','caseqty'],
+      case_cube:   ['casecube','casecubicfeet','cartoncube'],
+      case_weight: ['caseweight','cartonweight','grosscaseweight'],
+      pallet_ti:   ['ti','tie','cartonsperlayer'],
+      pallet_hi:   ['hi','high','layersperpallet'],
+      hazmat:      ['hazmat','haz','dg','dangerousgoods','unno','unnumber','hazclass','hazardclass'],
+      temp_zone:   ['tempzone','temp','temperature','storagetemp','climate'],
+      velocity:    ['velocity','velocityclass','abcclass','abc','movement','fastslow'],
+      active:      ['active','activeflag','status','discontinued','itemstatus'],
+      uom:         ['uom','baseuom','unitofmeasure','stockuom']
+    }
+  },
+  inbound: {
+    label:'Inbound History',
+    required:['receipt_id','received_at','sku','qty'],
+    fields:{
+      receipt_id:  ['receipt','receiptid','receiptno','asn','ponumber','po','pono','grn','deliveryno','receiptnumber','trailerid'],
+      trailer_id:  ['trailer','trailerid','containerid','container'],
+      received_at: ['receiveddate','receivedat','receiveddt','receiptdate','grndate','postingdate','arrivaldate','unloaddate','deliverydate'],
+      appointment_at:['appointment','appointmenttime','scheduledarrival','scheduleddt','apptdt'],
+      vendor:      ['vendor','vendorid','supplier','supplierid','vendorname','suppliername','shipper'],
+      origin:      ['origin','originport','originzip','shipfrom','shipfromzip','country','countryoforigin','countrycode'],
+      sku:         ['sku','item','itemnumber','itemid','material','materialnumber','matnr','partnumber'],
+      qty:         ['qty','quantity','receivedqty','qtyreceived','receivedqty','menge','eaches','units','unitsreceived'],
+      uom:         ['uom','unitofmeasure','receiveduom','baseuom'],
+      lot:         ['lot','lotnumber','batch','batchno'],
+      expiry:      ['expiry','expirydate','expirationdate','bestbydate']
+    }
+  },
+  outbound: {
+    label:'Outbound History',
+    required:['order_id','order_at','sku','qty','ship_to_zip','carrier'],
+    fields:{
+      order_id:    ['orderid','orderno','ordernumber','order','salesorder','salesorderno','sonumber','vbeln','so','orderkey'],
+      line_seq:    ['line','lineno','linenumber','linesequence','lineseq','posnr','item'],
+      order_at:    ['orderdate','orderdatetime','orderreleased','releasedate','releasedatetime','createddate','createdat'],
+      must_ship_by:['mustshipby','reqshipdate','requestedshipdate','duedate','promisedate','sladate'],
+      ship_at:     ['shipdate','shippeddate','shipdt','actualshipdate','shippedat'],
+      sku:         ['sku','item','itemnumber','itemid','material','matnr','partnumber','productcode'],
+      qty:         ['qty','quantity','orderqty','shippedqty','units','eaches','menge','unitsordered','unitsshipped'],
+      uom:         ['uom','unitofmeasure','orderuom','baseuom'],
+      ship_to_zip: ['shiptozip','shipzip','zipcode','postalcode','postcode','destzip','destinationzip','zip','plz'],
+      ship_to_city:['shiptocity','city','destcity'],
+      ship_to_state:['shiptostate','state','destinationstate','region'],
+      ship_to_country:['shiptocountry','country','destcountry'],
+      carrier:     ['carrier','scac','carriercode','shipvia','shipcarrier','serviceprovider'],
+      service:     ['service','servicelevel','servicecode','shipmode','mode'],
+      order_type:  ['ordertype','type','channel','salesorg','salestype','ordersource']
+    }
+  },
+  inventory: {
+    label:'Inventory Snapshot',
+    required:['snapshot_date','sku','qty_on_hand'],
+    fields:{
+      snapshot_date:['snapshotdate','snapshot','asofdate','asof','date','reportdate','monthenddate','periodenddate','period'],
+      sku:         ['sku','item','itemnumber','material','matnr','partnumber'],
+      location:    ['location','loc','bin','binloc','slot','storagelocation','lgpla','lgort','locationid','storageloc'],
+      location_type:['locationtype','loctype','bintype','storagetype','lgtyp'],
+      zone:        ['zone','area','section'],
+      qty_on_hand: ['qtyonhand','onhand','qtyavailable','stock','invqty','menge','inventory','currentqty','unitsonhand'],
+      uom:         ['uom','unitofmeasure','stockuom','baseuom'],
+      lot:         ['lot','batch','lotnumber'],
+      expiry:      ['expiry','expirationdate','bestbydate']
+    }
+  }
+};
+
+/* ============================================================
+   Ingest — parse file → pick sheet → sniff header row → raw rows
+   ============================================================ */
+const Ingest = (()=>{
+  async function parse(file){
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf,{type:'array',cellDates:true,cellNF:false});
+    const sheets = wb.SheetNames.map(n=>{
+      const sh = wb.Sheets[n];
+      const aoa = XLSX.utils.sheet_to_json(sh,{header:1,defval:null,raw:true,blankrows:false});
+      return { name:n, aoa, score: scoreSheet(aoa) };
+    }).sort((a,b)=>b.score-a.score);
+    const chosen = sheets[0];
+    if(!chosen || !chosen.aoa || !chosen.aoa.length)
+      return { file:file.name, headers:[], rows:[], sheetName:chosen?.name, warn:'Empty file' };
+    const hdrIdx = sniffHeaderRow(chosen.aoa);
+    const headers = (chosen.aoa[hdrIdx]||[]).map((h,i)=> h==null||h==='' ? `Column${i+1}` : String(h).trim());
+    const rows = [];
+    for(let r=hdrIdx+1;r<chosen.aoa.length;r++){
+      const row = chosen.aoa[r];
+      if(!row || row.every(c=>c==null||c==='')) continue;
+      const obj = {};
+      headers.forEach((h,i)=> obj[h] = row[i]==null?null:row[i]);
+      // skip totals/subtotal rows (first col contains "total" and most cells null)
+      const firstTxt = String(Object.values(obj)[0]||'').toLowerCase();
+      if(/\btotal\b|\bsubtotal\b|\bgrand total\b/.test(firstTxt) && Object.values(obj).filter(v=>v!=null).length<headers.length/2) continue;
+      rows.push(obj);
+    }
+    return { file:file.name, headers, rows, sheetName:chosen.name, sheetsConsidered:sheets.length };
+  }
+
+  // score a sheet by "looks like a data table"
+  function scoreSheet(aoa){
+    if(!aoa || !aoa.length) return 0;
+    let score = 0;
+    const firstDataRow = aoa.find(r=>r && r.some(c=>c!=null&&c!==''));
+    if(!firstDataRow) return 0;
+    score += Math.min(aoa.length, 100); // row count
+    score += (firstDataRow.filter(c=>c!=null).length)*2; // width
+    return score;
+  }
+
+  // find the most header-like row in the first 20
+  function sniffHeaderRow(aoa){
+    const LOOK = Math.min(aoa.length, 20);
+    let best = 0, bestScore = -1;
+    for(let i=0;i<LOOK;i++){
+      const row = aoa[i]||[];
+      const nonNull = row.filter(c=>c!=null&&c!=='');
+      if(nonNull.length<2) continue;
+      let s = 0;
+      s += nonNull.length*2;
+      // header-ish: short strings, no numbers, unique
+      const unique = new Set(nonNull.map(c=>String(c).trim())).size;
+      s += unique*2;
+      const strCount = nonNull.filter(c=>typeof c==='string' && c.length<40 && !/^\d+(\.\d+)?$/.test(c)).length;
+      s += strCount*3;
+      // penalty if any cell is a date or big number (real header rows rarely have those)
+      const numCount = nonNull.filter(c=>typeof c==='number').length;
+      s -= numCount*2;
+      // bonus: row below looks like data (has numbers or dates)
+      const next = aoa[i+1]||[];
+      const nextHasData = next.some(c=>typeof c==='number' || isDateLike(c));
+      if(nextHasData) s += 10;
+      if(s>bestScore){ bestScore=s; best=i; }
+    }
+    return best;
+  }
+
+  return { parse };
+})();
+
+/* ============================================================
+   Classify — which canonical type is this file?
+   Uses both header hits AND required-field coverage.
+   ============================================================ */
+const Classify = (()=>{
+  function classify(headers){
+    const scores = {};
+    for(const [type,def] of Object.entries(CANONICAL)){
+      let hits = 0, fields = 0;
+      for(const [canon,syns] of Object.entries(def.fields)){
+        const match = headers.find(h=>Mapper.matchScore(h,canon,syns) > 0.5);
+        if(match){ hits++; if(def.required.includes(canon)) fields+=3; else fields+=1; }
+      }
+      scores[type] = fields;
+    }
+    const ranked = Object.entries(scores).sort((a,b)=>b[1]-a[1]);
+    const [type,score] = ranked[0];
+    return score>=4 ? {type,label:CANONICAL[type].label,score} : {type:null,label:'Unknown — needs manual type',score};
+  }
+  return { classify };
+})();
+
+/* ============================================================
+   Mapper — fuzzy map source headers → canonical fields
+   Returns {canonical_field: {source, confidence, evidence}}
+   ============================================================ */
+const Mapper = (()=>{
+  // score how well a header matches a canonical field with its synonym list
+  function matchScore(header, canonical, synonyms){
+    const h = norm(header);
+    const ht = tokens(header);
+    let best = 0;
+    const candidates = [canonical, ...synonyms];
+    for(const c of candidates){
+      const cn = norm(c);
+      if(h === cn) { best = Math.max(best, 1.0); continue; }
+      if(h.includes(cn) && cn.length>=3) best = Math.max(best, 0.85);
+      if(cn.includes(h) && h.length>=3) best = Math.max(best, 0.8);
+      // token overlap
+      const ct = tokens(c);
+      const overlap = ct.filter(t=>ht.includes(t)).length;
+      if(overlap>0) best = Math.max(best, 0.6 + 0.1*overlap);
+    }
+    return best;
+  }
+
+  function mapHeaders(headers, type, sampleRows){
+    const def = CANONICAL[type];
+    if(!def) return {};
+    const mapping = {};
+    const used = new Set();
+    // pass 1: header-name fuzzy
+    for(const [canon,syns] of Object.entries(def.fields)){
+      let best = {source:null, conf:0};
+      for(const h of headers){
+        if(used.has(h)) continue;
+        const s = matchScore(h, canon, syns);
+        if(s > best.conf) best = {source:h, conf:s};
+      }
+      if(best.source && best.conf >= 0.55){
+        mapping[canon] = { source:best.source, confidence:best.conf, evidence:'header name' };
+        used.add(best.source);
+      }
+    }
+    // pass 2: content-sniff for still-missing required fields
+    for(const canon of def.required){
+      if(mapping[canon]) continue;
+      const candidate = contentSniff(canon, headers.filter(h=>!used.has(h)), sampleRows);
+      if(candidate){
+        mapping[canon] = { source:candidate.header, confidence:candidate.conf, evidence:'content-sniff: '+candidate.reason };
+        used.add(candidate.header);
+      }
+    }
+    return mapping;
+  }
+
+  function contentSniff(canon, headers, sample){
+    const samples = sample.slice(0,50);
+    for(const h of headers){
+      const vals = samples.map(r=>r[h]).filter(v=>v!=null&&v!=='');
+      if(!vals.length) continue;
+      if(canon==='ship_to_zip'){
+        const zipRate = vals.filter(isZip).length/vals.length;
+        if(zipRate>0.7) return {header:h, conf:0.75, reason:`${(zipRate*100).toFixed(0)}% look like ZIPs`};
+      }
+      if(canon==='order_at' || canon==='received_at' || canon==='snapshot_date'){
+        const dateRate = vals.filter(isDateLike).length/vals.length;
+        if(dateRate>0.7) return {header:h, conf:0.7, reason:`${(dateRate*100).toFixed(0)}% look like dates`};
+      }
+      if(canon==='qty' || canon==='qty_on_hand'){
+        const numRate = vals.filter(isNum).length/vals.length;
+        const avg = vals.filter(isNum).reduce((a,b)=>a+ +b,0)/Math.max(vals.filter(isNum).length,1);
+        if(numRate>0.9 && avg>0 && avg<100000) return {header:h, conf:0.6, reason:`numeric, avg ${avg.toFixed(0)}`};
+      }
+      if(canon==='sku'){
+        const strRate = vals.filter(v=>typeof v==='string'||typeof v==='number').length/vals.length;
+        const unique = new Set(vals).size;
+        if(strRate>0.9 && unique/vals.length>0.1) return {header:h, conf:0.55, reason:`${unique} distinct values`};
+      }
+    }
+    return null;
+  }
+
+  return { mapHeaders, matchScore };
+})();
+
+/* ============================================================
+   Normalize — apply mapping + clean values to canonical rows
+   ============================================================ */
+const Normalize = (()=>{
+  function toDate(v){
+    if(v==null||v==='') return null;
+    if(v instanceof Date) return v;
+    if(typeof v==='number'){
+      // excel serial → JS date
+      const d = new Date(Math.round((v-25569)*86400*1000));
+      return isNaN(d)?null:d;
+    }
+    const d = new Date(v);
+    return isNaN(d)?null:d;
+  }
+  function toNum(v){
+    if(v==null||v==='') return null;
+    if(typeof v==='number') return v;
+    const s = String(v).replace(/[,$]/g,'').trim();
+    if(s==='' ) return null;
+    const n = +s;
+    return isNaN(n)?null:n;
+  }
+  function cleanUom(v){
+    if(v==null) return null;
+    const s = String(v).toUpperCase().trim();
+    const map = {EA:'EA','EACH':'EA','EACHES':'EA','EA.':'EA','UNIT':'EA','UNITS':'EA','PC':'EA','PCS':'EA','PIECE':'EA','PIECES':'EA',
+                 CS:'CS','CASE':'CS','CASES':'CS','CTN':'CS','CARTON':'CS','CARTONS':'CS','BOX':'CS','BOXES':'CS',
+                 PL:'PL','PLT':'PL','PALLET':'PL','PALLETS':'PL','SKID':'PL','SKIDS':'PL'};
+    return map[s] || s;
+  }
+  function cleanZip(v){
+    if(v==null) return null;
+    const s = String(v).trim();
+    const m = s.match(/^(\d{3,5})/);
+    return m ? m[1].padStart(5,'0') : s;
+  }
+
+  function apply(rawRows, mapping, type){
+    return rawRows.map(r=>{
+      const out = {};
+      for(const [canon,info] of Object.entries(mapping)){
+        let v = r[info.source];
+        if(/_at$|_date$/.test(canon)) v = toDate(v);
+        else if(canon==='qty'||canon==='qty_on_hand'||/cube|weight|pack/.test(canon)) v = toNum(v);
+        else if(canon==='uom') v = cleanUom(v);
+        else if(canon==='ship_to_zip') v = cleanZip(v);
+        out[canon] = v;
+      }
+      return out;
+    });
+  }
+  return { apply };
+})();
+
+/* ============================================================
+   WideToLong — detect wide inventory (one col per month) and pivot
+   ============================================================ */
+const WideToLong = (()=>{
+  function maybePivot(parsed){
+    // only attempt on inventory-shaped files
+    const headers = parsed.headers;
+    const dateCols = headers.filter(h=>{
+      const s = String(h).trim();
+      if(/^\d{4}[-/]\d{1,2}/.test(s)) return true;
+      if(/^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*[- ]?\d{2,4}/i.test(s)) return true;
+      if(/^q[1-4][- ]?\d{2,4}/i.test(s)) return true;
+      return false;
+    });
+    if(dateCols.length<3) return parsed; // not wide
+    const idCols = headers.filter(h=>!dateCols.includes(h));
+    const longRows = [];
+    for(const r of parsed.rows){
+      for(const dc of dateCols){
+        const v = r[dc];
+        if(v==null||v==='') continue;
+        const o = {};
+        idCols.forEach(c=>o[c]=r[c]);
+        o['snapshot_date'] = dc;
+        o['qty_on_hand'] = v;
+        longRows.push(o);
+      }
+    }
+    return {...parsed, headers:[...idCols,'snapshot_date','qty_on_hand'], rows:longRows, pivoted:true, pivotedFrom:dateCols.length};
+  }
+  return { maybePivot };
+})();
+
+/* ============================================================
+   State + orchestration
+   ============================================================ */
+const App = (()=>{
+  const state = { files: [] };
+  // file: {name, sheetName, headers, rawRows, detected, mapping, canonicalRows, pivoted}
+
+  // --- nav ---
+  document.querySelectorAll('.navitem').forEach(n=>{
+    n.addEventListener('click',()=>{
+      const v=n.dataset.view; if(!v) return;
+      document.querySelectorAll('.navitem').forEach(x=>x.classList.remove('active'));
+      n.classList.add('active');
+      ['assess','most','settings','about'].forEach(id=>{
+        document.getElementById('view-'+id).classList.toggle('hidden', id!==v);
+      });
+    });
+  });
+
+  // --- drop zone ---
+  const drop = document.getElementById('drop');
+  const fileInput = document.getElementById('fileInput');
+  drop.addEventListener('click',()=>fileInput.click());
+  ['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('hover');}));
+  ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('hover');}));
+  drop.addEventListener('drop',e=>handleFiles(e.dataTransfer.files));
+  fileInput.addEventListener('change',e=>handleFiles(e.target.files));
+
+  async function handleFiles(fl){
+    for(const f of fl){
+      try {
+        let parsed = await Ingest.parse(f);
+        parsed = WideToLong.maybePivot(parsed);
+        const detected = Classify.classify(parsed.headers);
+        const mapping = detected.type ? Mapper.mapHeaders(parsed.headers, detected.type, parsed.rows) : {};
+        state.files.push({
+          name:f.name, sheetName:parsed.sheetName, headers:parsed.headers,
+          rawRows:parsed.rows, detected, mapping, canonicalRows:null,
+          pivoted:parsed.pivoted||false, pivotedFrom:parsed.pivotedFrom||0
+        });
+      } catch(err){
+        console.error(err);
+        alert('Failed to parse '+f.name+': '+err.message);
+      }
+    }
+    renderFileList();
+    renderMappingPanel();
+  }
+
+  // Accept pre-parsed files (demo button)
+  function addPreParsed(files){
+    for(const pf of files){
+      const parsed = WideToLong.maybePivot({headers:pf.headers, rows:pf.rows, sheetName:'demo'});
+      const detected = Classify.classify(parsed.headers);
+      const mapping = detected.type ? Mapper.mapHeaders(parsed.headers, detected.type, parsed.rows) : {};
+      state.files.push({
+        name:pf.name, sheetName:'demo', headers:parsed.headers,
+        rawRows:parsed.rows, detected, mapping, canonicalRows:null,
+        pivoted:parsed.pivoted||false, pivotedFrom:parsed.pivotedFrom||0
+      });
+    }
+    renderFileList();
+    renderMappingPanel();
+  }
+
+  function renderFileList(){
+    const el = document.getElementById('fileList');
+    el.innerHTML = state.files.map((f,i)=>{
+      const reqCount = f.detected.type ? CANONICAL[f.detected.type].required.length : 0;
+      const mappedReq = f.detected.type ? CANONICAL[f.detected.type].required.filter(c=>f.mapping[c]).length : 0;
+      const cls = !f.detected.type ? 'warn' : (mappedReq===reqCount?'ok':'warn');
+      return `
+      <div class="file-row">
+        <div style="min-width:0">
+          <div style="font-weight:600">${f.name}${f.pivoted?' <span class="pill mute">pivoted ${f.pivotedFrom}→long</span>':''}</div>
+          <div style="font-size:11px;color:var(--muted)">sheet "${f.sheetName}" · ${f.rawRows.length.toLocaleString()} rows · ${f.headers.length} columns · mapped ${Object.keys(f.mapping).length}/${Object.keys(CANONICAL[f.detected.type]?.fields||{}).length} fields</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span class="pill ${cls}">${f.detected.label}</span>
+          <button class="btn ghost sm" onclick="App.toggleMap(${i})">Review mapping</button>
+          <button class="btn ghost sm" onclick="App.removeFile(${i})">×</button>
+        </div>
+      </div>`;
+    }).join('');
+    document.getElementById('runBtn').disabled = state.files.length===0;
+  }
+
+  let openMap = null;
+  function toggleMap(i){ openMap = (openMap===i?null:i); renderMappingPanel(); }
+
+  function renderMappingPanel(){
+    const panel = document.getElementById('mappingPanel');
+    if(openMap==null || !state.files[openMap]){ panel.classList.add('hidden'); panel.innerHTML=''; return; }
+    const f = state.files[openMap];
+    const def = CANONICAL[f.detected.type];
+    panel.classList.remove('hidden');
+    const typeOpts = Object.entries(CANONICAL).map(([k,v])=>`<option value="${k}" ${k===f.detected.type?'selected':''}>${v.label}</option>`).join('');
+    if(!def){
+      panel.innerHTML = `<div class="card">
+        <h3 style="margin:0 0 12px">Column mapping — ${f.name}</h3>
+        <p class="prov">Could not auto-detect file type. Pick one:</p>
+        <select onchange="App.setType(${openMap},this.value)"><option value="">— select —</option>${typeOpts}</select>
+      </div>`;
+      return;
+    }
+    const canonicals = Object.keys(def.fields);
+    const rows = canonicals.map(canon=>{
+      const m = f.mapping[canon];
+      const req = def.required.includes(canon);
+      const conf = m ? m.confidence : 0;
+      const confLabel = conf>=0.8?`<span class="conf-h">${(conf*100).toFixed(0)}%</span>`
+                       :conf>=0.6?`<span class="conf-m">${(conf*100).toFixed(0)}%</span>`
+                       :conf>0?`<span class="conf-l">${(conf*100).toFixed(0)}%</span>`
+                       :'<span class="conf-l">—</span>';
+      const sample = m ? f.rawRows.slice(0,3).map(r=>r[m.source]).filter(v=>v!=null).join(' · ') : '';
+      const opts = ['<option value="">— unmapped —</option>',
+        ...f.headers.map(h=>`<option value="${h}" ${m&&m.source===h?'selected':''}>${h}</option>`)].join('');
+      return `<div class="mapping-row">
+        <div>
+          <div><strong>${canon}</strong>${req?' <span class="pill bad" style="padding:1px 6px;font-size:9px">REQ</span>':''}</div>
+          <div class="prov" style="margin:2px 0 0">${m?m.evidence:'not mapped'}</div>
+        </div>
+        <select onchange="App.remap(${openMap},'${canon}',this.value)">${opts}</select>
+        <div class="sample">${sample||'—'}</div>
+        <div style="text-align:right">${confLabel}</div>
+      </div>`;
+    }).join('');
+    panel.innerHTML = `<div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <h3 style="margin:0">Column mapping — ${f.name}</h3>
+        <select onchange="App.setType(${openMap},this.value)">${typeOpts}</select>
+      </div>
+      <p class="prov">High-confidence matches auto-accepted. Remap anything we got wrong — your changes apply instantly.</p>
+      <div class="mapping-row" style="color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.5px">
+        <div>Canonical field</div><div>Source column</div><div>Sample values</div><div style="text-align:right">Confidence</div>
+      </div>
+      ${rows}
+    </div>`;
+  }
+
+  function setType(i,type){
+    const f = state.files[i];
+    f.detected = {type, label:CANONICAL[type]?.label||'Unknown', score:0};
+    f.mapping = type ? Mapper.mapHeaders(f.headers, type, f.rawRows) : {};
+    renderFileList(); renderMappingPanel();
+  }
+  function remap(i,canon,src){
+    const f = state.files[i];
+    if(src) f.mapping[canon] = {source:src, confidence:1.0, evidence:'manual'};
+    else delete f.mapping[canon];
+    renderFileList(); renderMappingPanel();
+  }
+  function removeFile(i){
+    state.files.splice(i,1);
+    if(openMap===i) openMap=null;
+    else if(openMap!=null && openMap>i) openMap--;
+    renderFileList(); renderMappingPanel();
+  }
+
+  document.getElementById('clearBtn').addEventListener('click',()=>{
+    state.files=[]; openMap=null; renderFileList(); renderMappingPanel();
+    document.getElementById('results').classList.add('hidden');
+  });
+
+  document.getElementById('runBtn').addEventListener('click',()=>{
+    // normalize each file with its mapping
+    for(const f of state.files){
+      if(f.detected.type) f.canonicalRows = Normalize.apply(f.rawRows, f.mapping, f.detected.type);
+    }
+    const report = Engine.run(state.files);
+    window.__lastReport = report;
+    document.getElementById('narrative').innerHTML = '<p class="prov">Click "Generate Narrative" to have Claude read the findings.</p>';
+    document.getElementById('narrateBtn').textContent = 'Generate Narrative';
+    Render.report(report);
+    try { document.getElementById('vizContent').innerHTML = Viz.render(state.files); }
+    catch(e){ console.error('Viz error',e); document.getElementById('vizContent').innerHTML='<div class="prov">Visual report unavailable: '+esc(e.message)+'</div>'; }
+  });
+
+  document.getElementById('demoBtn').addEventListener('click',()=>addPreParsed(DemoData.clean()));
+  document.getElementById('messyDemoBtn').addEventListener('click',()=>addPreParsed(DemoData.messy()));
+  document.getElementById('ridgelineBtn').addEventListener('click',()=>{
+    state.files=[]; openMap=null;
+    addPreParsed(DemoData.ridgeline());
+    showToast('Ridgeline Outdoor Co. — 2,400 SKUs, 24k outbound lines, 6k receipts, 8 inventory snapshots');
+  });
+
+  return { removeFile, toggleMap, setType, remap };
+})();
+
+/* ============================================================
+   Engine — per-file profiling batteries + cross-file diagnostics
+   Phase 3: real math. Operates on CANONICAL fields only.
+   ============================================================ */
+const Engine = (()=>{
+  // utils
+  const pct = (n,d)=> d ? (n/d*100) : 0;
+  const sum = a => a.reduce((x,y)=>x+(+y||0),0);
+  const mean = a => a.length ? sum(a)/a.length : 0;
+  const histoMode = a => {
+    if(!a.length) return null;
+    const m = {}; a.forEach(v=>m[v]=(m[v]||0)+1);
+    return Object.entries(m).sort((x,y)=>y[1]-x[1])[0];
+  };
+  const parseDate = v => { if(v instanceof Date) return v; const d = new Date(v); return isNaN(d)?null:d; };
+
+  function run(files){
+    const perFile = files.map(f=>{
+      const fn = f.detected.type ? Batteries[f.detected.type] : Batteries.unknown;
+      return { file:f, result: fn(f) };
+    });
+    // index files by type for cross
+    const byType = {};
+    files.forEach(f=>{ if(f.detected.type && f.canonicalRows) byType[f.detected.type]=f; });
+    const cross = Cross.run(byType);
+    return { perFile, cross };
+  }
+
+  const Batteries = {
+    /* ---------- ITEM MASTER ---------- */
+    item(f){
+      const rows = f.canonicalRows||[];
+      const findings = [];
+      const missingReq = CANONICAL.item.required.filter(c=>!f.mapping[c]);
+      if(missingReq.length){
+        findings.push({sev:'crit',title:'Required fields not mapped',detail:missingReq.join(', ')});
+        return { status:'insufficient', findings, rowCount:rows.length };
+      }
+      // null rates
+      const nullRate = k => rows.length ? rows.filter(r=>r[k]==null||r[k]===0).length/rows.length : 1;
+      const cr = nullRate('each_cube'), wr = nullRate('each_weight'), cpr = nullRate('case_pack');
+      if(cr>0.05) findings.push({sev:'crit',title:`Each-cube null/zero ${cr.toFixed(3).slice(2)}%`,detail:`${(cr*100).toFixed(1)}% of SKUs missing cube — exceeds 5% threshold. NOT DESIGN-READY.`});
+      else findings.push({sev:'ok',title:`Cube completeness ${(100-cr*100).toFixed(1)}%`,detail:'Within tolerance'});
+      if(wr>0.05) findings.push({sev:'warn',title:`Weight null rate ${(wr*100).toFixed(1)}%`,detail:'Over 5% threshold'});
+      if(cpr>0.05) findings.push({sev:'warn',title:`Case pack null rate ${(cpr*100).toFixed(1)}%`,detail:'Required to reconcile pick UOM'});
+
+      // duplicate-default cube tell
+      const cubeVals = rows.map(r=>r.each_cube).filter(isNum);
+      const top = histoMode(cubeVals);
+      if(top && top[1]/cubeVals.length>0.3) findings.push({sev:'warn',title:`${((top[1]/cubeVals.length)*100).toFixed(0)}% of SKUs share cube=${top[0]}`,detail:'Suspicious uniform value — likely a default plugged into the ERP field, not real measured data'});
+
+      // UOM hierarchy multiply-out check (if case_cube mapped)
+      if(f.mapping.case_cube){
+        let mismatch = 0, checked = 0;
+        rows.forEach(r=>{
+          if(isNum(r.each_cube)&&isNum(r.case_cube)&&isNum(r.case_pack)&&r.case_pack>0){
+            checked++;
+            const expected = r.each_cube * r.case_pack;
+            const delta = Math.abs(expected - r.case_cube) / Math.max(r.case_cube,0.001);
+            if(delta > 0.15) mismatch++;
+          }
+        });
+        if(checked>0){
+          const rate = mismatch/checked;
+          if(rate>0.1) findings.push({sev:'warn',title:`UOM hierarchy mismatch ${(rate*100).toFixed(1)}%`,detail:`${mismatch} of ${checked} SKUs have each_cube × case_pack that disagrees with case_cube by >15% — hierarchy is lying somewhere`});
+          else findings.push({sev:'ok',title:`UOM hierarchy reconciles (${(rate*100).toFixed(1)}% mismatch)`,detail:'Each × pack ≈ case cube for the vast majority of SKUs'});
+        }
+      }
+
+      // duplicate SKU / GTIN
+      const skuField = 'sku';
+      const seen = {};
+      rows.forEach(r=>{ if(r[skuField]!=null) seen[r[skuField]]=(seen[r[skuField]]||0)+1; });
+      const dupes = Object.values(seen).filter(c=>c>1).length;
+      if(dupes>0) findings.push({sev:'warn',title:`${dupes} duplicate SKUs`,detail:'Same SKU appears on multiple rows — possible case-pack drift or ERP merge artifact'});
+      if(f.mapping.gtin){
+        const gs = {};
+        rows.forEach(r=>{ if(r.gtin) gs[r.gtin]=(gs[r.gtin]||0)+1; });
+        const gdupes = Object.values(gs).filter(c=>c>1).length;
+        if(gdupes>0) findings.push({sev:'warn',title:`${gdupes} duplicate GTINs`,detail:'Same barcode under multiple SKUs — classic merger/migration artifact'});
+      }
+
+      // weight vs cube density outliers
+      const densities = rows.filter(r=>isNum(r.each_cube)&&isNum(r.each_weight)&&r.each_cube>0).map(r=>r.each_weight/r.each_cube);
+      if(densities.length>20){
+        const m = mean(densities);
+        const outliers = densities.filter(d=>d>m*10||d<m/10).length;
+        if(outliers/densities.length>0.05) findings.push({sev:'warn',title:`${outliers} density outliers`,detail:'SKUs with weight/cube ratio >10× or <1/10× the mean — likely unit-of-measure errors or bad data'});
+      }
+
+      // hazmat keyword scan
+      const hazFlag = f.mapping.hazmat;
+      const descField = f.mapping.description?.source;
+      if(descField){
+        const HAZ_RE = /\b(lithium|aerosol|alcohol|battery|batteries|flammable|corrosive|ethanol|acetone|propane|butane|peroxide)\b/i;
+        const kwHits = f.rawRows.filter(r=>HAZ_RE.test(String(r[descField]||''))).length;
+        if(kwHits>0){
+          if(!hazFlag) findings.push({sev:'warn',title:`${kwHits} SKUs look hazmat by description`,detail:'No hazmat flag column — keyword scan flags lithium/aerosol/alcohol/battery/flammable in description. Ask customer for hazmat master.'});
+          else {
+            // compare: % of keyword-hit SKUs that are flagged
+            const flaggedKwHits = f.rawRows.filter(r=>{
+              if(!HAZ_RE.test(String(r[descField]||''))) return false;
+              const v = r[f.mapping.hazmat.source];
+              return v!=null && v!=='' && v!=='N' && v!==0 && v!=='No';
+            }).length;
+            const unflagged = kwHits - flaggedKwHits;
+            if(unflagged>0) findings.push({sev:'warn',title:`${unflagged} description-hazmat but flag=empty`,detail:`${kwHits} SKUs have hazmat keywords; only ${flaggedKwHits} have the hazmat flag set. Reconcile before designing storage.`});
+          }
+        }
+      }
+      const ready = !findings.some(x=>x.sev==='crit');
+      return { status: ready?'ready':'insufficient', findings, rowCount:rows.length };
+    },
+
+    /* ---------- OUTBOUND HISTORY ---------- */
+    outbound(f){
+      const rows = f.canonicalRows||[];
+      const findings = [];
+      const missingReq = CANONICAL.outbound.required.filter(c=>!f.mapping[c]);
+      if(missingReq.length){
+        findings.push({sev:'crit',title:'Required fields not mapped',detail:missingReq.join(', ')+' — design cannot proceed'});
+        return { status:'insufficient', findings, rowCount:rows.length };
+      }
+      // order/line/unit shape
+      const orderIds = rows.map(r=>r.order_id);
+      const orders = new Set(orderIds).size;
+      const lpo = rows.length/Math.max(orders,1);
+      const units = sum(rows.map(r=>r.qty));
+      const upl = units/Math.max(rows.length,1);
+      findings.push({sev:'ok',title:`Lines/order ≈ ${lpo.toFixed(2)}`,detail: lpo<1.5?'Single-line profile → DTC/parcel methodology':lpo<5?'Mixed profile → zone pick or batch':lpo<20?'Wholesale replen → wave + cluster pick':'Store replen / DSD → large batch, pallet or case'});
+      findings.push({sev:'ok',title:`Units/line ≈ ${upl.toFixed(2)}`,detail: upl<1.2?'Each pick dominant':upl<10?'Inner/split case — check for hidden each pick':upl<100?'Case pick':'Pallet pick'});
+
+      // Pareto: top 20% of SKUs = what % of units?
+      const skuUnits = {};
+      rows.forEach(r=>{ skuUnits[r.sku] = (skuUnits[r.sku]||0) + (+r.qty||0); });
+      const skuList = Object.entries(skuUnits).sort((a,b)=>b[1]-a[1]);
+      const totalUnits = sum(skuList.map(s=>s[1]));
+      const top20idx = Math.ceil(skuList.length*0.2);
+      const top20Units = sum(skuList.slice(0,top20idx).map(s=>s[1]));
+      const paretoPct = pct(top20Units, totalUnits);
+      findings.push({sev:'ok',title:`Pareto: top 20% SKUs = ${paretoPct.toFixed(0)}% of units`,detail: paretoPct>85?'Very steep — aggressive forward-pick / small active face':paretoPct>70?'Classic 80/20 — standard forward/reserve split':'Flat curve — more SKUs in primary, larger pick module'});
+
+      // seasonality: peak-week vs avg-week
+      const dates = rows.map(r=>({d:parseDate(r.order_at), q:+r.qty||0})).filter(x=>x.d);
+      if(dates.length){
+        const weeks = {};
+        dates.forEach(({d,q})=>{
+          const wk = `${d.getFullYear()}-W${String(Math.floor(d.getMonth()*4+d.getDate()/7)).padStart(2,'0')}`;
+          weeks[wk] = (weeks[wk]||0) + q;
+        });
+        const weekVals = Object.values(weeks);
+        if(weekVals.length>4){
+          const avgWk = mean(weekVals);
+          const peakWk = Math.max(...weekVals);
+          const ratio = peakWk/avgWk;
+          findings.push({sev:'ok',title:`Peak/avg week ratio ${ratio.toFixed(2)}×`,detail: ratio<1.5?'Consumer staples profile — smooth':ratio<3?'Moderate seasonality — retail':ratio<5?'Strong Q4 retail peak':'Extreme peak — design is a rubber band'});
+        }
+        // history depth
+        const ts = dates.map(x=>x.d.getTime());
+        const months = (Math.max(...ts)-Math.min(...ts))/(1000*60*60*24*30);
+        if(months<6) findings.push({sev:'warn',title:`Only ${months.toFixed(1)} months of history`,detail:'12+ preferred for seasonality + trending'});
+        else findings.push({sev:'ok',title:`${months.toFixed(1)} months of history`,detail:`${new Date(Math.min(...ts)).toISOString().slice(0,10)} → ${new Date(Math.max(...ts)).toISOString().slice(0,10)}`});
+      }
+
+      // carrier / channel mix
+      if(f.mapping.carrier){
+        const cm = {};
+        rows.forEach(r=>{ if(r.carrier) cm[r.carrier]=(cm[r.carrier]||0)+1; });
+        const top3 = Object.entries(cm).sort((a,b)=>b[1]-a[1]).slice(0,3);
+        if(top3.length) findings.push({sev:'ok',title:'Carrier mix',detail:top3.map(c=>`${c[0]} ${pct(c[1],rows.length).toFixed(0)}%`).join(' · ')});
+      }
+      if(f.mapping.order_type){
+        const tm = {};
+        rows.forEach(r=>{ if(r.order_type) tm[r.order_type]=(tm[r.order_type]||0)+1; });
+        const types = Object.keys(tm).length;
+        if(types>1) findings.push({sev:'warn',title:`${types} order types mixed`,detail:'Separate by channel before computing labor standards — DTC/B2B/replen have different profiles'});
+      }
+
+      // split-case hidden in case pick (needs item master — flagged in cross)
+      if(!f.mapping.must_ship_by) findings.push({sev:'warn',title:'No must-ship-by field',detail:'Wave timing assumed, not derived — will be flagged in downstream outputs'});
+      return { status:'ready', findings, rowCount:rows.length };
+    },
+
+    /* ---------- INBOUND HISTORY ---------- */
+    inbound(f){
+      const rows = f.canonicalRows||[];
+      const findings = [];
+      const missingReq = CANONICAL.inbound.required.filter(c=>!f.mapping[c]);
+      if(missingReq.length) findings.push({sev:'crit',title:'Required fields not mapped',detail:missingReq.join(', ')});
+      if(!f.mapping.appointment_at) findings.push({sev:'warn',title:'No appointment time',detail:'Dwell cannot be derived — dock sizing will use a flagged assumption'});
+
+      const receipts = new Set(rows.map(r=>r.receipt_id));
+      const lpr = rows.length/Math.max(receipts.size,1);
+      findings.push({sev:'ok',title:`${receipts.size.toLocaleString()} receipts · ${lpr.toFixed(1)} lines/receipt`,detail: lpr<2?'Median=1 suggests header-level file masquerading as line-level':'Line-level confirmed'});
+
+      // negatives and zeros
+      const negs = rows.filter(r=>isNum(r.qty)&&r.qty<0).length;
+      const zeros = rows.filter(r=>r.qty===0).length;
+      if(negs>0) findings.push({sev:'warn',title:`${negs} negative-qty lines`,detail:'Vendor returns or corrections — separate from clean inbound before sizing'});
+      if(zeros>rows.length*0.01) findings.push({sev:'warn',title:`${zeros} zero-qty lines`,detail:'Cancelled-but-not-purged — filter before computing volumes'});
+
+      // vendor concentration
+      if(f.mapping.vendor){
+        const vc = {};
+        rows.forEach(r=>{ if(r.vendor) vc[r.vendor]=(vc[r.vendor]||0)+1; });
+        const top = Object.entries(vc).sort((a,b)=>b[1]-a[1]);
+        if(top.length){
+          const top10Share = pct(sum(top.slice(0,10).map(x=>x[1])), rows.length);
+          findings.push({sev:'ok',title:`Top 10 vendors = ${top10Share.toFixed(0)}% of lines`,detail: top10Share>70?'Concentrated — design receiving to flow patterns of top vendors':'Long-tail vendor base — design for variety'});
+        }
+      }
+      // date range
+      const dates = rows.map(r=>parseDate(r.received_at)).filter(Boolean).map(d=>d.getTime());
+      if(dates.length){
+        const months = (Math.max(...dates)-Math.min(...dates))/(1000*60*60*24*30);
+        findings.push({sev: months>=12?'ok':'warn',title:`${months.toFixed(1)} months of history`,detail: months>=12?'Full year+ available':'< 12 months — seasonality insights limited'});
+      }
+      return { status: findings.some(x=>x.sev==='crit')?'insufficient':'ready', findings, rowCount:rows.length };
+    },
+
+    /* ---------- INVENTORY SNAPSHOTS ---------- */
+    inventory(f){
+      const rows = f.canonicalRows||[];
+      const findings = [];
+      const missingReq = CANONICAL.inventory.required.filter(c=>!f.mapping[c]);
+      if(missingReq.length) findings.push({sev:'crit',title:'Required fields not mapped',detail:missingReq.join(', ')});
+      if(!f.mapping.location) findings.push({sev:'warn',title:'No location column',detail:'DC-level only — slotting + cube utilization cannot run. Outputs will be marked DIRECTIONAL.'});
+      if(f.pivoted) findings.push({sev:'ok',title:'Wide format auto-pivoted',detail:`${f.pivotedFrom} date columns pivoted to long format`});
+
+      const snapshotDates = new Set(rows.map(r=>{ const d=parseDate(r.snapshot_date); return d?d.toISOString().slice(0,10):String(r.snapshot_date); }));
+      if(snapshotDates.size<6) findings.push({sev:'warn',title:`${snapshotDates.size} snapshot(s)`,detail:'≥6 month-end snapshots recommended for turns + DOH trending'});
+      else findings.push({sev:'ok',title:`${snapshotDates.size} snapshots`,detail:'Sufficient for DOH/turns analysis'});
+
+      // negatives
+      const negs = rows.filter(r=>isNum(r.qty_on_hand)&&r.qty_on_hand<0).length;
+      if(negs/Math.max(rows.length,1)>0.01) findings.push({sev:'warn',title:`${negs} negative on-hand rows`,detail:'ERP ↔ WMS desync or count errors — >1% indicates data-layer unreliability'});
+
+      // zero-location rate (honeycomb indicator) — only if location + multiple snapshots
+      if(f.mapping.location && snapshotDates.size){
+        // use latest snapshot
+        const latestKey = [...snapshotDates].sort().pop();
+        const latest = rows.filter(r=>{ const d=parseDate(r.snapshot_date); const k=d?d.toISOString().slice(0,10):String(r.snapshot_date); return k===latestKey; });
+        if(latest.length>50){
+          const zeros = latest.filter(r=>!isNum(r.qty_on_hand)||r.qty_on_hand===0).length;
+          const zp = pct(zeros, latest.length);
+          findings.push({sev: zp>40?'warn':'ok',title:`Zero-location rate ${zp.toFixed(0)}% (latest snapshot)`,detail: zp<20?'Healthy cube/location utilization':zp<40?'Elevated — some honeycombing':'Heavy honeycombing — fragmented storage, real cube util lower than location occupancy suggests'});
+        }
+      }
+      return { status: findings.some(x=>x.sev==='crit')?'insufficient':'ready', findings, rowCount:rows.length };
+    },
+    unknown(f){
+      return { status:'insufficient', findings:[{sev:'warn',title:'File type not classified',detail:'Open Review mapping and pick a type'}], rowCount:f.rawRows?.length||0 };
+    }
+  };
+  return { run };
+})();
+
+/* ============================================================
+   Cross — multi-file diagnostics with real math
+   ============================================================ */
+const Cross = (()=>{
+  const sum = a => a.reduce((x,y)=>x+(+y||0),0);
+  const pct = (n,d)=> d ? (n/d*100) : 0;
+  const parseDate = v => { if(v instanceof Date) return v; const d = new Date(v); return isNaN(d)?null:d; };
+
+  function run(byType){
+    const out = [];
+    const item = byType.item, out_ = byType.outbound, inv = byType.inventory, inb = byType.inbound;
+
+    // ---------- ITEM × OUTBOUND ----------
+    if(item && out_){
+      const itemRows = item.canonicalRows, outRows = out_.canonicalRows;
+      // ABC velocity class
+      const skuUnits = {};
+      outRows.forEach(r=>{ skuUnits[r.sku]=(skuUnits[r.sku]||0)+(+r.qty||0); });
+      const ranked = Object.entries(skuUnits).sort((a,b)=>b[1]-a[1]);
+      const total = sum(ranked.map(r=>r[1]));
+      const abc = {A:0,B:0,C:0,Dead:0};
+      let running=0;
+      ranked.forEach(([s,u])=>{
+        running+=u;
+        const cumPct=running/total;
+        if(cumPct<=0.8) abc.A++;
+        else if(cumPct<=0.95) abc.B++;
+        else abc.C++;
+      });
+      // dead SKUs: in item master but zero outbound in period
+      const itemSkus = new Set(itemRows.map(r=>r.sku));
+      const activeSkus = new Set(ranked.map(r=>r[0]));
+      const dead = [...itemSkus].filter(s=>!activeSkus.has(s)).length;
+      abc.Dead = dead;
+      const pctDead = pct(dead, itemSkus.size);
+      out.push({sev: pctDead>20?'warn':'ok',title:`Velocity classification: A=${abc.A} B=${abc.B} C=${abc.C} Dead=${dead}`,detail:`${pctDead.toFixed(0)}% of item master has zero outbound in the period — ${pctDead>20?'customer "active" flag is inflated; trim before sizing':'healthy active ratio'}`});
+
+      // pick UOM distribution from outbound × item master case_pack
+      const cpMap = {}; itemRows.forEach(r=>{ if(r.sku&&isNum(r.case_pack)&&r.case_pack>0) cpMap[r.sku]=r.case_pack; });
+      let eachLines=0, caseLines=0, splitLines=0, unknownLines=0;
+      outRows.forEach(r=>{
+        const cp = cpMap[r.sku]; const q = +r.qty||0;
+        if(!cp||!q) { unknownLines++; return; }
+        if(q < cp) eachLines++;
+        else if(q % cp === 0) caseLines++;
+        else splitLines++;
+      });
+      const totalLines = eachLines+caseLines+splitLines;
+      if(totalLines>0){
+        out.push({sev: splitLines/totalLines>0.1?'warn':'ok',title:`Pick UOM mix: ${pct(eachLines,totalLines).toFixed(0)}% each · ${pct(caseLines,totalLines).toFixed(0)}% full case · ${pct(splitLines,totalLines).toFixed(0)}% split case`,detail: splitLines/totalLines>0.1?'Material split-case volume hidden inside what looks like case pick — labor standard implications are large':'Clean split between each and case'});
+      }
+      if(unknownLines/outRows.length>0.2) out.push({sev:'warn',title:`${pct(unknownLines,outRows.length).toFixed(0)}% of outbound lines lack case-pack`,detail:'Item master case_pack missing for many outbound SKUs — join yield is weak, reconcile before designing pick module'});
+    }
+
+    // ---------- INBOUND × OUTBOUND ----------
+    if(inb && out_){
+      // cross-dock eligible: SKUs where inbound receipt date ≈ outbound ship date within 48h
+      const inMap = {}; // sku -> array of receive dates (ms)
+      inb.canonicalRows.forEach(r=>{
+        const d = parseDate(r.received_at); if(!d||!r.sku) return;
+        (inMap[r.sku] = inMap[r.sku]||[]).push(d.getTime());
+      });
+      let xdokLines=0, totalOut=0;
+      out_.canonicalRows.forEach(r=>{
+        const d = parseDate(r.order_at); if(!d) return;
+        totalOut++;
+        const arr = inMap[r.sku]; if(!arr) return;
+        const t = d.getTime();
+        if(arr.some(rd => Math.abs(t-rd) < 48*3600*1000)) xdokLines++;
+      });
+      if(totalOut>0){
+        const xp = pct(xdokLines,totalOut);
+        out.push({sev:'ok',title:`Cross-dock eligible: ${xp.toFixed(1)}% of outbound lines`,detail: xp>10?'Meaningful cross-dock pool — design dedicated lanes':'Minimal cross-dock — flow-through not justified'});
+      }
+    }
+
+    // ---------- INVENTORY × OUTBOUND ----------
+    if(inv && out_){
+      // Days on hand by SKU
+      const skuUnits = {};
+      out_.canonicalRows.forEach(r=>{ skuUnits[r.sku]=(skuUnits[r.sku]||0)+(+r.qty||0); });
+      // use max snapshot date as "current"
+      const latestSnapByKey = {};
+      inv.canonicalRows.forEach(r=>{
+        const d = parseDate(r.snapshot_date); if(!d||!r.sku) return;
+        const k = d.toISOString().slice(0,7);
+        if(!latestSnapByKey[k]) latestSnapByKey[k]=[];
+        latestSnapByKey[k].push(r);
+      });
+      const latestKey = Object.keys(latestSnapByKey).sort().pop();
+      const latest = latestSnapByKey[latestKey]||[];
+      const skuOH = {};
+      latest.forEach(r=>{ skuOH[r.sku] = (skuOH[r.sku]||0) + (+r.qty_on_hand||0); });
+      // need date range to compute daily rate
+      const outDates = out_.canonicalRows.map(r=>parseDate(r.order_at)).filter(Boolean).map(d=>d.getTime());
+      if(outDates.length){
+        const days = Math.max(1,(Math.max(...outDates)-Math.min(...outDates))/(1000*3600*24));
+        const bins = {stockout:0,healthy:0,slow:0,dead:0};
+        let deadCubeSkus=0;
+        Object.keys(skuOH).forEach(sku=>{
+          const oh = skuOH[sku]; const u = skuUnits[sku]||0;
+          if(u===0){ if(oh>0){ bins.dead++; deadCubeSkus++; } return; }
+          const doh = oh / (u/days);
+          if(doh<7) bins.stockout++;
+          else if(doh<=45) bins.healthy++;
+          else if(doh<=180) bins.slow++;
+          else bins.dead++;
+        });
+        const tot = bins.stockout+bins.healthy+bins.slow+bins.dead;
+        out.push({sev: bins.dead/tot>0.2?'warn':'ok',title:`DOH distribution: ${pct(bins.stockout,tot).toFixed(0)}% <7d · ${pct(bins.healthy,tot).toFixed(0)}% 7-45d · ${pct(bins.slow,tot).toFixed(0)}% 45-180d · ${pct(bins.dead,tot).toFixed(0)}% >180d`,detail: bins.dead/tot>0.2?'Large tail of dead / near-dead inventory — customer will swear it is smaller than this. Surface in the data-quality conversation.':'Healthy DOH shape'});
+        if(deadCubeSkus>0) out.push({sev:'warn',title:`${deadCubeSkus} SKUs with on-hand but zero outbound`,detail:'Dead stock sitting in cube — factor into transition plan'});
+      }
+    }
+
+    // ---------- ITEM × INVENTORY ----------
+    if(item && inv){
+      const cubeMap = {};
+      item.canonicalRows.forEach(r=>{ if(r.sku&&isNum(r.each_cube)) cubeMap[r.sku]=r.each_cube; });
+      // cube-weighted on-hand (most recent snapshot)
+      const latestSnap = {};
+      inv.canonicalRows.forEach(r=>{
+        const d = parseDate(r.snapshot_date); if(!d) return;
+        const k = d.toISOString().slice(0,7);
+        if(!latestSnap[k]) latestSnap[k]=[];
+        latestSnap[k].push(r);
+      });
+      const latestKey = Object.keys(latestSnap).sort().pop();
+      const rows = latestSnap[latestKey]||[];
+      let joined=0, totalCube=0;
+      rows.forEach(r=>{
+        if(isNum(cubeMap[r.sku])&&isNum(r.qty_on_hand)){
+          joined++;
+          totalCube += cubeMap[r.sku] * r.qty_on_hand;
+        }
+      });
+      if(joined>0) out.push({sev:'ok',title:`Cube on-hand (latest): ${totalCube.toLocaleString(undefined,{maximumFractionDigits:0})} ft³`,detail:`Joined ${joined.toLocaleString()} inventory lines to item master cube — ${pct(joined,rows.length).toFixed(0)}% join yield`});
+    }
+
+    // ---------- FOUR-FILE ----------
+    const types = [item,out_,inv,inb].filter(Boolean).length;
+    if(types===4) out.push({sev:'ok',title:'All four files present',detail:'Full design-ready dataset available — slotting, forward/reserve ratio, cube utilization, DOH, labor standards, dock sizing can all run against derived inputs'});
+
+    return out;
+  }
+  return { run };
+})();
+
+/* ============================================================
+   Viz — SVG chart primitives + Visual Report renderer
+   All handrolled SVG, no external chart libs. Dark theme, GXO orange.
+   ============================================================ */
+const Viz = (()=>{
+  const C = {
+    bg:'#0b1220', panel:'#111a2e', panel2:'#16223b', ink:'#e6ecf5', muted:'#97a3b8',
+    grid:'#22304d', line:'#22304d',
+    ok:'#4ade80', warn:'#fbbf24', bad:'#f87171',
+    accent:'#ff6a00', accent2:'#ffa257',
+    series:['#ff6a00','#ffa257','#4ade80','#60a5fa','#a78bfa','#f472b6','#fbbf24','#34d399']
+  };
+  const esc2 = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+  /* ---------- primitives ---------- */
+  function svg(w,h,body){
+    return `<svg viewBox="0 0 ${w} ${h}" width="100%" style="max-width:${w}px;display:block" xmlns="http://www.w3.org/2000/svg">${body}</svg>`;
+  }
+
+  // Donut ring — single value 0-100
+  function ring(score, label, sub, size=140){
+    const cx=size/2, cy=size/2, R=size/2-10, r=R-14;
+    const pct = Math.max(0,Math.min(100,score));
+    const ang = (pct/100)*Math.PI*2 - Math.PI/2;
+    const x1 = cx + Math.cos(-Math.PI/2)*R, y1 = cy + Math.sin(-Math.PI/2)*R;
+    const x2 = cx + Math.cos(ang)*R, y2 = cy + Math.sin(ang)*R;
+    const large = pct>50?1:0;
+    const color = pct>=80?C.ok:pct>=60?C.warn:C.bad;
+    const path = pct>=99.9
+      ? `M ${cx} ${cy-R} A ${R} ${R} 0 1 1 ${cx-0.01} ${cy-R} Z`
+      : `M ${x1} ${y1} A ${R} ${R} 0 ${large} 1 ${x2} ${y2}`;
+    return svg(size,size+24,`
+      <circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="${C.grid}" stroke-width="12"/>
+      <path d="${path}" fill="none" stroke="${color}" stroke-width="12" stroke-linecap="round"/>
+      <text x="${cx}" y="${cy+4}" text-anchor="middle" fill="${C.ink}" font-size="22" font-weight="800">${pct.toFixed(0)}</text>
+      <text x="${cx}" y="${cy+20}" text-anchor="middle" fill="${C.muted}" font-size="9">/ 100</text>
+      <text x="${cx}" y="${size+12}" text-anchor="middle" fill="${C.ink}" font-size="11" font-weight="600">${esc2(label)}</text>
+      <text x="${cx}" y="${size+23}" text-anchor="middle" fill="${C.muted}" font-size="9">${esc2(sub||'')}</text>
+    `);
+  }
+
+  // Pareto chart — bars sorted desc + cumulative line
+  function pareto(vals, labelTop='SKU rank', labelRight='cum % units'){
+    const W=720,H=280,M={t:20,r:50,b:38,l:50};
+    const iw=W-M.l-M.r, ih=H-M.t-M.b;
+    const top = Math.min(vals.length, 60);
+    const v = vals.slice(0,top);
+    const max = Math.max(...v,1);
+    const total = vals.reduce((a,b)=>a+b,0);
+    const bw = iw/top;
+    let cum=0;
+    const linePts = [];
+    const bars = v.map((x,i)=>{
+      cum += x;
+      const cumPct = cum/total;
+      const bx = M.l+i*bw, by = M.t+ih-(x/max)*ih, bh = (x/max)*ih;
+      linePts.push([M.l+i*bw+bw/2, M.t+ih-cumPct*ih]);
+      return `<rect x="${bx+1}" y="${by}" width="${bw-2}" height="${bh}" fill="${C.accent}" opacity=".85"/>`;
+    }).join('');
+    const line = 'M '+linePts.map(p=>p.join(' ')).join(' L ');
+    const gridY = [0,0.25,0.5,0.75,1].map(g=>`<line x1="${M.l}" y1="${M.t+ih-g*ih}" x2="${M.l+iw}" y2="${M.t+ih-g*ih}" stroke="${C.grid}" stroke-dasharray="2 3"/><text x="${M.l-6}" y="${M.t+ih-g*ih+4}" text-anchor="end" fill="${C.muted}" font-size="9">${(g*max/1000).toFixed(0)}k</text><text x="${M.l+iw+6}" y="${M.t+ih-g*ih+4}" fill="${C.muted}" font-size="9">${(g*100).toFixed(0)}%</text>`).join('');
+    // 80% reference line
+    const y80 = M.t+ih-0.8*ih;
+    const ref = `<line x1="${M.l}" y1="${y80}" x2="${M.l+iw}" y2="${y80}" stroke="${C.ok}" stroke-dasharray="4 3"/><text x="${M.l+iw-4}" y="${y80-4}" text-anchor="end" fill="${C.ok}" font-size="9">80% line</text>`;
+    return svg(W,H,`
+      ${gridY}${ref}${bars}
+      <path d="${line}" fill="none" stroke="${C.accent2}" stroke-width="2.5"/>
+      ${linePts.map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="2" fill="${C.accent2}"/>`).join('')}
+      <text x="${M.l}" y="${H-8}" fill="${C.muted}" font-size="10">${esc2(labelTop)} (top ${top})</text>
+      <text x="${W-M.r}" y="${H-8}" text-anchor="end" fill="${C.muted}" font-size="10">${esc2(labelRight)}</text>
+    `);
+  }
+
+  // Line chart — time series
+  function line(series, opts={}){
+    const W=720,H=220,M={t:20,r:20,b:30,l:50};
+    const iw=W-M.l-M.r, ih=H-M.t-M.b;
+    if(!series.length) return svg(W,H,`<text x="${W/2}" y="${H/2}" text-anchor="middle" fill="${C.muted}" font-size="11">No data</text>`);
+    const max = Math.max(...series.map(p=>p.y));
+    const min = 0;
+    const sx = i => M.l + (i/(series.length-1||1))*iw;
+    const sy = y => M.t+ih-((y-min)/(max-min||1))*ih;
+    const path = 'M '+series.map((p,i)=>`${sx(i)} ${sy(p.y)}`).join(' L ');
+    const area = `M ${sx(0)} ${M.t+ih} L `+series.map((p,i)=>`${sx(i)} ${sy(p.y)}`).join(' L ')+` L ${sx(series.length-1)} ${M.t+ih} Z`;
+    const gridY = [0,0.25,0.5,0.75,1].map(g=>`<line x1="${M.l}" y1="${M.t+ih-g*ih}" x2="${M.l+iw}" y2="${M.t+ih-g*ih}" stroke="${C.grid}" stroke-dasharray="2 3"/><text x="${M.l-6}" y="${M.t+ih-g*ih+4}" text-anchor="end" fill="${C.muted}" font-size="9">${(g*max).toLocaleString(undefined,{maximumFractionDigits:0})}</text>`).join('');
+    // find peak
+    const peakIdx = series.reduce((best,p,i,a)=>p.y>a[best].y?i:best,0);
+    const avg = series.reduce((a,b)=>a+b.y,0)/series.length;
+    const avgY = sy(avg);
+    const labels = series.filter((_,i)=>i%Math.max(1,Math.floor(series.length/8))===0)
+      .map((p,i,a)=>{ const origIdx = series.indexOf(p); return `<text x="${sx(origIdx)}" y="${H-10}" text-anchor="middle" fill="${C.muted}" font-size="9">${esc2(p.x)}</text>`; }).join('');
+    return svg(W,H,`
+      ${gridY}
+      <path d="${area}" fill="${C.accent}" opacity=".12"/>
+      <path d="${path}" fill="none" stroke="${C.accent}" stroke-width="2.2"/>
+      <line x1="${M.l}" y1="${avgY}" x2="${M.l+iw}" y2="${avgY}" stroke="${C.muted}" stroke-dasharray="3 3" opacity=".6"/>
+      <text x="${M.l+iw-4}" y="${avgY-4}" text-anchor="end" fill="${C.muted}" font-size="9">avg</text>
+      <circle cx="${sx(peakIdx)}" cy="${sy(series[peakIdx].y)}" r="4" fill="${C.warn}" stroke="${C.bg}" stroke-width="2"/>
+      <text x="${sx(peakIdx)}" y="${sy(series[peakIdx].y)-8}" text-anchor="middle" fill="${C.warn}" font-size="10" font-weight="700">peak</text>
+      ${labels}
+    `);
+  }
+
+  // Stacked horizontal bar — proportions
+  function stackBar(segments, label){
+    const W=720,H=56,bh=22,y=10;
+    const total = segments.reduce((a,b)=>a+b.v,0)||1;
+    let x=20;
+    const segs = segments.map((s,i)=>{
+      const w = (s.v/total)*(W-40);
+      const col = s.color||C.series[i%C.series.length];
+      const seg = `<rect x="${x}" y="${y}" width="${w}" height="${bh}" fill="${col}"/>`+
+        (w>40?`<text x="${x+w/2}" y="${y+bh/2+4}" text-anchor="middle" fill="#0b1220" font-size="11" font-weight="700">${(s.v/total*100).toFixed(0)}%</text>`:'');
+      x+=w; return seg;
+    }).join('');
+    const legend = segments.map((s,i)=>{
+      const col = s.color||C.series[i%C.series.length];
+      return `<g><rect x="${i*140+20}" y="${H-14}" width="10" height="10" fill="${col}"/><text x="${i*140+34}" y="${H-5}" fill="${C.ink}" font-size="10">${esc2(s.label)}</text></g>`;
+    }).join('');
+    return svg(W,H+10,`<text x="20" y="${y-2}" fill="${C.muted}" font-size="10">${esc2(label||'')}</text>${segs}${legend}`);
+  }
+
+  // Histogram bars — categorical counts
+  function histo(bins, title){
+    const W=720,H=220,M={t:30,r:20,b:38,l:50};
+    const iw=W-M.l-M.r, ih=H-M.t-M.b;
+    const max = Math.max(...bins.map(b=>b.v),1);
+    const bw = iw/bins.length;
+    const bars = bins.map((b,i)=>{
+      const bx=M.l+i*bw+4, bh=(b.v/max)*ih, by=M.t+ih-bh;
+      const col = b.color||C.accent;
+      return `<rect x="${bx}" y="${by}" width="${bw-8}" height="${bh}" fill="${col}" opacity=".9" rx="2"/>
+        <text x="${bx+(bw-8)/2}" y="${by-6}" text-anchor="middle" fill="${C.ink}" font-size="11" font-weight="700">${b.v.toLocaleString()}</text>
+        <text x="${bx+(bw-8)/2}" y="${H-18}" text-anchor="middle" fill="${C.muted}" font-size="10">${esc2(b.label)}</text>
+        <text x="${bx+(bw-8)/2}" y="${H-6}" text-anchor="middle" fill="${C.muted}" font-size="9">${b.sub||''}</text>`;
+    }).join('');
+    return svg(W,H,`<text x="${M.l}" y="16" fill="${C.ink}" font-size="11" font-weight="700">${esc2(title||'')}</text>${bars}`);
+  }
+
+  // Gauge — single value with zones
+  function gauge(value, max, title, zones){
+    const W=260,H=150,cx=W/2,cy=120,R=100;
+    const pct = Math.max(0,Math.min(1,value/max));
+    const startA = Math.PI, endA = 0;
+    const arc = (a1,a2,color)=>{
+      const x1=cx+Math.cos(a1)*R,y1=cy+Math.sin(a1)*R;
+      const x2=cx+Math.cos(a2)*R,y2=cy+Math.sin(a2)*R;
+      return `<path d="M ${x1} ${y1} A ${R} ${R} 0 0 1 ${x2} ${y2}" fill="none" stroke="${color}" stroke-width="14" stroke-linecap="round"/>`;
+    };
+    let arcs = '';
+    let cursor = startA;
+    zones.forEach(z=>{
+      const next = startA - z.pct*Math.PI;
+      arcs += arc(cursor, next, z.color);
+      cursor = next;
+    });
+    const needleA = startA - pct*Math.PI;
+    const nx = cx + Math.cos(needleA)*(R-20), ny = cy + Math.sin(needleA)*(R-20);
+    return svg(W,H,`
+      ${arcs}
+      <line x1="${cx}" y1="${cy}" x2="${nx}" y2="${ny}" stroke="${C.ink}" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="${cx}" cy="${cy}" r="5" fill="${C.ink}"/>
+      <text x="${cx}" y="${cy-25}" text-anchor="middle" fill="${C.ink}" font-size="22" font-weight="800">${value.toFixed(0)}%</text>
+      <text x="${cx}" y="${cy+24}" text-anchor="middle" fill="${C.muted}" font-size="10">${esc2(title)}</text>
+    `);
+  }
+
+  /* ---------- metrics computation ---------- */
+  function computeMetrics(files){
+    const byType={};
+    files.forEach(f=>{ if(f.canonicalRows && f.detected.type) byType[f.detected.type]=f; });
+    const m = {};
+
+    // Data quality scores per file
+    m.scores = {};
+    files.forEach(f=>{
+      if(!f.detected.type) return;
+      const def = CANONICAL[f.detected.type];
+      const reqMapped = def.required.filter(r=>f.mapping[r]).length;
+      const reqScore = (reqMapped/def.required.length)*100;
+      const rows = f.canonicalRows||[];
+      let completeness = 100;
+      if(f.detected.type==='item' && rows.length){
+        const cr = rows.filter(r=>r.each_cube==null||r.each_cube===0).length/rows.length;
+        const wr = rows.filter(r=>r.each_weight==null||r.each_weight===0).length/rows.length;
+        completeness = (1 - (cr+wr)/2) * 100;
+      }
+      const score = Math.round((reqScore*0.5 + completeness*0.5));
+      m.scores[f.detected.type] = { score, label:def.label, rowCount:rows.length };
+    });
+
+    // Outbound-derived: Pareto, seasonality, methodology
+    if(byType.outbound){
+      const rows = byType.outbound.canonicalRows;
+      const skuUnits = {};
+      rows.forEach(r=>{ skuUnits[r.sku]=(skuUnits[r.sku]||0)+(+r.qty||0); });
+      m.paretoVals = Object.values(skuUnits).sort((a,b)=>b-a);
+      const total = m.paretoVals.reduce((a,b)=>a+b,0);
+      const top20idx = Math.ceil(m.paretoVals.length*0.2);
+      m.paretoTop20 = m.paretoVals.slice(0,top20idx).reduce((a,b)=>a+b,0)/total*100;
+      m.skuCount = m.paretoVals.length;
+      // seasonality by month
+      const months = {};
+      rows.forEach(r=>{
+        const d = r.order_at instanceof Date ? r.order_at : new Date(r.order_at);
+        if(isNaN(d)) return;
+        const k = d.toISOString().slice(0,7);
+        months[k] = (months[k]||0)+(+r.qty||0);
+      });
+      m.seasonality = Object.entries(months).sort().map(([k,v])=>({x:k.slice(2),y:v}));
+      m.orders = new Set(rows.map(r=>r.order_id)).size;
+      m.lines = rows.length;
+      m.units = total;
+      m.lpo = m.lines/Math.max(m.orders,1);
+      m.upl = m.units/Math.max(m.lines,1);
+      // channel mix
+      if(byType.outbound.mapping.order_type){
+        const cm = {};
+        rows.forEach(r=>{ if(r.order_type) cm[r.order_type]=(cm[r.order_type]||0)+1; });
+        m.channelMix = Object.entries(cm).map(([k,v])=>({label:k,v}));
+      }
+      // carrier mix
+      if(byType.outbound.mapping.carrier){
+        const cm = {};
+        rows.forEach(r=>{ if(r.carrier) cm[r.carrier]=(cm[r.carrier]||0)+1; });
+        m.carrierMix = Object.entries(cm).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([k,v])=>({label:k,v}));
+      }
+    }
+
+    // Item × Outbound: ABC + pick UOM
+    if(byType.item && byType.outbound){
+      const items = byType.item.canonicalRows;
+      const out = byType.outbound.canonicalRows;
+      const skuUnits = {};
+      out.forEach(r=>{ skuUnits[r.sku]=(skuUnits[r.sku]||0)+(+r.qty||0); });
+      const ranked = Object.entries(skuUnits).sort((a,b)=>b[1]-a[1]);
+      const total = ranked.reduce((a,b)=>a+b[1],0);
+      let A=0,B=0,Cc=0; let cum=0;
+      ranked.forEach(([s,u])=>{
+        cum+=u; const p=cum/total;
+        if(p<=0.8) A++; else if(p<=0.95) B++; else Cc++;
+      });
+      const itemSkus = new Set(items.map(r=>r.sku));
+      const active = new Set(ranked.map(r=>r[0]));
+      const dead = [...itemSkus].filter(s=>!active.has(s)).length;
+      m.abc = { A, B, C:Cc, Dead:dead };
+      // pick UOM mix
+      const cpMap = {}; items.forEach(r=>{ if(r.sku&&isNum(r.case_pack)&&r.case_pack>0) cpMap[r.sku]=r.case_pack; });
+      let each=0,caseF=0,split=0;
+      out.forEach(r=>{
+        const cp = cpMap[r.sku], q=+r.qty||0;
+        if(!cp||!q) return;
+        if(q<cp) each++; else if(q%cp===0) caseF++; else split++;
+      });
+      m.pickUom = { each, caseF, split };
+    }
+
+    // Inventory × Outbound: DOH distribution
+    if(byType.inventory && byType.outbound){
+      const inv = byType.inventory.canonicalRows;
+      const out = byType.outbound.canonicalRows;
+      // latest snapshot
+      const latestByMonth = {};
+      inv.forEach(r=>{
+        const d = r.snapshot_date instanceof Date ? r.snapshot_date : new Date(r.snapshot_date);
+        if(isNaN(d)) return;
+        const k = d.toISOString().slice(0,7);
+        (latestByMonth[k]=latestByMonth[k]||[]).push(r);
+      });
+      const latestKey = Object.keys(latestByMonth).sort().pop();
+      const latest = latestByMonth[latestKey]||[];
+      const skuOH = {};
+      latest.forEach(r=>{ skuOH[r.sku]=(skuOH[r.sku]||0)+(+r.qty_on_hand||0); });
+      const skuU = {};
+      out.forEach(r=>{ skuU[r.sku]=(skuU[r.sku]||0)+(+r.qty||0); });
+      const dates = out.map(r=>r.order_at instanceof Date?r.order_at:new Date(r.order_at)).filter(d=>!isNaN(d)).map(d=>d.getTime());
+      const days = dates.length ? Math.max(1,(Math.max(...dates)-Math.min(...dates))/(1000*3600*24)) : 365;
+      const bins = {stockout:0, healthy:0, slow:0, dead:0};
+      Object.keys(skuOH).forEach(sku=>{
+        const oh=skuOH[sku], u=skuU[sku]||0;
+        if(u===0){ if(oh>0) bins.dead++; return; }
+        const doh = oh/(u/days);
+        if(doh<7) bins.stockout++;
+        else if(doh<=45) bins.healthy++;
+        else if(doh<=180) bins.slow++;
+        else bins.dead++;
+      });
+      m.dohBins = bins;
+      // zero-location rate on latest snapshot
+      const zeros = latest.filter(r=>!isNum(r.qty_on_hand)||r.qty_on_hand===0).length;
+      m.zeroLocRate = zeros/Math.max(latest.length,1)*100;
+      m.latestSnapKey = latestKey;
+    }
+
+    // Item × Inventory cube on-hand
+    if(byType.item && byType.inventory){
+      const cubeMap = {};
+      byType.item.canonicalRows.forEach(r=>{ if(r.sku&&isNum(r.each_cube)) cubeMap[r.sku]=r.each_cube; });
+      const latestByMonth = {};
+      byType.inventory.canonicalRows.forEach(r=>{
+        const d = r.snapshot_date instanceof Date ? r.snapshot_date : new Date(r.snapshot_date);
+        if(isNaN(d)) return;
+        const k = d.toISOString().slice(0,7);
+        (latestByMonth[k]=latestByMonth[k]||[]).push(r);
+      });
+      const latestKey = Object.keys(latestByMonth).sort().pop();
+      const latest = latestByMonth[latestKey]||[];
+      let cube=0, joined=0;
+      latest.forEach(r=>{
+        if(isNum(cubeMap[r.sku])&&isNum(r.qty_on_hand)){
+          joined++;
+          cube += cubeMap[r.sku]*r.qty_on_hand;
+        }
+      });
+      m.cubeOH = cube;
+      m.cubeJoinRate = joined/Math.max(latest.length,1)*100;
+    }
+
+    return m;
+  }
+
+  /* ---------- full Visual Report ---------- */
+  function render(files){
+    const m = computeMetrics(files);
+    let html = '';
+
+    // ---- Data Quality Scorecard ring row ----
+    const ringEntries = Object.entries(m.scores||{});
+    if(ringEntries.length){
+      html += `<div style="margin-bottom:18px">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:${C.muted};margin-bottom:10px">Data Quality Scorecard</div>
+        <div style="display:flex;gap:14px;flex-wrap:wrap;justify-content:flex-start">
+          ${ringEntries.map(([k,v])=>`<div style="background:${C.panel2};border:1px solid ${C.grid};border-radius:12px;padding:12px;min-width:160px">${ring(v.score, v.label, v.rowCount.toLocaleString()+' rows')}</div>`).join('')}
+        </div>
+      </div>`;
+    }
+
+    // ---- Outbound KPIs + Pareto + Seasonality ----
+    if(m.paretoVals){
+      html += `<div style="margin-bottom:18px">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:${C.muted};margin-bottom:10px">Outbound Profile — ${m.skuCount.toLocaleString()} active SKUs</div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">
+          <div style="background:${C.panel2};border:1px solid ${C.grid};border-radius:10px;padding:14px"><div style="font-size:10px;color:${C.muted};text-transform:uppercase;letter-spacing:1px">Orders</div><div style="font-size:22px;font-weight:800;color:${C.ink}">${m.orders.toLocaleString()}</div></div>
+          <div style="background:${C.panel2};border:1px solid ${C.grid};border-radius:10px;padding:14px"><div style="font-size:10px;color:${C.muted};text-transform:uppercase;letter-spacing:1px">Lines / Order</div><div style="font-size:22px;font-weight:800;color:${C.accent}">${m.lpo.toFixed(2)}</div><div style="font-size:10px;color:${C.muted}">${m.lpo<1.5?'DTC profile':m.lpo<5?'Mixed':m.lpo<20?'Wholesale':'Store replen'}</div></div>
+          <div style="background:${C.panel2};border:1px solid ${C.grid};border-radius:10px;padding:14px"><div style="font-size:10px;color:${C.muted};text-transform:uppercase;letter-spacing:1px">Units / Line</div><div style="font-size:22px;font-weight:800;color:${C.accent}">${m.upl.toFixed(2)}</div><div style="font-size:10px;color:${C.muted}">${m.upl<1.2?'Each pick':m.upl<10?'Inner/split':'Case/pallet'}</div></div>
+          <div style="background:${C.panel2};border:1px solid ${C.grid};border-radius:10px;padding:14px"><div style="font-size:10px;color:${C.muted};text-transform:uppercase;letter-spacing:1px">Top 20% → Units</div><div style="font-size:22px;font-weight:800;color:${C.accent}">${m.paretoTop20.toFixed(0)}%</div><div style="font-size:10px;color:${C.muted}">${m.paretoTop20>85?'Steep curve':m.paretoTop20>70?'Classic 80/20':'Flat'}</div></div>
+        </div>
+        <div style="background:${C.panel2};border:1px solid ${C.grid};border-radius:10px;padding:14px;margin-bottom:10px">
+          <div style="font-size:11px;color:${C.muted};margin-bottom:6px">Pareto — SKU → Unit Concentration (top 60)</div>
+          ${pareto(m.paretoVals)}
+        </div>
+        <div style="background:${C.panel2};border:1px solid ${C.grid};border-radius:10px;padding:14px">
+          <div style="font-size:11px;color:${C.muted};margin-bottom:6px">Seasonality — Units Shipped by Month</div>
+          ${line(m.seasonality)}
+        </div>
+      </div>`;
+    }
+
+    // ---- ABC + Pick UOM ----
+    if(m.abc){
+      const abcSegs = [
+        {label:`A (${m.abc.A})`, v:m.abc.A, color:C.ok},
+        {label:`B (${m.abc.B})`, v:m.abc.B, color:'#60a5fa'},
+        {label:`C (${m.abc.C})`, v:m.abc.C, color:C.warn},
+        {label:`Dead (${m.abc.Dead})`, v:m.abc.Dead, color:C.bad}
+      ];
+      const uomSegs = [
+        {label:`Each (${m.pickUom.each.toLocaleString()})`, v:m.pickUom.each, color:C.accent},
+        {label:`Full case (${m.pickUom.caseF.toLocaleString()})`, v:m.pickUom.caseF, color:'#60a5fa'},
+        {label:`Split case (${m.pickUom.split.toLocaleString()})`, v:m.pickUom.split, color:C.bad}
+      ];
+      html += `<div style="margin-bottom:18px">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:${C.muted};margin-bottom:10px">Velocity & Pick UOM — Item × Outbound join</div>
+        <div style="background:${C.panel2};border:1px solid ${C.grid};border-radius:10px;padding:14px;margin-bottom:10px">
+          <div style="font-size:11px;color:${C.muted};margin-bottom:6px">ABC Velocity Classification</div>
+          ${stackBar(abcSegs,'SKUs by velocity class — top 80% / next 15% / next 5% / zero outbound')}
+        </div>
+        <div style="background:${C.panel2};border:1px solid ${C.grid};border-radius:10px;padding:14px">
+          <div style="font-size:11px;color:${C.muted};margin-bottom:6px">Pick UOM Mix</div>
+          ${stackBar(uomSegs,'Outbound lines by pick UOM — split-case volume hidden in case pick is the red')}
+        </div>
+      </div>`;
+    }
+
+    // ---- DOH Distribution + Honeycomb gauge + Cube ----
+    if(m.dohBins){
+      const total = m.dohBins.stockout+m.dohBins.healthy+m.dohBins.slow+m.dohBins.dead;
+      const bins = [
+        {label:'<7d', sub:'stockout', v:m.dohBins.stockout, color:C.bad},
+        {label:'7-45d', sub:'healthy', v:m.dohBins.healthy, color:C.ok},
+        {label:'45-180d', sub:'slow', v:m.dohBins.slow, color:C.warn},
+        {label:'>180d', sub:'dead', v:m.dohBins.dead, color:C.bad}
+      ];
+      html += `<div style="margin-bottom:18px">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:${C.muted};margin-bottom:10px">Inventory Health — Inventory × Outbound join</div>
+        <div style="display:grid;grid-template-columns:2fr 1fr;gap:10px">
+          <div style="background:${C.panel2};border:1px solid ${C.grid};border-radius:10px;padding:14px">
+            <div style="font-size:11px;color:${C.muted};margin-bottom:6px">Days-on-Hand Distribution (latest snapshot: ${m.latestSnapKey||'—'})</div>
+            ${histo(bins,'')}
+            <div style="font-size:10px;color:${C.muted};margin-top:6px">Healthy shape = unimodal 7-45d. Bimodal <7 + >180 = chasing stockouts AND sitting on dead cube.</div>
+          </div>
+          <div style="background:${C.panel2};border:1px solid ${C.grid};border-radius:10px;padding:14px;text-align:center">
+            <div style="font-size:11px;color:${C.muted};margin-bottom:6px">Honeycomb Indicator</div>
+            ${gauge(m.zeroLocRate||0, 100, 'zero-loc rate', [
+              {pct:0.2,color:C.ok},
+              {pct:0.2,color:C.warn},
+              {pct:0.6,color:C.bad}
+            ])}
+            <div style="font-size:10px;color:${C.muted}">Healthy <20% · Elevated 20-40% · Heavy >40%</div>
+          </div>
+        </div>
+        ${m.cubeOH ? `<div style="background:${C.panel2};border:1px solid ${C.grid};border-radius:10px;padding:14px;margin-top:10px;display:flex;justify-content:space-around;align-items:center">
+          <div><div style="font-size:10px;color:${C.muted};text-transform:uppercase;letter-spacing:1px">Cube On-Hand</div><div style="font-size:26px;font-weight:800;color:${C.accent}">${m.cubeOH.toLocaleString(undefined,{maximumFractionDigits:0})} <span style="font-size:13px;color:${C.muted}">ft³</span></div></div>
+          <div><div style="font-size:10px;color:${C.muted};text-transform:uppercase;letter-spacing:1px">Item × Inv Join Yield</div><div style="font-size:26px;font-weight:800;color:${m.cubeJoinRate>90?C.ok:C.warn}">${m.cubeJoinRate.toFixed(0)}%</div></div>
+          <div><div style="font-size:10px;color:${C.muted};text-transform:uppercase;letter-spacing:1px">Dead Cube Share</div><div style="font-size:26px;font-weight:800;color:${m.dohBins.dead/total>0.2?C.bad:C.warn}">${(m.dohBins.dead/total*100).toFixed(0)}%</div></div>
+        </div>`:''}
+      </div>`;
+    }
+
+    return html || '<p class="prov">Not enough canonical data to render charts. Load a demo dataset or upload files with outbound + item master + inventory.</p>';
+  }
+
+  return { render, computeMetrics };
+})();
+
+/* ============================================================
+   Render
+   ============================================================ */
+const Render = (()=>{
+  function report(r){
+    document.getElementById('results').classList.remove('hidden');
+    const rc = document.getElementById('reportCard');
+    rc.innerHTML = r.perFile.map(pf=>{
+      const s=pf.result.status;
+      const cls = s==='ready'?'ok':s==='insufficient'?'bad':'warn';
+      return `<div class="kpi">
+        <div class="l">${pf.file.detected.label}</div>
+        <div class="v">${pf.file.name}</div>
+        <div style="margin-top:6px"><span class="pill ${cls}">${s.toUpperCase()}</span></div>
+        <div class="prov">${pf.result.rowCount.toLocaleString()} rows</div>
+      </div>`;
+    }).join('');
+    const fnd=document.getElementById('findings');
+    const all = r.perFile.flatMap(pf=>pf.result.findings.map(x=>({...x,file:pf.file.detected.label})));
+    fnd.innerHTML = all.length ? all.map(x=>`
+      <div class="finding ${x.sev==='crit'?'crit':x.sev==='warn'?'warn':'ok'}">
+        <h4>[${x.file}] ${x.title}</h4>
+        <p>${x.detail}</p>
+      </div>`).join('') : '<p class="prov">No findings yet.</p>';
+    const cf=document.getElementById('crossFile');
+    cf.innerHTML = r.cross.length ? r.cross.map(c=>`
+      <div class="finding ${c.sev==='crit'?'crit':c.sev==='warn'?'warn':'ok'}"><h4>${c.title}</h4><p>${c.detail}</p></div>
+    `).join('') : '<p class="prov">Need ≥2 recognized files to run cross-diagnostics.</p>';
+  }
+  return { report };
+})();
+
+/* ============================================================
+   DemoData — clean + MESSY + RIDGELINE (polished, seeded flaws)
+   ============================================================ */
+const DemoData = (()=>{
+
+  // seeded PRNG so every demo is deterministic
+  function rng(seed){ let s=seed; return ()=>{ s = (s*9301+49297)%233280; return s/233280; }; }
+
+  /* ---------- Ridgeline Outdoor Co. ---------- */
+  /* Fictional mid-market DTC + wholesale outdoor gear brand.
+     Every seeded flaw is tagged with the diagnostic it fires. */
+  function ridgeline(){
+    const r = rng(20260406);
+    const SKU_COUNT = 2400;
+    const OUTBOUND_LINES = 24000;
+    const INBOUND_LINES = 6000;
+    const INV_SKUS = 2000;
+    const SNAPSHOTS = 8;
+
+    // ---------- ITEM MASTER ----------
+    const categories = [
+      {name:'Tent', cubeMean:1.8, wtMean:5.2, cp:[2,4]},
+      {name:'Sleeping Bag', cubeMean:0.9, wtMean:3.1, cp:[4,6]},
+      {name:'Backpack', cubeMean:1.2, wtMean:2.0, cp:[4,6]},
+      {name:'Headlamp', cubeMean:0.04, wtMean:0.3, cp:[12,24]},
+      {name:'Trail Runner', cubeMean:0.25, wtMean:1.8, cp:[6,12]},
+      {name:'Water Bottle', cubeMean:0.08, wtMean:0.4, cp:[12,24]},
+      {name:'Cookset', cubeMean:0.35, wtMean:2.2, cp:[6,8]},
+      {name:'Stove (Butane)', cubeMean:0.18, wtMean:1.4, cp:[6,12]}, // hazmat by desc
+      {name:'Trekking Poles', cubeMean:0.22, wtMean:0.9, cp:[6,12]},
+      {name:'Rain Jacket', cubeMean:0.14, wtMean:0.5, cp:[12,24]},
+      {name:'Bear Spray (Aerosol)', cubeMean:0.06, wtMean:0.3, cp:[12]}, // hazmat
+      {name:'Lithium Battery Pack', cubeMean:0.05, wtMean:0.4, cp:[12,24]}, // hazmat
+      {name:'Camp Chair', cubeMean:0.8, wtMean:2.5, cp:[2,4]},
+      {name:'First Aid Kit', cubeMean:0.1, wtMean:0.4, cp:[12]},
+      {name:'Insulated Mug', cubeMean:0.06, wtMean:0.3, cp:[12,24]}
+    ];
+
+    const items = [];
+    for(let i=0;i<SKU_COUNT;i++){
+      const cat = categories[Math.floor(r()*categories.length)];
+      const eachCube = +(cat.cubeMean*(0.7+r()*0.6)).toFixed(4);
+      const eachWt = +(cat.wtMean*(0.75+r()*0.5)).toFixed(2);
+      const cp = cat.cp[Math.floor(r()*cat.cp.length)];
+      const caseCube = +(eachCube*cp*(0.95+r()*0.1)).toFixed(4);
+
+      // FLAW 1: 6% of SKUs missing cube → trips hard-stop rule
+      const missingCube = r()<0.06;
+      // FLAW 2: 4% missing weight
+      const missingWt = r()<0.04;
+      // FLAW 3: ~35% default volume on a specific block (indices 200-1000)
+      const defaultCube = (i>=200 && i<1000) && r()<0.6;
+
+      items.push({
+        'MATNR':'RO'+String(100000+i),
+        'MAKTX': cat.name+' '+['Summit','Ridge','Alpine','Trail','Base','Expedition'][i%6]+' '+(100+i%400),
+        'Base UoM':'EA',
+        'Gross Weight (lb)': missingWt ? null : eachWt,
+        'Volume (cuft)': missingCube ? null : (defaultCube ? 0.012 : eachCube),
+        'Case Qty': cp,
+        'Case Cube (cuft)': caseCube,
+        'Hazmat Class': null, // FLAW 4: no hazmat flag despite lithium/aerosol/butane in descriptions
+        'Status':'Active',
+        'Introduced':'2023-'+String(1+Math.floor(r()*12)).padStart(2,'0')+'-01'
+      });
+
+      // FLAW 5: 40 duplicate SKUs (merger artifact)
+      if(i<40){
+        items.push({...items[items.length-1], 'MAKTX':items[items.length-1].MAKTX+' (Legacy Div)'});
+      }
+    }
+    // FLAW 6: 6 density outliers (weight/cube ratio extreme)
+    for(let i=0;i<6;i++){
+      items[i*100]['Gross Weight (lb)'] = items[i*100]['Gross Weight (lb)']*50; // kg-as-lb error
+    }
+
+    // ---------- OUTBOUND ORDER HISTORY ----------
+    const outbound = [];
+    // Pareto weights: 20% of SKUs get 78% of units
+    const activeSkus = items.slice(0, 1800).map(it=>it.MATNR); // 600 dead SKUs
+    const top20 = Math.floor(activeSkus.length*0.2);
+    const channelMix = [
+      {t:'DTC', carrier:'UPS', wt:0.55, lines_per:1.4, qty_max:2},
+      {t:'DTC', carrier:'FedEx', wt:0.20, lines_per:1.3, qty_max:2},
+      {t:'WHLS', carrier:'YRC',   wt:0.15, lines_per:8,   qty_max:24},
+      {t:'REPL', carrier:'ODFL',  wt:0.10, lines_per:12,  qty_max:36}
+    ];
+    // 14 months of history with Q4 seasonality
+    const start = new Date(2025,1,1); // Feb 2025
+    let orderSeq = 100000;
+    for(let i=0;i<OUTBOUND_LINES;i++){
+      // seasonality: ramp into Oct-Dec
+      const monthOff = Math.floor(r()*14);
+      let weight = 1;
+      if(monthOff===8) weight=1.6;       // Oct
+      else if(monthOff===9) weight=2.4;  // Nov (peak)
+      else if(monthOff===10) weight=3.2; // Dec (peak)
+      if(r()>1/weight) continue; // drop some lines in off-season to create ratio
+      const day = Math.floor(r()*28)+1;
+      const d = new Date(2025,1+monthOff,day);
+      // channel
+      const cr = r(); let c=channelMix[0], acc=0;
+      for(const cm of channelMix){ acc+=cm.wt; if(cr<=acc){ c=cm; break; } }
+      // SKU (Pareto skew)
+      let sku;
+      if(r()<0.78) sku = activeSkus[Math.floor(r()*top20)];
+      else sku = activeSkus[top20+Math.floor(r()*(activeSkus.length-top20))];
+      // order grouping
+      const linesThis = 1+Math.floor(r()*c.lines_per);
+      for(let l=0;l<linesThis && outbound.length<OUTBOUND_LINES;l++){
+        let q = 1+Math.floor(r()*c.qty_max);
+        // FLAW 7: 8% split-case hidden in wholesale (qty just above case pack)
+        if(c.t==='WHLS' && r()<0.3){
+          const item = items.find(x=>x.MATNR===sku);
+          if(item && item['Case Qty']) q = item['Case Qty']+Math.floor(r()*3)+1; // non-integer multiple
+        }
+        outbound.push({
+          'Sales Doc.':'SO'+(orderSeq),
+          'Line':l+1,
+          'Created On': d.toISOString().slice(0,10),
+          'Material Number': sku,
+          'Menge': q,
+          'VRKME':'EA',
+          'Postal Code': String(10000+Math.floor(r()*89999)).padStart(5,'0'),
+          'Ship Via': c.carrier,
+          'Doc Type': c.t
+        });
+      }
+      orderSeq++;
+    }
+
+    // ---------- INBOUND HISTORY ----------
+    const vendors = ['ACME MFG','PacRim Supply','Cascade Corp','NorthStar Trading','Ridgeback Intl',
+                     'TrailCraft','Alpine Goods','Summit Source','GearForge','BaseCamp Dist',
+                     'Expedition Partners','Trek Supply','Outdoor Works','Boreal Imports','WildCo'];
+    const inbound = [];
+    for(let i=0;i<INBOUND_LINES;i++){
+      // top-10 concentration ~65%
+      let vIdx;
+      if(r()<0.65) vIdx = Math.floor(r()*10);
+      else vIdx = 10+Math.floor(r()*5);
+      const monthOff = Math.floor(r()*12);
+      const day = Math.floor(r()*28)+1;
+      const d = new Date(2025,2+monthOff,day);
+      const sku = activeSkus[Math.floor(r()*activeSkus.length)];
+      let qty = 50+Math.floor(r()*450);
+      // FLAW 8: 3% negative returns
+      if(r()<0.03) qty = -Math.floor(r()*20+5);
+      // FLAW 9: 4% cross-dock eligible — receive date matches outbound ship within 48h
+      if(r()<0.04){
+        // pick a real outbound record for this sku and receive within 24h
+        const out = outbound.find(o=>o['Material Number']===sku);
+        if(out){
+          const od = new Date(out['Created On']);
+          od.setDate(od.getDate()-1);
+          inbound.push({
+            'GRN No':'GRN'+String(80000+Math.floor(i/4)),
+            'Posting Date':od.toISOString().slice(0,10),
+            'Vendor':vendors[vIdx],
+            'Material':sku,
+            'Menge':qty,
+            'Unit':'EA',
+            'Trailer':'TR'+String(1000+Math.floor(r()*500))
+          });
+          continue;
+        }
+      }
+      inbound.push({
+        'GRN No':'GRN'+String(80000+Math.floor(i/4)),
+        'Posting Date':d.toISOString().slice(0,10),
+        'Vendor':vendors[vIdx],
+        'Material':sku,
+        'Menge':qty,
+        'Unit':'EA',
+        'Trailer':'TR'+String(1000+Math.floor(r()*500))
+      });
+    }
+
+    // ---------- INVENTORY SNAPSHOTS (WIDE format) ----------
+    // aisle-rack-level locations
+    const inv = [];
+    for(let i=0;i<INV_SKUS;i++){
+      const sku = items[i]?.MATNR; if(!sku) continue;
+      const aisle = String.fromCharCode(65+Math.floor(i/100));
+      const row = {Material:sku, 'Storage Loc':`${aisle}-${String(1+(i%50)).padStart(2,'0')}-${String(1+(i%10))}-${String(1+(i%4))}`};
+      // 8 monthly snapshots wide
+      const months = ['2025-08','2025-09','2025-10','2025-11','2025-12','2026-01','2026-02','2026-03'];
+      for(const m of months){
+        let q;
+        // healthy distribution with bias toward the dead tail (FLAW 10: dead cube)
+        const cls = r();
+        if(cls<0.05) q = 0;                                 // stockout
+        else if(cls<0.06) q = -Math.floor(r()*5+1);         // FLAW 11: negatives
+        else if(cls<0.30) q = Math.floor(r()*600)+200;      // fast mover
+        else if(cls<0.65) q = Math.floor(r()*300)+50;       // medium
+        else if(cls<0.80) q = Math.floor(r()*100)+20;       // slow
+        else q = Math.floor(r()*500)+100;                   // stagnant (dead tail big)
+        // FLAW 12: 27% zero-location latest snapshot (honeycomb)
+        if(m==='2026-03' && r()<0.27) q = 0;
+        row[m] = q;
+      }
+      inv.push(row);
+    }
+
+    return [
+      {name:'Ridgeline_MaterialMaster_SAP.xlsx', rows:items,    headers:Object.keys(items[0])},
+      {name:'Ridgeline_VA05_Outbound_14mo.xlsx', rows:outbound, headers:Object.keys(outbound[0])},
+      {name:'Ridgeline_MIGO_Receipts.xlsx',      rows:inbound,  headers:Object.keys(inbound[0])},
+      {name:'Ridgeline_MB52_Inventory_Wide.xlsx', rows:inv,     headers:Object.keys(inv[0])}
+    ];
+  }
+
+  /* ---------- legacy clean/messy (small) ---------- */
+  function clean(){
+    const items = []; for(let i=0;i<500;i++) items.push({
+      SKU:'SKU'+(10000+i), Description:'Demo Item '+i,
+      EachCube: i%20===0 ? null : +(Math.random()*2).toFixed(3),
+      EachWeight: i%25===0 ? null : +(Math.random()*10).toFixed(2),
+      CasePack: [6,12,24,48][i%4], Hazmat: null
+    });
+    const outbound=[]; for(let i=0;i<2000;i++) outbound.push({
+      OrderID:'O'+Math.floor(i/3), OrderDate:new Date(2026,0,1+(i%60)),
+      SKU:'SKU'+(10000+(i%500)), Qty:1+Math.floor(Math.random()*6), UOM:'EA',
+      ShipToZip:'30'+(100+i%899), Carrier:['UPS','FedEx','LTL'][i%3], OrderType:'B2C'
+    });
+    return [
+      {name:'demo_item_master.xlsx', rows:items, headers:Object.keys(items[0])},
+      {name:'demo_outbound.xlsx',    rows:outbound, headers:Object.keys(outbound[0])}
+    ];
+  }
+  // SAP-style messy headers + German/odd codes
+  function messy(){
+    // Item master with SAP MATNR/MAKTX/GEWEI, units in kg, default dims
+    const items = []; for(let i=0;i<400;i++) items.push({
+      MATNR:'MAT'+String(1000+i).padStart(6,'0'),
+      MAKTX: (i%30===0?'Lithium Battery Pack ':i%35===0?'Alcohol Wipes ':'Product ')+i,
+      'Base UoM':'EA',
+      'Gewicht (kg)': i%20===0 ? null : +(Math.random()*5).toFixed(2),
+      'Volumen (m3)': i<200 ? 0.012 : +(Math.random()*0.5).toFixed(4), // 50% default volume = tell
+      'Units per Case':[6,12,24][i%3],
+      'Haz Class': null
+    });
+    // Outbound with odd headers, dates as strings, no carrier column name
+    const outbound=[]; for(let i=0;i<3000;i++) outbound.push({
+      'Sales Doc.':'SO'+Math.floor(i/2.5),
+      'Item':(i%3)+10,
+      'Created On':'2026-'+String(1+(i%3)).padStart(2,'0')+'-'+String(1+(i%28)).padStart(2,'0'),
+      'Material Number':'MAT'+String(1000+(i%400)).padStart(6,'0'),
+      'Menge':1+Math.floor(Math.random()*4),
+      'VRKME':'EA',
+      'Postal Code':'300'+String(10+(i%89)).padStart(2,'0'),
+      'Ship Via':['UPSN','FDEG','YRCW'][i%3],
+      'Doc Type':'ZOR'
+    });
+    // Inventory WIDE format - one col per month
+    const inv = []; for(let i=0;i<200;i++){
+      const r = {Material:'MAT'+String(1000+i).padStart(6,'0'), 'Storage Loc':'A-'+String(1+i%50).padStart(2,'0')+'-'+String(1+i%10)};
+      ['2025-10','2025-11','2025-12','2026-01','2026-02','2026-03'].forEach(m=>{ r[m]=Math.floor(Math.random()*500); });
+      inv.push(r);
+    }
+    // Inbound with a pre-header title row simulated by putting weird nulls (we handle inside parse, but here skip)
+    const inbound=[]; for(let i=0;i<800;i++) inbound.push({
+      'GRN No':'GRN'+String(5000+Math.floor(i/5)).padStart(7,'0'),
+      'Posting Date':'2026-'+String(1+(i%3)).padStart(2,'0')+'-'+String(1+(i%28)).padStart(2,'0'),
+      'Vendor':'V'+String(100+(i%40)),
+      'Material':'MAT'+String(1000+(i%400)).padStart(6,'0'),
+      'Menge':Math.floor(Math.random()*200)+10,
+      'Unit':'EA'
+    });
+    return [
+      {name:'item_master_SAP_extract.xlsx', rows:items,    headers:Object.keys(items[0])},
+      {name:'VA05_outbound_202601_202603.xlsx', rows:outbound, headers:Object.keys(outbound[0])},
+      {name:'MB52_inventory_wide.xlsx', rows:inv, headers:Object.keys(inv[0])},
+      {name:'MIGO_goods_receipts.xlsx', rows:inbound, headers:Object.keys(inbound[0])}
+    ];
+  }
+  return { clean, messy, ridgeline };
+})();
+
+/* ============================================================
+   Narrate — Claude narrative layer via Supabase edge function
+   Bring-your-own-key; stored in localStorage; forwarded to
+   analytics-narrate edge function which proxies to Anthropic.
+   ============================================================ */
+const Narrate = (()=>{
+  const KEY_STORE = 'ies_analytics_claude_key';
+  const MODEL_STORE = 'ies_analytics_claude_model';
+  function getKey(){ try{ return localStorage.getItem(KEY_STORE)||''; }catch(e){ return ''; } }
+  function setKey(k){ try{ localStorage.setItem(KEY_STORE,k); }catch(e){} }
+  function clearKey(){ try{ localStorage.removeItem(KEY_STORE); }catch(e){} }
+  function getModel(){ try{ return localStorage.getItem(MODEL_STORE)||'claude-sonnet-4-6'; }catch(e){ return 'claude-sonnet-4-6'; } }
+  function setModel(m){ try{ localStorage.setItem(MODEL_STORE,m); }catch(e){} }
+
+  async function call({system, user, max_tokens=2000}){
+    const apiKey = getKey();
+    if(!apiKey) throw new Error('No API key — add one in Settings');
+    if(!sb) throw new Error('Supabase client not initialized');
+    const { data, error } = await sb.functions.invoke('analytics-narrate', {
+      body: { apiKey, model:getModel(), system, user, max_tokens }
+    });
+    if(error) throw new Error('Edge function error: '+error.message);
+    if(data && data.error) throw new Error('Claude API error: '+(typeof data.error==='string'?data.error:JSON.stringify(data.error)));
+    if(data && data.content && data.content[0] && data.content[0].text) return data.content[0].text;
+    throw new Error('Unexpected response shape');
+  }
+
+  const SYSTEM = `You are a senior IES solutions designer at GXO with 20+ years of 3PL experience across all verticals. You are reviewing the output of an automated data profiling engine that just ran against customer data files provided for a new deal qualification.
+
+Your job: read the findings and write a crisp commentary in the voice of a seasoned analyst briefing the deal team. Structure your response in plain prose paragraphs under these four headings:
+
+1. What I see
+2. What concerns me
+3. What I would ask the customer before committing to a design
+4. What I am and am not willing to commit to from this data
+
+Be specific. Cite the actual numbers in the findings. Never invent data. If a finding is missing, say so. Be direct and useful — no hedging for its own sake, no fluff. Write the way a senior analyst would talk to a VP, not the way a report is written.`;
+
+  async function generate(report){
+    const summary = {
+      files: report.perFile.map(pf=>({
+        type: pf.file.detected.label,
+        filename: pf.file.name,
+        status: pf.result.status,
+        rowCount: pf.result.rowCount,
+        findings: pf.result.findings.map(f=>({severity:f.sev, title:f.title, detail:f.detail}))
+      })),
+      crossFile: report.cross.map(c=>({severity:c.sev, title:c.title, detail:c.detail}))
+    };
+    const user = 'Here is the profiling engine output as JSON. Write your commentary.\n\n```json\n'+JSON.stringify(summary,null,2)+'\n```';
+    return call({system:SYSTEM, user, max_tokens:2500});
+  }
+
+  async function test(){
+    return call({system:'Respond with exactly: OK', user:'Say OK', max_tokens:20});
+  }
+
+  return { getKey, setKey, clearKey, getModel, setModel, generate, test };
+})();
+
+/* ---------- Settings UI wiring ---------- */
+(function(){
+  const keyInput = document.getElementById('apiKeyInput');
+  const modelSel = document.getElementById('modelSelect');
+  const status = document.getElementById('keyStatus');
+  function refresh(){
+    const k = Narrate.getKey();
+    keyInput.value = k;
+    modelSel.value = Narrate.getModel();
+    status.textContent = k ? `Key stored (${k.length} chars, ends …${k.slice(-6)})` : 'No key set';
+  }
+  refresh();
+  document.getElementById('saveKeyBtn').addEventListener('click',()=>{
+    Narrate.setKey(keyInput.value.trim()); refresh(); showToast('API key saved');
+  });
+  document.getElementById('clearKeyBtn').addEventListener('click',()=>{
+    Narrate.clearKey(); refresh(); showToast('API key cleared');
+  });
+  modelSel.addEventListener('change',()=>{ Narrate.setModel(modelSel.value); showToast('Model: '+modelSel.value); });
+  document.getElementById('testKeyBtn').addEventListener('click',async()=>{
+    status.textContent = 'Testing...';
+    try {
+      const res = await Narrate.test();
+      status.textContent = 'Test OK — Claude replied: '+res.trim();
+    } catch(e){ status.textContent = 'Test failed: '+e.message; }
+  });
+})();
+
+/* ---------- Generate Narrative button on assessment page ---------- */
+document.getElementById('narrateBtn').addEventListener('click',async()=>{
+  const btn = document.getElementById('narrateBtn');
+  const out = document.getElementById('narrative');
+  // rebuild the report from state
+  const state = window.__lastReport;
+  if(!state){ out.innerHTML = '<p class="prov" style="color:var(--warn)">Run the assessment first.</p>'; return; }
+  if(!Narrate.getKey()){ out.innerHTML = '<p class="prov" style="color:var(--warn)">No Anthropic API key set. Go to Settings to add one.</p>'; return; }
+  btn.disabled = true; btn.textContent = 'Generating...';
+  out.innerHTML = '<p class="prov">Claude is reading the findings...</p>';
+  try {
+    const text = await Narrate.generate(state);
+    // light markdown rendering
+    const html = text
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/^### (.+)$/gm,'<h4 style="margin:16px 0 6px;color:var(--accent2)">$1</h4>')
+      .replace(/^## (.+)$/gm,'<h3 style="margin:18px 0 8px">$1</h3>')
+      .replace(/^# (.+)$/gm,'<h3 style="margin:18px 0 8px">$1</h3>')
+      .replace(/^\d+\.\s+\*\*(.+?)\*\*/gm,'<h4 style="margin:16px 0 6px;color:var(--accent2)">$1</h4>')
+      .replace(/^\*\*(.+?)\*\*$/gm,'<h4 style="margin:16px 0 6px;color:var(--accent2)">$1</h4>')
+      .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+      .replace(/\n\n/g,'</p><p>')
+      .replace(/\n/g,'<br/>');
+    out.innerHTML = '<div style="line-height:1.65">'+'<p>'+html+'</p></div>';
+  } catch(e){
+    out.innerHTML = '<p class="prov" style="color:var(--bad)">Error: '+e.message+'</p>';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Regenerate Narrative';
+  }
+});
+</script>
+<script src="most-standards.js"></script>
+<script>
+/* initialize MOST when user clicks the MOST nav item the first time */
+(function(){
+  var inited = false;
+  document.querySelector('.navitem[data-view="most"]').addEventListener('click', function(){
+    if(inited) return;
+    inited = true;
+    if(typeof mostApp !== 'undefined' && mostApp.init){
+      try { mostApp.init(); } catch(e){ console.error('MOST init failed',e); showToast('MOST failed to load: '+e.message); }
+    } else {
+      showToast('MOST module not loaded');
+    }
+  });
+})();
+</script>
+</body>
+</html>
