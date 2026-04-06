@@ -8458,17 +8458,10 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
                 </div>
             </div>
 
-            <div class="cm-card">
-                <div class="cm-card-title">Calculated Metrics</div>
-                <div class="cm-field-group cm-flex-between">
-                    <span>Total Orders per Year</span>
-                    <span class="cm-text-orange" id="totalOrders">0</span>
-                </div>
-                <div class="cm-field-group cm-flex-between">
-                    <span>Total Picks per Year</span>
-                    <span class="cm-text-orange" id="totalPicks">0</span>
-                </div>
-            </div>
+        <!-- Calculated Metrics card removed 2026-04-06 (redundant; metrics shown in Summary) -->
+        <!-- Hidden anchors retained so existing JS that updates these IDs doesn't error -->
+        <span id="totalOrders" style="display:none;"></span>
+        <span id="totalPicks" style="display:none;"></span>
 
         <!-- Order Profile section merged into Volumes above -->
 
