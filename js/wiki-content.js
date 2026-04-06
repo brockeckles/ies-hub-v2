@@ -2626,22 +2626,334 @@ WIKI_PAGES['dtg-costmodel'] = DTG_STYLE + '<div class="wiki-article dtg">' +
 
   '</div>';
 
-// ─── STUBS for the other 6 guides (will flesh out next pass) ───
-function _dtgStub(title, ns) {
-  return DTG_STYLE + '<div class="wiki-article dtg">' +
-    '<div class="wiki-breadcrumb">Design Tool Guides / ' + title + '</div>' +
-    '<h1>' + title + '</h1>' +
-    '<p><span class="tag">' + ns + '</span></p>' +
-    '<h2>Coming next pass</h2>' +
-    '<p>This guide is stubbed. Cost Model Builder is the template — once Brock signs off on its shape, this page will be built against the same Purpose / Inputs / Calculations / Integrations / Gotchas structure.</p>' +
-    '</div>';
-}
-WIKI_PAGES['dtg-netopt']    = _dtgStub('Network Optimization', 'netoptApp');
-WIKI_PAGES['dtg-wsc']       = _dtgStub('Warehouse Sizing & Configuration', 'wscApp');
-WIKI_PAGES['dtg-fleet']     = _dtgStub('Fleet Modeler', 'fmApp');
-WIKI_PAGES['dtg-most']      = _dtgStub('MOST Labor Standards', 'mostApp');
-WIKI_PAGES['dtg-cog']       = _dtgStub('Center of Gravity', 'cogApp');
-WIKI_PAGES['dtg-deckgen']   = _dtgStub('Deck Generation', 'deckGen');
+// ─── NETWORK OPTIMIZATION ───
+WIKI_PAGES['dtg-netopt'] = DTG_STYLE + '<div class="wiki-article dtg">' +
+  '<div class="wiki-breadcrumb">Design Tool Guides / Network Optimization</div>' +
+  '<h1>Network Optimization</h1>' +
+  '<p><span class="tag">Solutions</span><span class="tag">netoptApp</span><span class="tag">multi-mode</span></p>' +
+
+  '<h2>Purpose</h2>' +
+  '<p>Greenfield / brownfield DC network design. Picks the best 1–N facility combinations from a candidate pool to serve a demand set, scoring each on landed cost and service level. Supports TL / LTL / Parcel costing and multi-mode transportation.</p>' +
+
+  '<h2>Inputs</h2>' +
+  '<table><tr><th>Field</th><th>Units</th><th>Default</th><th>Source</th></tr>' +
+  '<tr><td>Facility candidates</td><td>name, lat/lng, capacity (units/yr), fixed $/yr (M), variable $/unit</td><td>10 GXO seed cities</td><td>NETOPT_FACILITY_CANDIDATES</td></tr>' +
+  '<tr><td>Demand points</td><td>city, lat/lng, volume (units/yr)</td><td>15 US cities, ~2.26M total</td><td>NETOPT_DEMAND_POINTS</td></tr>' +
+  '<tr><td>Suppliers (inbound)</td><td>city, volume, mode</td><td>optional</td><td>user / CSV</td></tr>' +
+  '<tr><td>Service SLA</td><td>days</td><td>2</td><td>user</td></tr>' +
+  '<tr><td>Mode mix</td><td>TL / LTL / Parcel %</td><td>profile-driven</td><td>user</td></tr></table>' +
+
+  '<h2>Key Calculations</h2>' +
+
+  '<h3>Distance &amp; Transit</h3>' +
+  '<code class="formula">// Haversine great-circle, then × circuity factor (1.2)\n' +
+  'distMi(a,b) = 3959 × 2 × asin(√(sin²(Δφ/2) + cosφ₁·cosφ₂·sin²(Δλ/2))) × 1.2\n' +
+  'transitDays = ceil(distMi / modeMphPerDay)\n' +
+  '  TL:    500 mi/day\n' +
+  '  LTL:   350 mi/day\n' +
+  '  Parcel: routed through hub network → 1–5 day zone</code>' +
+
+  '<h3>Assignment (greedy nearest-feasible)</h3>' +
+  '<code class="formula">For each demand d (sorted desc by volume):\n' +
+  '  candidates = facilities sorted by distMi(f,d)\n' +
+  '  assign to first f where remainingCapacity(f) ≥ d.volume\n' +
+  '  d.assignedFacility = f\n' +
+  '  d.assignedVolume = d.volume\n' +
+  '  remainingCapacity(f) -= d.volume\n\n' +
+  'If no feasible f exists for any d → scenario flagged INFEASIBLE</code>' +
+  '<div class="gotcha"><b>Gotcha:</b> Greedy is O(n·m), not optimal. For ≤15 demand points the gap to MILP is &lt;5%; large networks should be solved offline.</div>' +
+
+  '<h3>Landed Cost Rollup</h3>' +
+  '<code class="formula">For each candidate set S of K facilities:\n' +
+  '  fixedCost   = Σ f.fixedCost  (for f ∈ S, in $M/yr)\n' +
+  '  varCost     = Σ d.assignedVolume × f.varCost / 1,000,000  ($M/yr)\n' +
+  '  freightCost = Σ d.assignedVolume × distMi(f,d) × $/mi/unit / 1,000,000\n' +
+  '  totalCost   = fixedCost + varCost + freightCost\n\n' +
+  '  weightedAvgTransit = Σ (d.vol × transitDays) / Σ d.vol\n' +
+  '  serviceScore = % of demand within SLA days</code>' +
+
+  '<h3>Feasibility Coloring</h3>' +
+  '<code class="formula">utilization(f) = assignedVolume(f) / capacity(f)\n' +
+  'green:  util ≤ 85%\n' +
+  'amber:  85% < util ≤ 100%\n' +
+  'red:    util > 100% → INFEASIBLE</code>' +
+
+  '<h2>Integrations</h2>' +
+  '<table><tr><th>Direction</th><th>Tool</th><th>What flows</th></tr>' +
+  '<tr><td>Writes →</td><td>CM</td><td>Selected facility seeds new Cost Model site (planned)</td></tr>' +
+  '<tr><td>Persists</td><td>Supabase</td><td><code>netopt_scenarios</code> + JSON for facilities/demands/results</td></tr>' +
+  '<tr><td>Imports</td><td>CSV</td><td>Facilities, demands, suppliers via upload</td></tr></table>' +
+
+  '<h2>Gotchas &amp; Quirks</h2>' +
+  '<div class="gotcha">All units are <b>raw units/yr</b> as of 2026-04-06. No K conversions anywhere.</div>' +
+  '<div class="gotcha">Seed facility capacities (2026-04-06) tuned so 1-DC scenarios are feasible at ~90% util. Real-world capacities should override.</div>' +
+  '<div class="gotcha">Greedy assignment depends on demand sort order. Tiebreakers fall to facility list order.</div>' +
+  '<div class="gotcha">Heatmap uses linear interpolation between facility centroids — visual approximation only.</div>' +
+  '</div>';
+
+// ─── WSC ───
+WIKI_PAGES['dtg-wsc'] = DTG_STYLE + '<div class="wiki-article dtg">' +
+  '<div class="wiki-breadcrumb">Design Tool Guides / Warehouse Sizing &amp; Configuration</div>' +
+  '<h1>Warehouse Sizing &amp; Configuration</h1>' +
+  '<p><span class="tag">Solutions</span><span class="tag">wscApp</span><span class="tag">3D + elevation</span></p>' +
+
+  '<h2>Purpose</h2>' +
+  '<p>Sizes a warehouse from inventory profile and throughput. Outputs SF, dock count, rack/aisle layout, and a 3D + elevation visualization. Drives the Facility section of Cost Model via bi-directional sync.</p>' +
+
+  '<h2>Inputs</h2>' +
+  '<table><tr><th>Field</th><th>Units</th><th>Default</th></tr>' +
+  '<tr><td>Pallet positions required</td><td>pallets</td><td>derived from DOH × throughput</td></tr>' +
+  '<tr><td>Days on hand</td><td>days</td><td>30</td></tr>' +
+  '<tr><td>Outbound throughput</td><td>pallets/day</td><td>from CM primary outbound</td></tr>' +
+  '<tr><td>Rack type</td><td>SD / DD / drive-in / shuttle</td><td>Selective single-deep</td></tr>' +
+  '<tr><td>Clear height</td><td>ft</td><td>36</td></tr>' +
+  '<tr><td>Aisle width</td><td>ft</td><td>11 (reach truck)</td></tr>' +
+  '<tr><td>Levels per bay</td><td>—</td><td>floor + 4</td></tr></table>' +
+
+  '<h2>Key Calculations</h2>' +
+
+  '<h3>Pallet Positions from Throughput</h3>' +
+  '<code class="formula">positionsRequired = outboundPalletsPerDay × DOH × (1 + safetyStock%)\n' +
+  '  Typical safetyStock% = 15–20%</code>' +
+
+  '<h3>Rack Module Geometry</h3>' +
+  '<code class="formula">// Per back-to-back row pair (one aisle served by 2 rows)\n' +
+  'positionsPerBay     = beamsPerLevel × levels       // e.g. 3 × 5 = 15\n' +
+  'baysPerRow          = floor(rowLength / bayWidth)  // bayWidth ≈ 8.5 ft\n' +
+  'positionsPerRowPair = 2 × baysPerRow × positionsPerBay\n\n' +
+  '// For double-deep, multiply by 2 (depth)\n' +
+  'if rackType == "DD": positionsPerRowPair *= 2</code>' +
+
+  '<h3>Storage SF</h3>' +
+  '<code class="formula">moduleWidth = 2 × rackDepth + aisleWidth\n' +
+  '  selectiveSD: 2×4 + 11  = 19 ft\n' +
+  '  doubleDeep:  2×8 + 11  = 27 ft (but 2× density)\n\n' +
+  'storageRows  = ceil(positionsRequired / positionsPerRowPair)\n' +
+  'storageSF    = storageRows × moduleWidth × rowLength</code>' +
+
+  '<h3>Total Building SF</h3>' +
+  '<code class="formula">dockSF       = dockCount × 1,200      // includes staging\n' +
+  'pickModSF    = positionsRequired × 0.15  // case/each pick area allowance\n' +
+  'vasSF        = 0.05 × storageSF          // VAS / packout\n' +
+  'officeSF     = max(2,000, FTE × 100)\n' +
+  'circulationSF = 0.10 × (storageSF + pickModSF + vasSF)\n\n' +
+  'totalSF = storageSF + dockSF + pickModSF + vasSF + officeSF + circulationSF</code>' +
+
+  '<h3>Dock Count</h3>' +
+  '<code class="formula">trailersPerDay  = (inbound + outbound) / palletsPerTrailer  // pPT ≈ 26\n' +
+  'docksRequired   = ceil(trailersPerDay / dockTurnsPerDay)    // turns ≈ 3\n' +
+  'docksWithBuffer = ceil(docksRequired × 1.15)                // 15% peak buffer</code>' +
+
+  '<h2>Integrations</h2>' +
+  '<table><tr><th>Direction</th><th>Tool</th><th>What flows</th></tr>' +
+  '<tr><td>Reads ←</td><td>CM</td><td>Primary outbound volume → throughput pre-fill</td></tr>' +
+  '<tr><td>Writes →</td><td>CM</td><td>Total SF, clear height, dock count → CM Facility section</td></tr>' +
+  '<tr><td>Renders</td><td>Three.js r128</td><td>3D warehouse + 2D elevation view</td></tr></table>' +
+
+  '<h2>Gotchas &amp; Quirks</h2>' +
+  '<div class="gotcha">Elevation view is intentionally minimal (no labels/dims) — show structure not decoration. Per design feedback 2026-04-05.</div>' +
+  '<div class="gotcha">Double-deep rack saves SF but loses honeycomb access — only use when SKU profile has &lt;1.5× pallet velocity per position.</div>' +
+  '<div class="gotcha">Office SF allowance (100/FTE) is light for clean-desk specs; bump for HQ-style facilities.</div>' +
+  '<div class="gotcha">3D rendering uses CylinderGeometry/BoxGeometry only — no CapsuleGeometry (not in r128).</div>' +
+  '</div>';
+
+// ─── FLEET MODELER ───
+WIKI_PAGES['dtg-fleet'] = DTG_STYLE + '<div class="wiki-article dtg">' +
+  '<div class="wiki-breadcrumb">Design Tool Guides / Fleet Modeler</div>' +
+  '<h1>Fleet Modeler</h1>' +
+  '<p><span class="tag">Solutions</span><span class="tag">fmApp</span><span class="tag">3-way comparison</span></p>' +
+
+  '<h2>Purpose</h2>' +
+  '<p>Sizes a private fleet from a lane set, costs it three ways (private / dedicated / common-carrier), and renders the route map. Supports per-vehicle costing and scenario persistence via the NetOpt-style scenario bar.</p>' +
+
+  '<h2>Inputs</h2>' +
+  '<table><tr><th>Field</th><th>Units</th><th>Notes</th></tr>' +
+  '<tr><td>Lanes</td><td>origin, dest, frequency, weight, mode</td><td>CSV upload or manual</td></tr>' +
+  '<tr><td>Vehicle types</td><td>capacity, MPG, $/mile, $/hr driver</td><td>Per-vehicle costing</td></tr>' +
+  '<tr><td>Driver work rules</td><td>hrs/day, days/wk</td><td>HOS 11/14 default</td></tr>' +
+  '<tr><td>Utilization target</td><td>%</td><td>85% default</td></tr></table>' +
+
+  '<h2>Key Calculations</h2>' +
+
+  '<h3>Lane Distance &amp; Time</h3>' +
+  '<code class="formula">distMi(o,d)   = haversine × 1.2 circuity\n' +
+  'driveHrs      = distMi / avgMph              // avgMph ≈ 50\n' +
+  'cycleHrs      = driveHrs + loadHrs + unloadHrs + dwellHrs\n' +
+  'roundTripHrs  = 2 × cycleHrs</code>' +
+
+  '<h3>Fleet Sizing</h3>' +
+  '<code class="formula">tripsPerLane_yr = lane.frequency × 52\n' +
+  'totalAnnualHrs  = Σ tripsPerLane_yr × roundTripHrs\n' +
+  'driverHrs_yr    = hrsPerDay × daysPerWk × 52   // typ 11 × 5 × 52 = 2,860\n' +
+  'driversRequired = ceil(totalAnnualHrs / (driverHrs_yr × utilTarget))\n' +
+  'tractorsRequired = driversRequired             // 1:1 baseline\n' +
+  'trailersRequired = tractorsRequired × trailerRatio  // typ 1.5</code>' +
+
+  '<h3>Per-Vehicle Annual Cost</h3>' +
+  '<code class="formula">tractorCost_yr = leasePerMo × 12 + maintPerMi × milesPerYr +\n' +
+  '                 fuelGal × $/gal + insurancePerYr + taxLicense\n' +
+  'fuelGal        = milesPerYr / mpg\n' +
+  'driverCost_yr  = wagePerHr × driverHrs_yr × (1 + benefits%)\n' +
+  'totalPerTractor_yr = tractorCost_yr + driverCost_yr</code>' +
+
+  '<h3>3-Way Comparison</h3>' +
+  '<code class="formula">privateCost   = (totalPerTractor × tractorsRequired) +\n' +
+  '                (trailerCost × trailersRequired) + overhead\n' +
+  'dedicatedCost = totalMiles × dedicated$/mi          // typ $2.20–2.80/mi\n' +
+  'commonCost    = Σ lane.weight × LTL_class_rate(lane)\n\n' +
+  'recommend = min(private, dedicated, common)\n' +
+  'breakeven = miles where private == dedicated</code>' +
+
+  '<h2>Integrations</h2>' +
+  '<table><tr><th>Direction</th><th>Tool</th><th>What flows</th></tr>' +
+  '<tr><td>Persists</td><td>Supabase</td><td><code>fleet_scenarios</code> parent + <code>fleet_scenario_lanes</code> children</td></tr>' +
+  '<tr><td>Renders</td><td>Leaflet</td><td>Lane polylines + facility markers</td></tr></table>' +
+
+  '<h2>Gotchas &amp; Quirks</h2>' +
+  '<div class="gotcha">Scenario bar pattern matches NetOpt: above the tabs, not on a separate Scenarios tab. Save / Save As / Delete with active-id tracking.</div>' +
+  '<div class="gotcha">Driver hours use 2,860/yr (11×5×52), not 2,080. Reflects HOS, not shift labor math.</div>' +
+  '<div class="gotcha">Common-carrier rate uses CzarLite-style class lookups offline; not a live API.</div>' +
+  '<div class="gotcha">Trailer ratio of 1.5 assumes drop-and-hook. Live-load operations should drop ratio to 1.0.</div>' +
+  '</div>';
+
+// ─── MOST ───
+WIKI_PAGES['dtg-most'] = DTG_STYLE + '<div class="wiki-article dtg">' +
+  '<div class="wiki-breadcrumb">Design Tool Guides / MOST Labor Standards</div>' +
+  '<h1>MOST Labor Standards</h1>' +
+  '<p><span class="tag">Solutions</span><span class="tag">mostApp</span><span class="tag">predetermined motion time</span></p>' +
+
+  '<h2>Purpose</h2>' +
+  '<p>Builds engineered labor standards using BasicMOST sequence models. Templates for common warehouse activities (case pick, pallet putaway, trailer load) plus a free-form composer. Outputs TMU → seconds → FTE requirements.</p>' +
+
+  '<h2>BasicMOST Sequence Models</h2>' +
+  '<table><tr><th>Sequence</th><th>Use</th><th>Pattern</th></tr>' +
+  '<tr><td>General Move</td><td>Move object freely through space</td><td>A B G A B P A</td></tr>' +
+  '<tr><td>Controlled Move</td><td>Move object on a path (lever, crank, restrained)</td><td>A B G M X I A</td></tr>' +
+  '<tr><td>Tool Use</td><td>Apply a tool</td><td>A B G A B P · ToolAction · A B P A</td></tr></table>' +
+  '<p>Where: A = Action distance, B = Body motion, G = Gain control, P = Place, M = Move controlled, X = Process, I = Align. Each parameter takes an index (0,1,3,6,10,16) representing TMU/10.</p>' +
+
+  '<h2>Key Calculations</h2>' +
+
+  '<h3>Sequence TMU</h3>' +
+  '<code class="formula">// Sum the index digits, multiply by 10\n' +
+  'sequenceTMU = (sumOfIndexDigits) × 10\n' +
+  'example A1 B0 G1 A1 B0 P3 A0 → (1+0+1+1+0+3+0)×10 = 60 TMU\n\n' +
+  '1 TMU = 0.036 sec = 0.0006 min</code>' +
+
+  '<h3>Standard Time (with allowances)</h3>' +
+  '<code class="formula">normalSec   = TMU × 0.036\n' +
+  'standardSec = normalSec × (1 + PFD%)\n' +
+  '  PFD = Personal/Fatigue/Delay allowance, typ 15%\n\n' +
+  'For an activity built from N sub-tasks:\n' +
+  '  totalStdSec = Σ subTaskStdSec × frequency</code>' +
+
+  '<h3>FTE Requirement</h3>' +
+  '<code class="formula">workContent_dailySec = stdSec_perUnit × dailyVolume\n' +
+  'productiveHrs_perFTE = shiftHrs × (1 − indirectAllowance%)  // typ 0.85\n' +
+  'FTE = workContent_dailySec / 3600 / productiveHrs_perFTE</code>' +
+
+  '<h2>Integrations</h2>' +
+  '<table><tr><th>Direction</th><th>Tool</th><th>What flows</th></tr>' +
+  '<tr><td>Writes →</td><td>CM</td><td>FTE counts by role → CM Labor section (planned)</td></tr>' +
+  '<tr><td>Library</td><td>—</td><td>Shared template library + per-deal composer</td></tr></table>' +
+
+  '<h2>Gotchas &amp; Quirks</h2>' +
+  '<div class="gotcha">Index values are restricted to 0,1,3,6,10,16 — picking values between is non-MOST and breaks defensibility.</div>' +
+  '<div class="gotcha">PFD allowances vary by climate/physical demand: 12% sedentary, 15% standard, 20%+ heavy lift.</div>' +
+  '<div class="gotcha">MOST is not a substitute for direct observation — use it where work is repeatable and engineered.</div>' +
+  '</div>';
+
+// ─── COG ───
+WIKI_PAGES['dtg-cog'] = DTG_STYLE + '<div class="wiki-article dtg">' +
+  '<div class="wiki-breadcrumb">Design Tool Guides / Center of Gravity</div>' +
+  '<h1>Center of Gravity</h1>' +
+  '<p><span class="tag">Solutions</span><span class="tag">cogApp</span><span class="tag">single-DC siting</span></p>' +
+
+  '<h2>Purpose</h2>' +
+  '<p>Computes the volume-weighted geographic centroid of a demand set — the theoretical optimum location for a single DC. Useful as a starting point before running NetOpt with full constraints.</p>' +
+
+  '<h2>Inputs</h2>' +
+  '<table><tr><th>Field</th><th>Units</th><th>Notes</th></tr>' +
+  '<tr><td>Demand points</td><td>city, lat, lng, weight</td><td>Weight = volume or revenue</td></tr>' +
+  '<tr><td>Mode</td><td>weighted COG / iterative COG</td><td>Iterative respects rate ≠ uniform</td></tr></table>' +
+
+  '<h2>Key Calculations</h2>' +
+
+  '<h3>Weighted COG (closed form)</h3>' +
+  '<code class="formula">cogLat = Σ (lat_i × w_i) / Σ w_i\n' +
+  'cogLng = Σ (lng_i × w_i) / Σ w_i\n\n' +
+  '// Equivalent to minimizing Σ w_i × dist²(p,i) — minimizes\n' +
+  '// the SUM-OF-SQUARED distances, not absolute distance.</code>' +
+
+  '<h3>Iterative COG (Weiszfeld)</h3>' +
+  '<code class="formula">// True minimization of Σ w_i × dist(p,i)\n' +
+  'p₀ = weightedCOG\n' +
+  'repeat:\n' +
+  '  p_{k+1} = Σ (w_i · point_i / dist(p_k, point_i)) /\n' +
+  '            Σ (w_i / dist(p_k, point_i))\n' +
+  'until |p_{k+1} − p_k| < ε</code>' +
+
+  '<h3>Total Weighted Distance</h3>' +
+  '<code class="formula">totalTonMi = Σ (w_i × dist(cog, i))   // demand-weighted\n' +
+  'avgDist    = totalTonMi / Σ w_i</code>' +
+
+  '<h2>Integrations</h2>' +
+  '<table><tr><th>Direction</th><th>Tool</th><th>What flows</th></tr>' +
+  '<tr><td>Writes →</td><td>NetOpt</td><td>COG point → seed candidate facility (manual)</td></tr></table>' +
+
+  '<h2>Gotchas &amp; Quirks</h2>' +
+  '<div class="gotcha">Weighted COG is fast but biased toward outliers (squared distance). Use iterative COG for real recommendations.</div>' +
+  '<div class="gotcha">COG ignores real estate cost, labor availability, transportation rates, and tax incentives. It is a starting point, not a site selection.</div>' +
+  '<div class="gotcha">A COG over a body of water or remote area is not actionable — snap to nearest viable industrial submarket.</div>' +
+  '</div>';
+
+// ─── DECK GENERATION ───
+WIKI_PAGES['dtg-deckgen'] = DTG_STYLE + '<div class="wiki-article dtg">' +
+  '<div class="wiki-breadcrumb">Design Tool Guides / Deck Generation</div>' +
+  '<h1>Deck Generation</h1>' +
+  '<p><span class="tag">Workflow</span><span class="tag">deckGen</span><span class="tag">PptxGenJS CDN</span></p>' +
+
+  '<h2>Purpose</h2>' +
+  '<p>Auto-generates GXO-branded PowerPoint decks at DOS milestones. Pulls from the active Cost Model + Deal + WSC and renders 4 standardized decks via PptxGenJS in-browser. No server side.</p>' +
+
+  '<h2>The 4 Decks</h2>' +
+  '<table><tr><th>Deck</th><th>Trigger Stage</th><th>Pulls From</th></tr>' +
+  '<tr><td>Discovery Brief</td><td>DOS Stage 1 — Discovery</td><td>Deal opportunity, vertical, qualifiers</td></tr>' +
+  '<tr><td>Solution Concept</td><td>DOS Stage 3 — Solution</td><td>WSC layout, MOST FTE, SCC selections</td></tr>' +
+  '<tr><td>Pricing Review</td><td>DOS Stage 4 — Pricing</td><td>CM P&amp;L, pricing buckets, NPV/MIRR</td></tr>' +
+  '<tr><td>BAFO Submission</td><td>DOS Stage 5 — Negotiation</td><td>Full CM + executive summary</td></tr></table>' +
+
+  '<h2>Architecture</h2>' +
+  '<code class="formula">deckGen.buildDeck(type, dealId)\n' +
+  '  → fetchDealContext(dealId)         // Supabase REST\n' +
+  '  → loadTemplate(type)               // slide layouts\n' +
+  '  → for slide in template:\n' +
+  '      pptx.addSlide()\n' +
+  '      slide.addText / addShape / addImage\n' +
+  '  → await pptx.writeFile({fileName})\n\n' +
+  '// MUST await writeFile, MUST strip phantom slideMasters,\n' +
+  '// MUST ensure .rels files exist or PPTX will corrupt.</code>' +
+
+  '<h2>Brand Tokens</h2>' +
+  '<table><tr><th>Token</th><th>Value</th></tr>' +
+  '<tr><td>Primary Navy</td><td>#0F2147</td></tr>' +
+  '<tr><td>Orange</td><td>#F37021</td></tr>' +
+  '<tr><td>Title font</td><td>Arial Bold 32pt</td></tr>' +
+  '<tr><td>Body font</td><td>Arial 14pt</td></tr>' +
+  '<tr><td>Slide size</td><td>16:9 (13.33 × 7.5 in)</td></tr></table>' +
+
+  '<h2>Integrations</h2>' +
+  '<table><tr><th>Direction</th><th>Source</th><th>What flows</th></tr>' +
+  '<tr><td>Reads ←</td><td>cost_models</td><td>P&amp;L, buckets, summary metrics</td></tr>' +
+  '<tr><td>Reads ←</td><td>opportunities</td><td>Deal name, client, vertical, stage</td></tr>' +
+  '<tr><td>Reads ←</td><td>WSC scenario</td><td>SF, layout image, throughput</td></tr></table>' +
+
+  '<h2>Gotchas &amp; Quirks</h2>' +
+  '<div class="gotcha"><b>Always</b> <code>await pptx.writeFile(...)</code>. Without await, the file writes mid-render and corrupts.</div>' +
+  '<div class="gotcha">Never use <code>defineLayout</code> or line borders on shapes — both produce phantom slideMasters that Office rejects.</div>' +
+  '<div class="gotcha">PptxGenJS is loaded via CDN at runtime. Failures should fall back to a clear error, not silent.</div>' +
+  '<div class="gotcha">Decks render in-browser — large tables can lock the tab for 2–4 seconds. Show a spinner.</div>' +
+  '</div>';
 
 // ═══════════════════════════════════════════════════════════════════════
 // SECURITY SECTION
