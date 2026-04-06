@@ -3530,16 +3530,31 @@ const cmApp = {
         return Math.max(1, Math.round(parseFloat(document.getElementById('contractTerm').value) || 3));
     },
 
-    // Determine the primary outbound UOM and annual volume for the deal
-    // Priority: eaches > cases > pallets (most granular first)
+    // Determine the primary outbound UOM and annual volume for the deal.
+    // Reads user-flagged volume lines (is_outbound=true). If multiple lines
+    // share the same UOM, their volumes are summed. If mixed UOMs are flagged,
+    // uses the first flagged line's UOM with its total.
+    // Falls back to auto-detection if no lines are flagged.
     getOutboundUom() {
+        var flagged = (this.projectData.volumeLines || []).filter(function(v) { return v.is_outbound; });
+        if (flagged.length > 0) {
+            // Use the UOM of the first flagged line; sum all flagged volumes with that UOM
+            var primaryUom = flagged[0].uom || 'unit';
+            var totalVol = 0;
+            flagged.forEach(function(v) {
+                if (v.uom === primaryUom) totalVol += (v.annual_volume || 0);
+            });
+            // Capitalize for display
+            var label = primaryUom.charAt(0).toUpperCase() + primaryUom.slice(1);
+            return { uom: label, volume: totalVol };
+        }
+        // Fallback: auto-detect from legacy volume fields
         var eaches = parseFloat(document.getElementById('eachesPicked').value) || 0;
         var cases = parseFloat(document.getElementById('casesPicked').value) || 0;
         var pallets = parseFloat(document.getElementById('palletsShipped').value) || 0;
         if (eaches > 0) return { uom: 'Each', volume: eaches };
         if (cases > 0) return { uom: 'Case', volume: cases };
         if (pallets > 0) return { uom: 'Pallet', volume: pallets };
-        // Fallback to orders if no outbound volumes defined
         var orders = parseFloat(document.getElementById('ordersPacked').value) || 0;
         if (orders > 0) return { uom: 'Order', volume: orders };
         return { uom: 'Unit', volume: 0 };
@@ -4483,8 +4498,17 @@ const cmApp = {
             name: '',
             uom: 'each',
             annual_volume: 0,
-            daily_volume: 0
+            daily_volume: 0,
+            is_outbound: false
         });
+        this.renderVolumeLines();
+        this.markChanged();
+    },
+
+    toggleOutboundFlag(idx) {
+        var line = this.projectData.volumeLines[idx];
+        if (!line) return;
+        line.is_outbound = !line.is_outbound;
         this.renderVolumeLines();
         this.markChanged();
     },
@@ -4510,12 +4534,20 @@ const cmApp = {
             });
             processAreaHtml += '</select>';
 
+            var isOut = line.is_outbound || false;
+            if (isOut) row.className = 'cm-outbound-row';
+            var flagHtml = '<span class="cm-outbound-flag' + (isOut ? ' active' : '') + '" ' +
+                'onclick="cmApp.toggleOutboundFlag(' + idx + ')" ' +
+                'title="' + (isOut ? 'Remove as outbound volume' : 'Flag as primary outbound volume') + '">' +
+                (isOut ? '\u2605' : '\u2606') + '</span>';
+
             row.innerHTML =
                 '<td>' + processAreaHtml + '</td>' +
                 '<td>' + this._cmInp('text', line.name, idx, 'volumeLines', 'name', {w:150, ph:'e.g., Cases Shipped'}) + '</td>' +
                 '<td>' + this._volumeUomSelectHtml(idx, line.uom) + '</td>' +
                 '<td class="cm-table-number">' + this._cmInp('number', line.annual_volume, idx, 'volumeLines', 'annual_volume', {w:100, ph:'0'}) + '</td>' +
                 '<td class="cm-table-number" id="vol-daily-' + idx + '">' + dailyVolume.toLocaleString('en-US', {minimumFractionDigits:1, maximumFractionDigits:1}) + '</td>' +
+                '<td style="text-align:center;">' + flagHtml + '</td>' +
                 '<td class="cm-table-actions"><button class="cm-btn-small cm-btn-small-danger" onclick="cmApp.deleteVolumeLine(' + idx + ')">Delete</button></td>';
             tbody.appendChild(row);
         });
@@ -4534,18 +4566,18 @@ const cmApp = {
     preseedVolumeLines() {
         // Clear and populate with standard 12 default volume lines
         this.projectData.volumeLines = [
-            { process_area: 'Receiving', name: 'Pallets Received', uom: 'pallet', annual_volume: 0, daily_volume: 0 },
-            { process_area: 'Receiving', name: 'Cases Received', uom: 'case', annual_volume: 0, daily_volume: 0 },
-            { process_area: 'Putaway', name: 'Pallets Putaway', uom: 'pallet', annual_volume: 0, daily_volume: 0 },
-            { process_area: 'Putaway', name: 'Cases Putaway', uom: 'case', annual_volume: 0, daily_volume: 0 },
-            { process_area: 'Replenishment', name: 'Replenishments', uom: 'pallet', annual_volume: 0, daily_volume: 0 },
-            { process_area: 'Picking', name: 'Eaches Picked', uom: 'each', annual_volume: 0, daily_volume: 0 },
-            { process_area: 'Picking', name: 'Cases Picked', uom: 'case', annual_volume: 0, daily_volume: 0 },
-            { process_area: 'Picking', name: 'Pallets Picked', uom: 'pallet', annual_volume: 0, daily_volume: 0 },
-            { process_area: 'Packing', name: 'Orders Packed', uom: 'order', annual_volume: 0, daily_volume: 0 },
-            { process_area: 'Shipping', name: 'Pallets Shipped', uom: 'pallet', annual_volume: 0, daily_volume: 0 },
-            { process_area: 'Returns', name: 'Returns Processed', uom: 'each', annual_volume: 0, daily_volume: 0 },
-            { process_area: 'VAS', name: 'VAS Units', uom: 'unit', annual_volume: 0, daily_volume: 0 }
+            { process_area: 'Receiving', name: 'Pallets Received', uom: 'pallet', annual_volume: 0, daily_volume: 0, is_outbound: false },
+            { process_area: 'Receiving', name: 'Cases Received', uom: 'case', annual_volume: 0, daily_volume: 0, is_outbound: false },
+            { process_area: 'Putaway', name: 'Pallets Putaway', uom: 'pallet', annual_volume: 0, daily_volume: 0, is_outbound: false },
+            { process_area: 'Putaway', name: 'Cases Putaway', uom: 'case', annual_volume: 0, daily_volume: 0, is_outbound: false },
+            { process_area: 'Replenishment', name: 'Replenishments', uom: 'pallet', annual_volume: 0, daily_volume: 0, is_outbound: false },
+            { process_area: 'Picking', name: 'Eaches Picked', uom: 'each', annual_volume: 0, daily_volume: 0, is_outbound: false },
+            { process_area: 'Picking', name: 'Cases Picked', uom: 'case', annual_volume: 0, daily_volume: 0, is_outbound: false },
+            { process_area: 'Picking', name: 'Pallets Picked', uom: 'pallet', annual_volume: 0, daily_volume: 0, is_outbound: false },
+            { process_area: 'Packing', name: 'Orders Packed', uom: 'order', annual_volume: 0, daily_volume: 0, is_outbound: false },
+            { process_area: 'Shipping', name: 'Pallets Shipped', uom: 'pallet', annual_volume: 0, daily_volume: 0, is_outbound: false },
+            { process_area: 'Returns', name: 'Returns Processed', uom: 'each', annual_volume: 0, daily_volume: 0, is_outbound: false },
+            { process_area: 'VAS', name: 'VAS Units', uom: 'unit', annual_volume: 0, daily_volume: 0, is_outbound: false }
         ];
         this.renderVolumeLines();
         this.markChanged();

@@ -3284,6 +3284,17 @@
             background: var(--gray-200);
         }
 
+        /* Outbound flag toggle */
+        .cm-outbound-flag {
+            cursor: pointer; font-size: 16px; opacity: 0.25; transition: all 0.15s;
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 28px; height: 28px; border-radius: 50%;
+        }
+        .cm-outbound-flag:hover { opacity: 0.6; }
+        .cm-outbound-flag.active { opacity: 1; color: #f59e0b; background: rgba(245,158,11,0.1); }
+        tr.cm-outbound-row { background: rgba(245,158,11,0.06); }
+        tr.cm-outbound-row td:first-child { border-left: 3px solid #f59e0b; }
+
         .cm-btn-small-danger {
             background: #fee2e2;
             color: #991b1b;
@@ -8375,7 +8386,7 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
 
             <div class="cm-card">
                 <div class="cm-card-title">Volume Lines</div>
-                <p class="cm-card-description">Define named volume lines that can be linked to labor activities. Each line auto-calculates daily volume based on operating days.</p>
+                <p class="cm-card-description">Define named volume lines that can be linked to labor activities. Each line auto-calculates daily volume based on operating days. Star (<span style="color:#f59e0b;">\u2605</span>) one or more lines to flag them as the primary outbound volume for unit cost metrics.</p>
                 <div style="overflow-x:auto;">
                     <table class="cm-table" id="volumeLinesTable">
                         <thead>
@@ -8385,6 +8396,7 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
                                 <th>UOM</th>
                                 <th style="text-align:right;">Annual Volume</th>
                                 <th style="text-align:right;">Daily Volume</th>
+                                <th style="text-align:center;width:70px;" title="Flag as primary outbound volume for unit cost metrics">Outbound</th>
                                 <th style="text-align:center;">Action</th>
                             </tr>
                         </thead>
@@ -10864,7 +10876,7 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
 <!-- Feedback: idea submission, voting -->
 <script src="js/feedback.js"></script>
 <!-- Cost Model Builder: cmApp, dealApp, financial modeling -->
-<script src="js/cost-model.js?v=20260405-s34"></script>
+<script src="js/cost-model.js?v=20260405-s35"></script>
 <!-- Cost Model Interaction Tests (gated behind __CM_TEST_MODE__) -->
 <script src="js/cost-model-tests.js?v=20260405-s31"></script>
 <!-- Fleet Modeler: fmApp, lane optimization -->
