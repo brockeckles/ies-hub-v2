@@ -2342,7 +2342,14 @@ const cmApp = {
     _updateLine(arr, idx, key, val, type) {
         const line = this.projectData[arr][idx];
         if (!line) return;
-        line[key] = type === 'number' ? (parseFloat(val) || 0) : val;
+        // ID fields (most_template_id, mhe_equipment_id, it_equipment_id, etc.):
+        // empty string → null, otherwise coerce to int. Prevents PostgREST integer-cast errors
+        // and stops IDs from getting silently dropped on save round-trips.
+        if (/_id$/.test(key)) {
+            line[key] = (val === '' || val == null) ? null : (parseInt(val, 10) || null);
+        } else {
+            line[key] = type === 'number' ? (parseFloat(val) || 0) : val;
+        }
 
         // Check if this field affects calculated columns
         const needsRender = (this._calcFields[arr] || []).indexOf(key) !== -1;
@@ -5247,6 +5254,10 @@ const cmApp = {
                             if (src.volume != null) clean.annual_volume = src.volume;
                             if (src.base_uph != null) clean.calculated_uph = src.base_uph;
                         }
+                        // Coerce empty-string ID fields to null (PostgREST integer cast hardening)
+                        Object.keys(clean).forEach(function(k) {
+                            if (/_id$/.test(k) && clean[k] === '') clean[k] = null;
+                        });
                         await cmApiPost(tableName, clean);
                     }
                 }
