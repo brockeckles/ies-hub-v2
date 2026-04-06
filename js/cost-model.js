@@ -4231,35 +4231,15 @@ const cmApp = {
         else if (m.totalCost > 0 && facilityPct > 0)
             h('ok', '\u2705', 'Facility cost share in range (' + facilityPct.toFixed(0) + '%)', 'Within 20-35% benchmark.');
 
-        // --- 2. Facility size suggestion from volumes ---
-        if (m.ordersPerYear > 0) {
-            const palletsStored = (m.palletsPerYear / 2) / 12; // rough avg on-hand
-            const eachSKUs = Math.max(500, (m.eachesPerYear || 0) / 200); // rough SKU estimate
-            // Pallet positions need ~40 sqft each (including aisle), pick area ~0.5 sqft/SKU slot, staging 10%
-            const estPalletArea = palletsStored * 40;
-            const estPickArea = eachSKUs * 1.5;
-            const estStagingDock = sqft * 0.10;
-            const suggestedSqft = Math.round((estPalletArea + estPickArea + estStagingDock) / 1000) * 1000;
-            if (suggestedSqft > 0 && Math.abs(suggestedSqft - sqft) / sqft > 0.30)
-                h('info', '\ud83d\udccf', 'Suggested facility size: ~' + suggestedSqft.toLocaleString() + ' sqft',
-                    'Based on pallet storage density and pick SKU slots. Current: ' + sqft.toLocaleString() + ' sqft (' +
-                    (sqft > suggestedSqft ? 'may be oversized' : 'may be undersized') + ').');
-        }
-
-        // --- 3. Throughput density ---
-        const ordersPerSqft = orders / sqft;
-        if (ordersPerSqft < 1.5)
-            h('info', '\ud83d\udce6', 'Low throughput density: ' + ordersPerSqft.toFixed(1) + ' orders/sqft/yr',
-                'Typical ecommerce 3PL: 3-8 orders/sqft/yr. Low density drives up per-unit facility cost.');
-        else if (ordersPerSqft > 12)
-            h('warn', '\u26a0\ufe0f', 'Very high throughput density: ' + ordersPerSqft.toFixed(1) + ' orders/sqft/yr',
-                'May need conveyor/sortation or multi-shift to handle volume in this footprint.');
-
-        // --- 4. Cost per outbound unit benchmark ---
-        if (m.costPerOrder > 0) {
-            h('info', '\ud83d\udce6', 'Cost per outbound unit: $' + m.costPerOrder.toFixed(2),
-                'Benchmark varies by UOM — eaches: $0.50-$3, cases: $1-$5, pallets: $5-$25, orders: $3-$8.');
-        }
+        // --- 2/3/4. Facility size, throughput density, cost-per-unit benchmarks ---
+        // REMOVED 2026-04-06: heuristics weren't defensible across the IES deal mix.
+        //   #2 Suggested facility size: pallet on-hand assumed 24 turns/yr, SKU count
+        //      guessed from eaches, staging used current SF (circular).
+        //   #3 Throughput density: 3-8 orders/sqft/yr only fits ecommerce profiles;
+        //      B2B pallet ops run 0.05-0.5.
+        //   #4 Cost per outbound unit: bands compared fully-loaded model output to
+        //      pick-only benchmarks - apples to oranges.
+        // To be rebuilt with profile tagging + DOH/SKU inputs.
 
         // --- 5. Staffing ratio checks ---
         if (ftes > 0) {
