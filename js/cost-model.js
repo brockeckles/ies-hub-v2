@@ -1419,7 +1419,8 @@ const cmApp = {
 
         const operatingDays = days * weeks;
         const operatingHours = operatingDays * hours;
-        const totalAvailable = operatingHours * shifts;
+        // Per-FTE annual hours (independent of shift count — added shifts add FTEs, not hours per FTE)
+        const totalAvailable = operatingHours;
 
         document.getElementById('operatingDays').textContent = fmtNum(operatingDays, 0);
         document.getElementById('annualHours').textContent = fmtNum(operatingHours, 0);
