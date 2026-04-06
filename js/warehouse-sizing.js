@@ -2686,8 +2686,8 @@ function render3DLayout(p) {
   var dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
   dirLight.position.set(bW * 0.6, clearH * 4, bD * 0.3);
   dirLight.castShadow = true;
-  dirLight.shadow.mapSize.width = 2048;
-  dirLight.shadow.mapSize.height = 2048;
+  dirLight.shadow.mapSize.width = 1024;
+  dirLight.shadow.mapSize.height = 1024;
   dirLight.shadow.camera.near = 1;
   dirLight.shadow.camera.far = Math.max(bW, bD) * 6;
   dirLight.shadow.camera.left = -bW;
@@ -3234,10 +3234,15 @@ function render3DLayout(p) {
   canvas.addEventListener('wheel', wsc3dOnWheel, { passive: false });
   canvas.addEventListener('contextmenu', function(e) { e.preventDefault(); });
 
-  // ── Animation loop ──
+  // ── Render-on-demand loop (perf fix: only render when dirty) ──
+  window.wsc3dDirty = true;
   function animate() {
     wsc3dAnimationId = requestAnimationFrame(animate);
-    renderer.render(scene, camera);
+    if (!wsc3dRenderer) return;
+    if (window.wsc3dDirty) {
+      window.wsc3dDirty = false;
+      renderer.render(scene, camera);
+    }
   }
   animate();
 
@@ -3252,6 +3257,7 @@ function render3DLayout(p) {
       wsc3dCamera.aspect = w / h;
       wsc3dCamera.updateProjectionMatrix();
       wsc3dRenderer.setSize(w, h);
+      window.wsc3dDirty = true;
     };
     window.addEventListener('resize', window._wsc3dResizeHandler);
   }
@@ -3260,6 +3266,7 @@ function render3DLayout(p) {
 // ── Camera update ──
 function updateWsc3dCamera() {
   if (!wsc3dCamera) return;
+  window.wsc3dDirty = true;
   var dist = wsc3dCameraDist;
   var theta = wsc3dCameraTheta;
   var phi = Math.max(0.05, Math.min(Math.PI / 2 - 0.05, wsc3dCameraPhi));
