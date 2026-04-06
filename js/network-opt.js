@@ -496,16 +496,16 @@ function netoptGenerateDemoDemand() {
 
 // Pre-defined facility candidates (10 major US warehouse cities)
 var NETOPT_FACILITY_CANDIDATES = [
-  {name: 'Atlanta', city: 'Atlanta, GA', capacity: 800000, fixedCost: 3.2, varCost: 0.25},
-  {name: 'Chicago', city: 'Chicago, IL', capacity: 750000, fixedCost: 3.0, varCost: 0.24},
-  {name: 'Dallas', city: 'Dallas, TX', capacity: 650000, fixedCost: 2.8, varCost: 0.23},
-  {name: 'Los Angeles', city: 'Los Angeles, CA', capacity: 700000, fixedCost: 3.1, varCost: 0.26},
-  {name: 'Memphis', city: 'Memphis, TN', capacity: 600000, fixedCost: 2.5, varCost: 0.22},
-  {name: 'Columbus', city: 'Columbus, OH', capacity: 550000, fixedCost: 2.4, varCost: 0.21},
-  {name: 'Indianapolis', city: 'Indianapolis, IN', capacity: 550000, fixedCost: 2.3, varCost: 0.20},
-  {name: 'Allentown', city: 'Allentown, PA', capacity: 600000, fixedCost: 2.7, varCost: 0.25},
-  {name: 'Savannah', city: 'Savannah, GA', capacity: 500000, fixedCost: 2.2, varCost: 0.21},
-  {name: 'Reno', city: 'Reno, NV', capacity: 400000, fixedCost: 1.8, varCost: 0.24}
+  {name: 'Atlanta', city: 'Atlanta, GA', capacity: 2500000, fixedCost: 3.2, varCost: 0.25},
+  {name: 'Chicago', city: 'Chicago, IL', capacity: 2500000, fixedCost: 3.0, varCost: 0.24},
+  {name: 'Dallas', city: 'Dallas, TX', capacity: 1500000, fixedCost: 2.8, varCost: 0.23},
+  {name: 'Los Angeles', city: 'Los Angeles, CA', capacity: 2500000, fixedCost: 3.1, varCost: 0.26},
+  {name: 'Memphis', city: 'Memphis, TN', capacity: 1500000, fixedCost: 2.5, varCost: 0.22},
+  {name: 'Columbus', city: 'Columbus, OH', capacity: 1500000, fixedCost: 2.4, varCost: 0.21},
+  {name: 'Indianapolis', city: 'Indianapolis, IN', capacity: 1500000, fixedCost: 2.3, varCost: 0.20},
+  {name: 'Allentown', city: 'Allentown, PA', capacity: 1500000, fixedCost: 2.7, varCost: 0.25},
+  {name: 'Savannah', city: 'Savannah, GA', capacity: 1000000, fixedCost: 2.2, varCost: 0.21},
+  {name: 'Reno', city: 'Reno, NV', capacity: 1000000, fixedCost: 1.8, varCost: 0.24}
 ];
 
 // Pre-defined major demand points (15 cities)
