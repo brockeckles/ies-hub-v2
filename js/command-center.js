@@ -434,16 +434,18 @@ async function loadAlerts() {
   const bar = document.querySelector('.alert-bar .alert-text');
   if (!bar) return;
   try {
+    // Filter expired server-side, order by newest first so fresh alerts always surface.
+    // Severity is a visual cue (badge), not a sort key.
+    const nowIso = new Date().toISOString();
     const { data: alerts, error } = await sb.from('hub_alerts')
       .select('title, severity, created_at, expires_at')
       .eq('is_active', true)
-      .order('severity', { ascending: true })
+      .or('expires_at.is.null,expires_at.gt.' + nowIso)
+      .order('created_at', { ascending: false })
       .limit(5);
 
     if (error) throw error;
-    // Client-side filter: skip expired alerts
-    const now = new Date();
-    const live = (alerts || []).filter(a => !a.expires_at || new Date(a.expires_at) > now);
+    const live = alerts || [];
     if (live.length) {
       bar.innerHTML = '<strong>' + live.length + ' active alert' + (live.length > 1 ? 's' : '') + ':</strong> ' +
         live.map(a => a.title).join(' \u00b7 ');
