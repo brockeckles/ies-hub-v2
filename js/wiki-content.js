@@ -2524,6 +2524,126 @@ function showWiki(page) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
+// DESIGN TOOL GUIDES (peer-expert reference: formulas, inputs, integrations)
+// ═══════════════════════════════════════════════════════════════════════
+
+// Shared styles for guide pages
+var DTG_STYLE = '<style>' +
+  '.dtg h2{font-size:18px;color:var(--ies-navy);margin:24px 0 10px;border-bottom:2px solid var(--ies-orange);padding-bottom:6px;}' +
+  '.dtg h3{font-size:14px;color:var(--ies-navy);margin:18px 0 8px;font-weight:700;}' +
+  '.dtg p{font-size:13px;line-height:1.6;color:var(--ies-gray-700);margin:0 0 10px;}' +
+  '.dtg table{width:100%;border-collapse:collapse;font-size:12px;margin:8px 0 16px;}' +
+  '.dtg th{background:var(--ies-gray-100);text-align:left;padding:8px 10px;color:var(--ies-navy);font-weight:700;border-bottom:2px solid var(--ies-gray-200);}' +
+  '.dtg td{padding:7px 10px;border-bottom:1px solid var(--ies-gray-100);color:var(--ies-gray-700);vertical-align:top;}' +
+  '.dtg code.formula{display:block;background:#0f172a;color:#e2e8f0;padding:12px 14px;border-radius:6px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.55;margin:6px 0 12px;white-space:pre-wrap;}' +
+  '.dtg .gotcha{background:#fff7ed;border-left:3px solid var(--ies-orange);padding:10px 14px;margin:8px 0;font-size:12px;color:var(--ies-gray-700);border-radius:0 6px 6px 0;}' +
+  '.dtg .tag{display:inline-block;background:var(--ies-gray-100);color:var(--ies-gray-700);font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;margin-right:6px;text-transform:uppercase;letter-spacing:.5px;}' +
+  '</style>';
+
+// ─── COST MODEL BUILDER ───
+WIKI_PAGES['dtg-costmodel'] = DTG_STYLE + '<div class="wiki-article dtg">' +
+  '<div class="wiki-breadcrumb">Design Tool Guides / Cost Model Builder</div>' +
+  '<h1>Cost Model Builder</h1>' +
+  '<p><span class="tag">Solutions</span><span class="tag">cmApp namespace</span><span class="tag">13 sections</span></p>' +
+
+  '<h2>Purpose</h2>' +
+  '<p>Builds a multi-year, fully-loaded 3PL P&amp;L for a single site. Captures volume, labor, space, equipment, MHE, IT, and overhead, then rolls them into pricing buckets to derive unit rates, gross margin, and NPV/MIRR. Designed to mirror the cost-block structure GXO uses in BAFO submissions.</p>' +
+
+  '<h2>Section Map</h2>' +
+  '<table><tr><th>#</th><th>Section</th><th>Drives</th></tr>' +
+  '<tr><td>1</td><td>Project Setup</td><td>Term, start date, escalators, discount rate</td></tr>' +
+  '<tr><td>2</td><td>Facility</td><td>SF, clear height, dock count → WSC sync</td></tr>' +
+  '<tr><td>3</td><td>Volumes</td><td>Inbound / outbound / storage by UOM &amp; year; <b>★ flag = primary outbound</b></td></tr>' +
+  '<tr><td>4</td><td>Labor</td><td>Roles, FTE counts, shift structure, wages, benefits load</td></tr>' +
+  '<tr><td>5</td><td>Space</td><td>Rent $/SF, CAM, utilities, R&amp;M</td></tr>' +
+  '<tr><td>6</td><td>MHE</td><td>Lease vs own, units, $/unit/month</td></tr>' +
+  '<tr><td>7</td><td>IT &amp; Systems</td><td>WMS license, hardware, telecom</td></tr>' +
+  '<tr><td>8</td><td>Other Direct</td><td>Supplies, waste, security</td></tr>' +
+  '<tr><td>9</td><td>Overhead</td><td>Site mgmt, corporate allocation %</td></tr>' +
+  '<tr><td>10</td><td>Pricing Buckets</td><td>Maps cost lines → revenue UOM (per unit, per pallet, per month, etc.)</td></tr>' +
+  '<tr><td>11</td><td>P&amp;L</td><td>Multi-year revenue, cost, GP%, EBITDA</td></tr>' +
+  '<tr><td>12</td><td>NPV / MIRR</td><td>Cash flow, terminal value, return metrics</td></tr>' +
+  '<tr><td>13</td><td>Summary</td><td>One-page deal summary for export</td></tr></table>' +
+
+  '<h2>Key Calculations</h2>' +
+
+  '<h3>Labor — Total Available Hours per FTE</h3>' +
+  '<code class="formula">availableHrs_per_FTE = operatingHrs_per_yr  // independent of shift count\n' +
+  '                    = (hrs_per_shift × days_per_wk × 52)\n' +
+  'Note: shifts multiply HEADCOUNT, not per-FTE hours.\n' +
+  'Total site labor hrs = availableHrs_per_FTE × FTE_count</code>' +
+  '<div class="gotcha"><b>Gotcha:</b> Earlier builds multiplied by shift count, doubling per-FTE hours. Fixed 2026-04-06.</div>' +
+
+  '<h3>Loaded Wage</h3>' +
+  '<code class="formula">loadedWage = baseWage × (1 + benefitsPct + payrollTaxPct)\n' +
+  'annualLaborCost_role = loadedWage × availableHrs_per_FTE × FTE_count</code>' +
+
+  '<h3>Outbound UOM Flag → Unit Cost Rollup</h3>' +
+  '<p>Exactly one volume line is starred as the primary outbound. Its UOM (cases / units / pallets / orders) becomes the denominator for all per-unit cost metrics throughout the model.</p>' +
+  '<code class="formula">primaryOutboundVol_yrN = volumes.find(v => v.isPrimaryOutbound).years[N]\n' +
+  'costPerUnit_yrN = totalCost_yrN / primaryOutboundVol_yrN\n' +
+  'revenuePerUnit_yrN = totalRevenue_yrN / primaryOutboundVol_yrN</code>' +
+  '<div class="gotcha"><b>Gotcha:</b> If no line is starred, denominator falls back to first outbound volume — model still runs but per-unit metrics may be wrong UOM.</div>' +
+
+  '<h3>Pricing Bucket Revenue</h3>' +
+  '<code class="formula">For each bucket b:\n' +
+  '  bucketCost_yrN  = Σ (mapped cost lines for b in year N)\n' +
+  '  bucketRev_yrN   = bucketRate × volume(b.uom)_yrN × (1 + escalator)^(N-1)\n' +
+  '  bucketGP_yrN    = bucketRev_yrN − bucketCost_yrN\n' +
+  '  bucketGP%_yrN   = bucketGP_yrN / bucketRev_yrN\n\n' +
+  'Bucket UOMs: per_unit, per_case, per_pallet, per_order, per_month, per_inbound,\n' +
+  '             per_storage_pallet_month, fixed_monthly</code>' +
+
+  '<h3>Multi-Year P&amp;L</h3>' +
+  '<code class="formula">revenue_yrN  = Σ bucketRev_yrN\n' +
+  'cost_yrN     = labor_yrN + space_yrN + mhe_yrN + it_yrN + other_yrN + overhead_yrN\n' +
+  'GP_yrN       = revenue_yrN − cost_yrN\n' +
+  'GP%_yrN      = GP_yrN / revenue_yrN\n' +
+  'EBITDA_yrN   = GP_yrN − siteOverhead_yrN\n\n' +
+  'Each line item escalates yr-over-yr by its own escalator (labor, rent, MHE distinct).</code>' +
+
+  '<h3>NPV &amp; MIRR</h3>' +
+  '<code class="formula">cashFlow_yr0 = −startupCapital\n' +
+  'cashFlow_yrN = EBITDA_yrN − maintCapex_yrN\n' +
+  'cashFlow_yrTerm = EBITDA_yrTerm + terminalValue\n\n' +
+  'NPV  = Σ cashFlow_yrN / (1 + discountRate)^N\n' +
+  'MIRR = ( FV(positiveCFs, reinvestRate) / |PV(negativeCFs, financeRate)| )^(1/n) − 1</code>' +
+  '<div class="gotcha"><b>Gotcha:</b> NPV/MIRR previously broke when year 0 had no negative CF. Fixed 2026-04-05 with explicit −startupCapital line.</div>' +
+
+  '<h2>Integrations</h2>' +
+  '<table><tr><th>Direction</th><th>Tool</th><th>What flows</th></tr>' +
+  '<tr><td>Reads ←</td><td>WSC</td><td>SF, clear height, dock count auto-fill Facility section</td></tr>' +
+  '<tr><td>Writes →</td><td>WSC</td><td>Primary outbound volume pre-fills WSC throughput</td></tr>' +
+  '<tr><td>Reads ←</td><td>MOST</td><td>Labor standards → FTE counts (planned)</td></tr>' +
+  '<tr><td>Reads ←</td><td>NetOpt</td><td>Selected facility → CM site seed (planned)</td></tr>' +
+  '<tr><td>Persists</td><td>Supabase</td><td><code>cost_models</code> + JSON columns for buckets, volumes, labor, P&amp;L</td></tr></table>' +
+
+  '<h2>Gotchas &amp; Quirks</h2>' +
+  '<div class="gotcha">Child tables (cm_labor_lines, cm_volumes, etc.) are <b>empty by design</b> — everything serializes into JSON columns on the parent <code>cost_models</code> row.</div>' +
+  '<div class="gotcha">Escalators compound year-over-year. A 3% labor escalator over 5 years = 1.03^4 = 12.5% on year 5.</div>' +
+  '<div class="gotcha">Pricing bucket "fixed_monthly" UOM ignores volume entirely — used for management fees and tech fees.</div>' +
+  '<div class="gotcha">Total Available Labor Hours displays per-FTE annual (2,080 typical), <b>not</b> total site hours. Multiply by FTE count for site total.</div>' +
+
+  '</div>';
+
+// ─── STUBS for the other 6 guides (will flesh out next pass) ───
+function _dtgStub(title, ns) {
+  return DTG_STYLE + '<div class="wiki-article dtg">' +
+    '<div class="wiki-breadcrumb">Design Tool Guides / ' + title + '</div>' +
+    '<h1>' + title + '</h1>' +
+    '<p><span class="tag">' + ns + '</span></p>' +
+    '<h2>Coming next pass</h2>' +
+    '<p>This guide is stubbed. Cost Model Builder is the template — once Brock signs off on its shape, this page will be built against the same Purpose / Inputs / Calculations / Integrations / Gotchas structure.</p>' +
+    '</div>';
+}
+WIKI_PAGES['dtg-netopt']    = _dtgStub('Network Optimization', 'netoptApp');
+WIKI_PAGES['dtg-wsc']       = _dtgStub('Warehouse Sizing & Configuration', 'wscApp');
+WIKI_PAGES['dtg-fleet']     = _dtgStub('Fleet Modeler', 'fmApp');
+WIKI_PAGES['dtg-most']      = _dtgStub('MOST Labor Standards', 'mostApp');
+WIKI_PAGES['dtg-cog']       = _dtgStub('Center of Gravity', 'cogApp');
+WIKI_PAGES['dtg-deckgen']   = _dtgStub('Deck Generation', 'deckGen');
+
+// ═══════════════════════════════════════════════════════════════════════
 // SECURITY SECTION
 // ═══════════════════════════════════════════════════════════════════════
 
