@@ -160,10 +160,36 @@ const fmApp = {
   },
 
   init() {
+    // Auto-restore last working session (lanes, config, results) from localStorage
+    try {
+      var raw = localStorage.getItem('fmAutosave');
+      if (raw) {
+        var snap = JSON.parse(raw);
+        if (snap && snap.lanes) this.lanes = snap.lanes;
+        if (snap && snap.config) this.config = Object.assign({}, this.config, snap.config);
+        if (snap && snap.results) this.results = snap.results;
+      }
+    } catch (e) { console.warn('FM autosave restore failed', e); }
+
     this.renderVehicleChecks();
     this.renderCostParams();
     this.renderLanesTable();
     this.updateTeamDrivingDisplay();
+
+    if (this.results) {
+      try { this.renderResults(); } catch (e) { console.warn('FM autorestore render failed', e); }
+    }
+  },
+
+  autosave() {
+    try {
+      localStorage.setItem('fmAutosave', JSON.stringify({
+        lanes: this.lanes || [],
+        config: this.config || {},
+        results: this.results || null,
+        ts: Date.now()
+      }));
+    } catch (e) {}
   },
 
   renderVehicleChecks() {
@@ -601,7 +627,8 @@ const fmApp = {
 
     this.renderResults();
     fmShowTab('results');
-    this.showToast('Fleet calculation complete');
+    this.autosave();
+    this.showToast('Fleet calculation complete — autosaved');
   },
 
   renderResults() {

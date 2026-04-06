@@ -9436,6 +9436,13 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
     <!-- RESULTS TAB -->
     <div id="fm-tab-results" class="fm-tab-content" style="display:none;">
       <div id="fm-results-content" style="display:none;">
+        <!-- Save bar -->
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;padding:12px 14px;background:#fff;border:1px solid var(--ies-gray-200);border-radius:10px;">
+          <span style="font-size:12px;color:var(--ies-gray-700);font-weight:600;">Save these results:</span>
+          <input type="text" id="fm-scenario-name-results" placeholder="Scenario name..." style="flex:1;padding:7px 12px;border:1px solid var(--ies-gray-300);border-radius:6px;font-size:12px;" />
+          <button class="fm-btn-primary" onclick="document.getElementById('fm-scenario-name').value=document.getElementById('fm-scenario-name-results').value; fmSaveScenario();" style="padding:7px 16px;font-size:12px;">Save Scenario</button>
+          <span style="font-size:11px;color:var(--ies-gray-500);">Auto-saved locally — formal save persists to DB</span>
+        </div>
         <!-- Fleet Summary -->
         <div style="background:linear-gradient(135deg, #0a1628, #0d1f3c, #0a1628);border-radius:10px;padding:24px;color:#fff;margin-bottom:20px;box-shadow:0 4px 12px rgba(0,0,0,.15);">
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:20px;">
@@ -10880,7 +10887,7 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
 <!-- Cost Model Interaction Tests (gated behind __CM_TEST_MODE__) -->
 <script src="js/cost-model-tests.js?v=20260405-s31"></script>
 <!-- Fleet Modeler: fmApp, lane optimization -->
-<script src="js/fleet-modeler.js?v=20260405-s23"></script>
+<script src="js/fleet-modeler.js?v=20260406-s3"></script>
 <!-- MOST Labor Standards: template library, analysis -->
 <script src="js/most-standards.js?v=20260405-s2"></script>
 <!-- Deck Generator: PptxGenJS presentation automation -->
