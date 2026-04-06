@@ -2478,7 +2478,7 @@ const cmApp = {
         html += '</select>';
         // Info icon to view template details (only shown when a template is selected)
         if (currentId) {
-            html += '<button onclick="cmApp.viewMostTemplate(' + currentId + ')" title="View MOST template details" style="background:none;border:none;cursor:pointer;padding:2px;display:flex;align-items:center;opacity:0.5;transition:opacity 0.15s;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.5"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ies-blue,#2563eb)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></button>';
+            html += '<button onclick="cmApp.viewMostTemplate(' + currentId + ',' + idx + ')" title="View / edit MOST template for this line" style="background:none;border:none;cursor:pointer;padding:2px;display:flex;align-items:center;opacity:0.5;transition:opacity 0.15s;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.5"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ies-blue,#2563eb)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></button>';
         }
         html += '</div>';
         return html;
@@ -2512,13 +2512,20 @@ const cmApp = {
         this.updateLaborTotals();
     },
 
-    viewMostTemplate(templateId) {
+    viewMostTemplate(templateId, lineIdx) {
         var template = (this.refData.mostTemplates || []).find(function(t) { return t.id === templateId; });
         if (!template) return;
 
         var elements = (this.refData.mostElements || []).filter(function(e) { return e.template_id === templateId; }).sort(function(a,b) { return (a.sequence_order || 0) - (b.sequence_order || 0); });
         var totalTmu = elements.reduce(function(s,e) { return s + (e.tmu_value || 0); }, 0);
         var uph = totalTmu > 0 ? Math.round(100000 / (totalTmu * 0.6)) : (template.units_per_hour_base || 0);
+
+        // Per-deal override context (only when called from a labor line)
+        this._popoutLineIdx = (typeof lineIdx === 'number') ? lineIdx : null;
+        var line = (this._popoutLineIdx != null) ? this.projectData.laborLines[this._popoutLineIdx] : null;
+        var templateBaseUph = template.units_per_hour_base || uph || 0;
+        var currentLineUph = line ? (line.base_uph || 0) : 0;
+        var isOverridden = line && currentLineUph > 0 && Math.abs(currentLineUph - templateBaseUph) > 0.5;
 
         // Build the popout content
         var overlay = document.getElementById('cmPopoutOverlay');
@@ -2552,6 +2559,29 @@ const cmApp = {
             html += '<div style="margin-top:12px;font-size:12px;color:var(--ies-gray-500);line-height:1.5;">' + template.description + '</div>';
         }
         html += '</div></div>';
+
+        // Per-deal override card (only when opened from a labor line)
+        if (line) {
+            html += '<div style="background:#fff7ed;border:1px solid #fed7aa;border-left:4px solid #f37021;border-radius:8px;padding:14px 16px;margin-bottom:20px;">';
+            html += '<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">';
+            html += '<div style="flex:1;min-width:240px;">';
+            html += '<div style="font-size:11px;color:#9a3412;text-transform:uppercase;letter-spacing:0.5px;font-weight:700;margin-bottom:4px;">Per-Deal Override</div>';
+            html += '<div style="font-size:12px;color:var(--ies-gray-600);line-height:1.4;">Override the UPH for <b>this labor line only</b>. Master template is unchanged. Edits flow back to the labor table on Save.</div>';
+            html += '</div>';
+            html += '<div style="display:flex;align-items:center;gap:10px;">';
+            html += '<div style="text-align:right;"><div style="font-size:10px;color:var(--ies-gray-400);text-transform:uppercase;letter-spacing:0.5px;">Template UPH</div><div style="font-size:18px;font-weight:700;color:var(--ies-gray-500);">' + Math.round(templateBaseUph).toLocaleString() + '</div></div>';
+            html += '<div style="font-size:18px;color:var(--ies-gray-300);">→</div>';
+            html += '<div style="text-align:left;"><div style="font-size:10px;color:#9a3412;text-transform:uppercase;letter-spacing:0.5px;font-weight:700;">This Deal</div>';
+            html += '<input id="cmMostOverrideInput" type="number" step="1" min="0" value="' + Math.round(currentLineUph || templateBaseUph) + '" style="width:90px;padding:6px 8px;font-size:18px;font-weight:700;border:2px solid #f37021;border-radius:6px;color:var(--ies-navy);background:#fff;" />';
+            html += '</div>';
+            html += '<button onclick="cmApp._applyMostOverride()" style="background:#f37021;color:#fff;border:none;border-radius:6px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;">Save Override</button>';
+            html += '<button onclick="cmApp._resetMostOverride()" title="Reset to template default" style="background:transparent;color:var(--ies-gray-500);border:1px solid var(--ies-gray-300);border-radius:6px;padding:9px 12px;font-size:12px;cursor:pointer;">Reset</button>';
+            html += '</div></div>';
+            if (isOverridden) {
+                html += '<div style="margin-top:10px;padding-top:10px;border-top:1px dashed #fed7aa;font-size:11px;color:#9a3412;"><b>⚑ Currently overridden:</b> this line uses ' + Math.round(currentLineUph).toLocaleString() + ' UPH instead of the template default of ' + Math.round(templateBaseUph).toLocaleString() + '.</div>';
+            }
+            html += '</div>';
+        }
 
         // Elements breakdown table
         if (elements.length > 0) {
@@ -2603,6 +2633,49 @@ const cmApp = {
         overlay.classList.add('open');
         popout.classList.add('open');
         document.body.style.overflow = 'hidden';
+    },
+
+    _applyMostOverride() {
+        var idx = this._popoutLineIdx;
+        if (idx == null) return;
+        var input = document.getElementById('cmMostOverrideInput');
+        if (!input) return;
+        var newUph = parseFloat(input.value) || 0;
+        if (newUph <= 0) { alert('UPH must be greater than 0.'); return; }
+        var line = this.projectData.laborLines[idx];
+        if (!line) return;
+        var allowancePct = parseFloat(this.projectData.absence_allowance_pct || 15);
+        line.base_uph = newUph;
+        line.adjusted_uph = newUph * (1 - allowancePct / 100);
+        line.annual_hours = line.adjusted_uph > 0 ? (line.volume || 0) / line.adjusted_uph : 0;
+        this.markChanged();
+        this.renderLaborTable();
+        this.updateLaborTotals();
+        // Visual confirmation
+        var btn = event && event.target;
+        if (btn) {
+            var orig = btn.textContent;
+            btn.textContent = '✓ Saved';
+            btn.style.background = '#10b981';
+            setTimeout(function() {
+                if (btn) { btn.textContent = orig; btn.style.background = '#f37021'; }
+            }, 1200);
+        }
+    },
+
+    _resetMostOverride() {
+        var idx = this._popoutLineIdx;
+        if (idx == null) return;
+        var line = this.projectData.laborLines[idx];
+        if (!line || !line.most_template_id) return;
+        var template = (this.refData.mostTemplates || []).find(function(t) { return String(t.id) === String(line.most_template_id); });
+        if (!template) return;
+        var elements = (this.refData.mostElements || []).filter(function(e) { return e.template_id === template.id; });
+        var totalTmu = elements.reduce(function(s,e) { return s + (e.tmu_value || 0); }, 0);
+        var templateUph = template.units_per_hour_base || (totalTmu > 0 ? Math.round(100000 / (totalTmu * 0.6)) : 0);
+        var input = document.getElementById('cmMostOverrideInput');
+        if (input) input.value = Math.round(templateUph);
+        this._applyMostOverride();
     },
 
     _equipSelectHtml(category, idx, currentId, fieldKey) {
