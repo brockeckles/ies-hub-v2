@@ -93,21 +93,19 @@
   <div style="text-align:center;max-width:400px;padding:40px;">
     <div style="font-size:22px;font-weight:800;color:#fff;margin-bottom:6px;">IES <span style="background:linear-gradient(135deg,#ff6a00,#ffa257);-webkit-background-clip:text;color:transparent;">Analytics Hub</span></div>
     <div style="font-size:13px;color:rgba(255,255,255,.5);margin-bottom:22px;">Enter team access code</div>
-    <input id="auth-input" type="password" placeholder="Access code" autofocus
-      style="width:100%;padding:12px 16px;border-radius:8px;border:1.5px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:#fff;font-size:15px;text-align:center;outline:none;box-sizing:border-box;"
-      onkeydown="if(event.key==='Enter')checkAuth()">
+    <input id="auth-input" type="password" placeholder="Access code" autofocus style="width:100%;padding:12px 16px;border-radius:8px;border:1.5px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:#fff;font-size:15px;text-align:center;outline:none;box-sizing:border-box;" onkeydown="if(event.key==='Enter')checkAuth()">
     <button onclick="checkAuth()" style="margin-top:12px;width:100%;padding:12px;border:none;border-radius:8px;background:linear-gradient(135deg,#ff6a00,#ffa257);color:#fff;font-weight:700;font-size:14px;cursor:pointer;">Enter</button>
     <div id="auth-error" style="color:#ef4444;font-size:12px;margin-top:10px;display:none;">Incorrect access code</div>
   </div>
 </div>
 <script>
 function checkAuth(){
-  var i=document.getElementById('auth-input'),g=document.getElementById('auth-gate'),e=document.getElementById('auth-error');
+  var i=document.getElementById("auth-input"),g=document.getElementById("auth-gate"),e=document.getElementById("auth-error");
   var c=i.value.trim().toLowerCase();
-  if(c==='ies206'||c==='ies2026'||c==='ieshub'){g.style.display='none';sessionStorage.setItem('ies-analytics-auth','1');}
-  else{e.style.display='block';i.style.borderColor='#ef4444';setTimeout(function(){e.style.display='none';i.style.borderColor='rgba(255,255,255,.15)';},2000);}
+  if(c==="ies206"||c==="ies2026"||c==="ieshub"){g.style.display="none";sessionStorage.setItem("ies-analytics-auth","1");}
+  else{e.style.display="block";i.style.borderColor="#ef4444";setTimeout(function(){e.style.display="none";i.style.borderColor="rgba(255,255,255,.15)";},2000);}
 }
-if(sessionStorage.getItem('ies-analytics-auth')==='1'){document.getElementById('auth-gate').style.display='none';}
+if(sessionStorage.getItem("ies-analytics-auth")==="1"){document.getElementById("auth-gate").style.display="none";}
 </script>
 <div class="app">
   <aside class="side">
@@ -1677,31 +1675,94 @@ const Viz = (()=>{
     return svg(W,H,`<text x="${M.l}" y="16" fill="${C.ink}" font-size="11" font-weight="700">${esc2(title||'')}</text>${bars}`);
   }
 
-  // Gauge — single value with zones
+  // Gauge — semicircle, fixed layout
   function gauge(value, max, title, zones){
-    const W=260,H=150,cx=W/2,cy=120,R=100;
+    const W=280,H=200,cx=140,cy=150,R=110;
     const pct = Math.max(0,Math.min(1,value/max));
-    const startA = Math.PI, endA = 0;
     const arc = (a1,a2,color)=>{
       const x1=cx+Math.cos(a1)*R,y1=cy+Math.sin(a1)*R;
       const x2=cx+Math.cos(a2)*R,y2=cy+Math.sin(a2)*R;
-      return `<path d="M ${x1} ${y1} A ${R} ${R} 0 0 1 ${x2} ${y2}" fill="none" stroke="${color}" stroke-width="14" stroke-linecap="round"/>`;
+      const large = Math.abs(a2-a1) > Math.PI ? 1 : 0;
+      return `<path d="M ${x1} ${y1} A ${R} ${R} 0 ${large} 1 ${x2} ${y2}" fill="none" stroke="${color}" stroke-width="18" stroke-linecap="butt"/>`;
     };
-    let arcs = '';
-    let cursor = startA;
+    // Angles in standard math: π=left, 0=right, sweep from π→0 over the top via angles in [π,2π] -> use negative sin (since SVG y-down)
+    // We'll use angle a where a∈[π,2π], and compute y with (cy - R*sin(a-π)) to flip. Simpler: parametric top half.
+    const pt = (t)=>{ // t in [0,1], 0=left, 1=right
+      const ang = Math.PI - t*Math.PI; // π→0
+      return [cx + R*Math.cos(ang), cy - R*Math.sin(ang)];
+    };
+    const arcBetween = (t1,t2,color)=>{
+      const [x1,y1]=pt(t1),[x2,y2]=pt(t2);
+      return `<path d="M ${x1} ${y1} A ${R} ${R} 0 0 1 ${x2} ${y2}" fill="none" stroke="${color}" stroke-width="18" stroke-linecap="butt"/>`;
+    };
+    let arcs = '', cursor = 0;
     zones.forEach(z=>{
-      const next = startA - z.pct*Math.PI;
-      arcs += arc(cursor, next, z.color);
+      const next = cursor + z.pct;
+      arcs += arcBetween(cursor, Math.min(next,1), z.color);
       cursor = next;
     });
-    const needleA = startA - pct*Math.PI;
-    const nx = cx + Math.cos(needleA)*(R-20), ny = cy + Math.sin(needleA)*(R-20);
+    const [nx,ny] = pt(pct);
+    const [nxIn,nyIn] = [cx + (R-28)*Math.cos(Math.PI - pct*Math.PI), cy - (R-28)*Math.sin(Math.PI - pct*Math.PI)];
+    const color = zones.reduce((acc,z,i,a)=>{
+      const c = a.slice(0,i+1).reduce((s,zz)=>s+zz.pct,0);
+      return pct <= c && acc===null ? z.color : acc;
+    }, null) || zones[zones.length-1].color;
     return svg(W,H,`
       ${arcs}
-      <line x1="${cx}" y1="${cy}" x2="${nx}" y2="${ny}" stroke="${C.ink}" stroke-width="3" stroke-linecap="round"/>
-      <circle cx="${cx}" cy="${cy}" r="5" fill="${C.ink}"/>
-      <text x="${cx}" y="${cy-25}" text-anchor="middle" fill="${C.ink}" font-size="22" font-weight="800">${value.toFixed(0)}%</text>
-      <text x="${cx}" y="${cy+24}" text-anchor="middle" fill="${C.muted}" font-size="10">${esc2(title)}</text>
+      <line x1="${cx}" y1="${cy}" x2="${nxIn}" y2="${nyIn}" stroke="${C.ink}" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="${cx}" cy="${cy}" r="6" fill="${C.ink}"/>
+      <text x="${cx}" y="${cy-30}" text-anchor="middle" fill="${color}" font-size="32" font-weight="800">${value.toFixed(0)}%</text>
+      <text x="${cx}" y="${cy+24}" text-anchor="middle" fill="${C.muted}" font-size="11">${esc2(title)}</text>
+    `);
+  }
+
+  // Horizontal top-N bar list
+  function hbar(rows, title){
+    const W=720, rowH=26, H=rows.length*rowH+30;
+    const max = Math.max(...rows.map(r=>r.v),1);
+    const labelW=150, valW=60, barX=labelW+10, barW=W-labelW-valW-30;
+    const bars = rows.map((r,i)=>{
+      const y = 24+i*rowH;
+      const w = (r.v/max)*barW;
+      return `<text x="${labelW}" y="${y+15}" text-anchor="end" fill="${C.ink}" font-size="11">${esc2(r.label)}</text>
+        <rect x="${barX}" y="${y+4}" width="${barW}" height="${rowH-10}" fill="${C.grid}" rx="3"/>
+        <rect x="${barX}" y="${y+4}" width="${w}" height="${rowH-10}" fill="${r.color||C.accent}" rx="3"/>
+        <text x="${barX+barW+6}" y="${y+15}" fill="${C.muted}" font-size="11">${r.v.toLocaleString()}</text>`;
+    }).join('');
+    return svg(W,H,`<text x="${labelW}" y="14" text-anchor="end" fill="${C.muted}" font-size="10">${esc2(title||'')}</text>${bars}`);
+  }
+
+  // Control chart — line with ±2σ bands, flag points outside
+  function control(series, title){
+    const W=720,H=240,M={t:24,r:20,b:34,l:50};
+    const iw=W-M.l-M.r, ih=H-M.t-M.b;
+    if(!series.length) return svg(W,H,`<text x="${W/2}" y="${H/2}" text-anchor="middle" fill="${C.muted}" font-size="11">No data</text>`);
+    const ys = series.map(p=>p.y);
+    const avg = ys.reduce((a,b)=>a+b,0)/ys.length;
+    const sd = Math.sqrt(ys.map(y=>(y-avg)**2).reduce((a,b)=>a+b,0)/ys.length);
+    const upper = avg+2*sd, lower = Math.max(0,avg-2*sd);
+    const max = Math.max(upper, ...ys)*1.1;
+    const sx = i=>M.l+(i/(series.length-1||1))*iw;
+    const sy = y=>M.t+ih-(y/max)*ih;
+    const band = `<rect x="${M.l}" y="${sy(upper)}" width="${iw}" height="${sy(lower)-sy(upper)}" fill="${C.ok}" opacity=".08"/>`;
+    const avgLine = `<line x1="${M.l}" y1="${sy(avg)}" x2="${M.l+iw}" y2="${sy(avg)}" stroke="${C.ok}" stroke-dasharray="3 3" opacity=".7"/>`;
+    const uLine = `<line x1="${M.l}" y1="${sy(upper)}" x2="${M.l+iw}" y2="${sy(upper)}" stroke="${C.warn}" stroke-dasharray="3 3" opacity=".7"/>`;
+    const lLine = `<line x1="${M.l}" y1="${sy(lower)}" x2="${M.l+iw}" y2="${sy(lower)}" stroke="${C.warn}" stroke-dasharray="3 3" opacity=".7"/>`;
+    const path = 'M '+series.map((p,i)=>`${sx(i)} ${sy(p.y)}`).join(' L ');
+    const pts = series.map((p,i)=>{
+      const out = p.y>upper||p.y<lower;
+      return `<circle cx="${sx(i)}" cy="${sy(p.y)}" r="${out?3.5:1.8}" fill="${out?C.bad:C.accent}"/>`;
+    }).join('');
+    const gridY = [0,0.25,0.5,0.75,1].map(g=>`<text x="${M.l-6}" y="${M.t+ih-g*ih+4}" text-anchor="end" fill="${C.muted}" font-size="9">${(g*max).toLocaleString(undefined,{maximumFractionDigits:0})}</text>`).join('');
+    const outliers = series.filter(p=>p.y>upper||p.y<lower).length;
+    return svg(W,H,`
+      <text x="${M.l}" y="14" fill="${C.ink}" font-size="11" font-weight="700">${esc2(title||'')}</text>
+      <text x="${M.l+iw}" y="14" text-anchor="end" fill="${C.muted}" font-size="10">avg=${avg.toFixed(0)} · σ=${sd.toFixed(0)} · ${outliers} outliers</text>
+      ${band}${gridY}${avgLine}${uLine}${lLine}
+      <path d="${path}" fill="none" stroke="${C.accent}" stroke-width="1.8"/>
+      ${pts}
+      <text x="${M.l+iw-4}" y="${sy(upper)-4}" text-anchor="end" fill="${C.warn}" font-size="9">+2σ</text>
+      <text x="${M.l+iw-4}" y="${sy(lower)-4}" text-anchor="end" fill="${C.warn}" font-size="9">−2σ</text>
     `);
   }
 
@@ -1753,6 +1814,57 @@ const Viz = (()=>{
       m.units = total;
       m.lpo = m.lines/Math.max(m.orders,1);
       m.upl = m.units/Math.max(m.lines,1);
+      // daily volume (units) for control chart + peak
+      const days = {};
+      const dowAgg = [0,0,0,0,0,0,0];
+      rows.forEach(r=>{
+        const d = r.order_at instanceof Date ? r.order_at : new Date(r.order_at);
+        if(isNaN(d)) return;
+        const k = d.toISOString().slice(0,10);
+        days[k]=(days[k]||0)+(+r.qty||0);
+        dowAgg[d.getUTCDay()] += (+r.qty||0);
+      });
+      const dayEntries = Object.entries(days).sort();
+      m.dailyOut = dayEntries.map(([k,v])=>({x:k.slice(5),y:v}));
+      if(m.dailyOut.length){
+        const dvals = m.dailyOut.map(p=>p.y);
+        m.avgDay = dvals.reduce((a,b)=>a+b,0)/dvals.length;
+        m.peakDay = Math.max(...dvals);
+        m.peakToAvg = m.peakDay/Math.max(m.avgDay,1);
+        // peak week (sliding 7-day)
+        let peakW=0;
+        for(let i=0;i+7<=dvals.length;i++){
+          const s = dvals.slice(i,i+7).reduce((a,b)=>a+b,0);
+          if(s>peakW) peakW=s;
+        }
+        m.peakWeek = peakW;
+        m.avgWeek = m.avgDay*7;
+      }
+      const dowNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      m.dow = dowAgg.map((v,i)=>({label:dowNames[i],v}));
+      // lines per order histogram
+      const linesByOrder = {};
+      rows.forEach(r=>{ if(r.order_id) linesByOrder[r.order_id]=(linesByOrder[r.order_id]||0)+1; });
+      const lpoBuckets = {'1':0,'2-3':0,'4-9':0,'10-24':0,'25+':0};
+      Object.values(linesByOrder).forEach(c=>{
+        if(c===1) lpoBuckets['1']++;
+        else if(c<=3) lpoBuckets['2-3']++;
+        else if(c<=9) lpoBuckets['4-9']++;
+        else if(c<=24) lpoBuckets['10-24']++;
+        else lpoBuckets['25+']++;
+      });
+      m.lpoHist = Object.entries(lpoBuckets).map(([k,v])=>({label:k,v}));
+      // units per line histogram
+      const uplBuckets = {'1':0,'2-5':0,'6-12':0,'13-24':0,'25+':0};
+      rows.forEach(r=>{
+        const q = +r.qty||0;
+        if(q<=1) uplBuckets['1']++;
+        else if(q<=5) uplBuckets['2-5']++;
+        else if(q<=12) uplBuckets['6-12']++;
+        else if(q<=24) uplBuckets['13-24']++;
+        else uplBuckets['25+']++;
+      });
+      m.uplHist = Object.entries(uplBuckets).map(([k,v])=>({label:k,v}));
       // channel mix
       if(byType.outbound.mapping.order_type){
         const cm = {};
@@ -1856,6 +1968,99 @@ const Viz = (()=>{
       m.cubeJoinRate = joined/Math.max(latest.length,1)*100;
     }
 
+    // Item-derived: cube class distribution, new-SKU by month
+    if(byType.item){
+      const items = byType.item.canonicalRows;
+      const cubeBuckets = {'Tiny <0.01':0,'Small <0.05':0,'Med <0.25':0,'Large <1':0,'Bulk ≥1':0};
+      items.forEach(r=>{
+        const c = +r.each_cube;
+        if(!isNum(c)||c<=0) return;
+        if(c<0.01) cubeBuckets['Tiny <0.01']++;
+        else if(c<0.05) cubeBuckets['Small <0.05']++;
+        else if(c<0.25) cubeBuckets['Med <0.25']++;
+        else if(c<1) cubeBuckets['Large <1']++;
+        else cubeBuckets['Bulk ≥1']++;
+      });
+      m.cubeClassHist = Object.entries(cubeBuckets).map(([k,v])=>({label:k,v}));
+      // new SKUs per month via first_seen / launch_date / create_date
+      const months = {};
+      items.forEach(r=>{
+        const d = r.launch_date||r.first_seen||r.create_date;
+        const dt = d instanceof Date ? d : (d?new Date(d):null);
+        if(!dt||isNaN(dt)) return;
+        const k = dt.toISOString().slice(0,7);
+        months[k]=(months[k]||0)+1;
+      });
+      if(Object.keys(months).length>1){
+        m.newSku = Object.entries(months).sort().map(([k,v])=>({x:k.slice(2),y:v}));
+      }
+    }
+
+    // Inbound-derived: daily volume + vendor concentration
+    if(byType.inbound){
+      const rows = byType.inbound.canonicalRows;
+      const days = {};
+      rows.forEach(r=>{
+        const d = r.receipt_at instanceof Date ? r.receipt_at : (r.receipt_at?new Date(r.receipt_at):null);
+        if(!d||isNaN(d)) return;
+        const k = d.toISOString().slice(0,10);
+        days[k]=(days[k]||0)+(+r.qty||0);
+      });
+      m.dailyIn = Object.entries(days).sort().map(([k,v])=>({x:k.slice(5),y:v}));
+      // vendor top 10
+      const vend = {};
+      rows.forEach(r=>{ if(r.vendor) vend[r.vendor]=(vend[r.vendor]||0)+(+r.qty||0); });
+      const vendTotal = Object.values(vend).reduce((a,b)=>a+b,0)||1;
+      m.vendorTop = Object.entries(vend).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([k,v])=>({label:k,v}));
+      m.vendorTop3Pct = m.vendorTop.slice(0,3).reduce((s,r)=>s+r.v,0)/vendTotal*100;
+      m.vendorCount = Object.keys(vend).length;
+    }
+
+    // ---- Design recommendations ----
+    if(m.abc){
+      const fastSlots = m.abc.A + Math.round(m.abc.B*0.4);
+      m.design = m.design||{};
+      m.design.forwardSlots = fastSlots;
+      m.design.reserveSkus = m.abc.B + m.abc.C;
+      // racking mix heuristic
+      const isDTC = m.lpo && m.lpo<2;
+      const isStoreRepl = m.lpo && m.lpo>8;
+      const isBulk = m.upl && m.upl>10;
+      let mix;
+      if(isDTC){
+        mix = {'Carton flow (A)':18,'Shelving (A/B)':22,'Selective pallet (B/C reserve)':42,'Double-deep reserve':12,'Bulk floor':6};
+      } else if(isStoreRepl){
+        mix = {'Pallet flow (A)':22,'Selective (A/B)':28,'Double-deep reserve':25,'Push-back (C)':15,'Bulk floor':10};
+      } else if(isBulk){
+        mix = {'Pallet flow (A)':18,'Selective':42,'Double-deep reserve':20,'Push-back':12,'Bulk floor':8};
+      } else {
+        mix = {'Carton flow (A)':12,'Shelving':15,'Selective':45,'Double-deep reserve':18,'Push-back':6,'Bulk floor':4};
+      }
+      m.design.rackingMix = Object.entries(mix).map(([k,v])=>({label:k,v}));
+    }
+    if(m.peakDay){
+      // Dock doors: peak day cube ÷ (~20 trailers/door/day × 3600 ft³/trailer)
+      // Fall back to units if no cube available
+      const peakCube = (m.cubeOH && m.avgDay) ? (m.cubeOH * (m.peakDay/(m.avgDay*30))) : null;
+      if(peakCube){
+        m.design = m.design||{};
+        m.design.dockDoorsOut = Math.max(2, Math.ceil(peakCube / (20*3600)));
+      } else if(m.peakDay){
+        m.design = m.design||{};
+        m.design.dockDoorsOut = Math.max(2, Math.ceil(m.peakDay/12000));
+      }
+      m.design = m.design||{};
+      m.design.peakToAvg = m.peakToAvg;
+    }
+    if(m.dailyIn && m.dailyIn.length){
+      const ins = m.dailyIn.map(p=>p.y);
+      const avgIn = ins.reduce((a,b)=>a+b,0)/ins.length;
+      const peakIn = Math.max(...ins);
+      m.design = m.design||{};
+      m.design.dockDoorsIn = Math.max(2, Math.ceil(peakIn/10000));
+      m.design.inboundPeakToAvg = peakIn/Math.max(avgIn,1);
+    }
+
     return m;
   }
 
@@ -1954,6 +2159,102 @@ const Viz = (()=>{
           <div><div style="font-size:10px;color:${C.muted};text-transform:uppercase;letter-spacing:1px">Item × Inv Join Yield</div><div style="font-size:26px;font-weight:800;color:${m.cubeJoinRate>90?C.ok:C.warn}">${m.cubeJoinRate.toFixed(0)}%</div></div>
           <div><div style="font-size:10px;color:${C.muted};text-transform:uppercase;letter-spacing:1px">Dead Cube Share</div><div style="font-size:26px;font-weight:800;color:${m.dohBins.dead/total>0.2?C.bad:C.warn}">${(m.dohBins.dead/total*100).toFixed(0)}%</div></div>
         </div>`:''}
+      </div>`;
+    }
+
+    // ---- Design Recommendations tile row ----
+    if(m.design){
+      const d = m.design;
+      const tile = (label,val,sub,col)=>`<div style="background:${C.panel2};border:1px solid ${C.grid};border-radius:10px;padding:14px"><div style="font-size:10px;color:${C.muted};text-transform:uppercase;letter-spacing:1px">${label}</div><div style="font-size:24px;font-weight:800;color:${col||C.accent}">${val}</div>${sub?`<div style="font-size:10px;color:${C.muted}">${sub}</div>`:''}</div>`;
+      html += `<div style="margin-bottom:18px">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:${C.muted};margin-bottom:10px">Design Recommendations — first-pass sizing</div>
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px">
+          ${d.forwardSlots?tile('Forward Pick Slots', d.forwardSlots.toLocaleString(), 'A + 40% B'):''}
+          ${d.reserveSkus?tile('Reserve SKUs', d.reserveSkus.toLocaleString(), 'B + C pool'):''}
+          ${d.dockDoorsOut?tile('Outbound Doors', d.dockDoorsOut, 'peak day sizing'):''}
+          ${d.dockDoorsIn?tile('Inbound Doors', d.dockDoorsIn, 'peak receipt day'):''}
+          ${d.peakToAvg?tile('Peak : Avg', d.peakToAvg.toFixed(2)+'×', d.peakToAvg>2.5?'Staffing flex critical':d.peakToAvg>1.5?'Moderate peak':'Flat profile', d.peakToAvg>2.5?C.bad:d.peakToAvg>1.5?C.warn:C.ok):''}
+        </div>
+      </div>`;
+      // Racking mix
+      if(d.rackingMix){
+        const total = d.rackingMix.reduce((a,b)=>a+b.v,0);
+        html += `<div style="background:${C.panel2};border:1px solid ${C.grid};border-radius:10px;padding:14px;margin-bottom:18px">
+          <div style="font-size:11px;color:${C.muted};margin-bottom:6px">Recommended Racking Mix — driven by order profile (lines/order ${m.lpo?m.lpo.toFixed(1):'—'}, units/line ${m.upl?m.upl.toFixed(1):'—'})</div>
+          ${stackBar(d.rackingMix.map(r=>({label:r.label+' '+Math.round(r.v/total*100)+'%',v:r.v})),'')}
+        </div>`;
+      }
+    }
+
+    // ---- Daily volume control chart ----
+    if(m.dailyOut && m.dailyOut.length>5){
+      html += `<div style="margin-bottom:18px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:${C.muted};margin-bottom:10px">Volume Control — Daily Outbound Units</div>
+        <div style="background:${C.panel2};border:1px solid ${C.grid};border-radius:10px;padding:14px">${control(m.dailyOut,'Statistical process control — ±2σ bands')}</div>
+      </div>`;
+    }
+
+    // ---- Day of Week + Peak callouts ----
+    if(m.dow && m.peakDay){
+      const dowBins = m.dow.map(d=>({label:d.label, v:d.v, color:C.accent2}));
+      html += `<div style="margin-bottom:18px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:${C.muted};margin-bottom:10px">Peak & Day-of-Week</div>
+        <div style="display:grid;grid-template-columns:2fr 1fr;gap:10px">
+          <div style="background:${C.panel2};border:1px solid ${C.grid};border-radius:10px;padding:14px">${histo(dowBins,'Units by Day of Week')}</div>
+          <div style="background:${C.panel2};border:1px solid ${C.grid};border-radius:10px;padding:14px;display:flex;flex-direction:column;justify-content:center;gap:12px">
+            <div><div style="font-size:10px;color:${C.muted};text-transform:uppercase;letter-spacing:1px">Peak Day</div><div style="font-size:22px;font-weight:800;color:${C.accent}">${m.peakDay.toLocaleString()}</div><div style="font-size:10px;color:${C.muted}">units</div></div>
+            <div><div style="font-size:10px;color:${C.muted};text-transform:uppercase;letter-spacing:1px">Peak Week</div><div style="font-size:22px;font-weight:800;color:${C.accent}">${(m.peakWeek||0).toLocaleString()}</div><div style="font-size:10px;color:${C.muted}">vs avg ${(m.avgWeek||0).toFixed(0)}</div></div>
+            <div><div style="font-size:10px;color:${C.muted};text-transform:uppercase;letter-spacing:1px">Peak : Avg Day</div><div style="font-size:22px;font-weight:800;color:${m.peakToAvg>2.5?C.bad:C.accent}">${m.peakToAvg.toFixed(2)}×</div></div>
+          </div>
+        </div>
+      </div>`;
+    }
+
+    // ---- Order shape histograms ----
+    if(m.lpoHist && m.uplHist){
+      html += `<div style="margin-bottom:18px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:${C.muted};margin-bottom:10px">Order Shape Distributions</div>
+        <div style="background:${C.panel2};border:1px solid ${C.grid};border-radius:10px;padding:14px;margin-bottom:10px">${histo(m.lpoHist.map(b=>({...b,color:C.accent})),'Lines per Order')}</div>
+        <div style="background:${C.panel2};border:1px solid ${C.grid};border-radius:10px;padding:14px">${histo(m.uplHist.map(b=>({...b,color:C.accent2})),'Units per Line')}</div>
+      </div>`;
+    }
+
+    // ---- Cube class distribution ----
+    if(m.cubeClassHist && m.cubeClassHist.some(b=>b.v>0)){
+      html += `<div style="margin-bottom:18px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:${C.muted};margin-bottom:10px">Item Cube Class — drives slot size strategy</div>
+        <div style="background:${C.panel2};border:1px solid ${C.grid};border-radius:10px;padding:14px">${histo(m.cubeClassHist.map((b,i)=>({...b,color:C.series[i]})),'SKUs by cube class (ft³)')}</div>
+      </div>`;
+    }
+
+    // ---- Channel + Carrier mix ----
+    if(m.channelMix || m.carrierMix){
+      html += `<div style="margin-bottom:18px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:${C.muted};margin-bottom:10px">Channel & Carrier Mix</div>`;
+      if(m.channelMix){
+        const segs = m.channelMix.map((s,i)=>({label:s.label,v:s.v,color:C.series[i]}));
+        html += `<div style="background:${C.panel2};border:1px solid ${C.grid};border-radius:10px;padding:14px;margin-bottom:10px">${stackBar(segs,'Orders by channel / order type')}</div>`;
+      }
+      if(m.carrierMix){
+        html += `<div style="background:${C.panel2};border:1px solid ${C.grid};border-radius:10px;padding:14px">${hbar(m.carrierMix.map((r,i)=>({label:r.label,v:r.v,color:C.series[i]})),'Top carriers by line count')}</div>`;
+      }
+      html += `</div>`;
+    }
+
+    // ---- Inbound profile ----
+    if(m.dailyIn && m.dailyIn.length){
+      html += `<div style="margin-bottom:18px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:${C.muted};margin-bottom:10px">Inbound Profile — ${m.vendorCount||0} vendors</div>
+        <div style="background:${C.panel2};border:1px solid ${C.grid};border-radius:10px;padding:14px;margin-bottom:10px">
+          <div style="font-size:11px;color:${C.muted};margin-bottom:6px">Daily Receipt Volume</div>${line(m.dailyIn)}
+        </div>`;
+      if(m.vendorTop && m.vendorTop.length){
+        html += `<div style="background:${C.panel2};border:1px solid ${C.grid};border-radius:10px;padding:14px">
+          <div style="font-size:11px;color:${C.muted};margin-bottom:6px">Top 10 Vendor Concentration — top 3 = ${m.vendorTop3Pct.toFixed(0)}% of receipts</div>
+          ${hbar(m.vendorTop.map((r,i)=>({label:r.label,v:r.v,color:i<3?C.accent:C.accent2})),'')}
+        </div>`;
+      }
+      html += `</div>`;
+    }
+
+    // ---- New SKU introduction trend ----
+    if(m.newSku && m.newSku.length>2){
+      html += `<div style="margin-bottom:18px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:${C.muted};margin-bottom:10px">SKU Proliferation — assortment velocity</div>
+        <div style="background:${C.panel2};border:1px solid ${C.grid};border-radius:10px;padding:14px">${line(m.newSku)}</div>
       </div>`;
     }
 
@@ -2301,16 +2602,27 @@ const Narrate = (()=>{
     throw new Error('Unexpected response shape');
   }
 
-  const SYSTEM = `You are a senior IES solutions designer at GXO with 20+ years of 3PL experience across all verticals. You are reviewing the output of an automated data profiling engine that just ran against customer data files provided for a new deal qualification.
+  const SYSTEM = `You are a senior IES solutions designer at GXO with 20+ years of 3PL experience across all verticals — ecom, retail, CPG, industrial, healthcare, cold chain, aerospace. You've designed hundreds of DCs from scratch. You are reviewing the output of an automated data profiling engine and a computed metrics pack for a new deal qualification.
 
-Your job: read the findings and write a crisp commentary in the voice of a seasoned analyst briefing the deal team. Structure your response in plain prose paragraphs under these four headings:
+Your job: write a senior-designer commentary in the voice of a seasoned analyst briefing the deal team (VPs and account execs). Use these SIX headings as prose sections (not bullet lists):
 
-1. What I see
-2. What concerns me
-3. What I would ask the customer before committing to a design
-4. What I am and am not willing to commit to from this data
+1. What I see — the shape of this business from the numbers
+2. What concerns me — data gaps, stoplights, and risk
+3. Design implications — translate the numbers into specific recommendations:
+   • Racking mix (selective / double-deep / push-back / pallet-flow / carton-flow / shelving) and WHY, tied to lines/order and units/line
+   • Forward pick area sizing — how many slots, which velocity classes, replen frequency
+   • Reserve-to-forward ratio and slotting strategy
+   • Peak-to-average ratio and what it means for staffing flex, conveyor sizing, and dock doors
+   • Dock door count (inbound/outbound) and dwell assumptions
+   • Cross-dock opportunity (% of pool eligible) and value
+   • Labor model implications (case pick vs each pick vs split-case handling, MOST standards focus areas)
+   • Slotting cube class breakdown (tiny/small/med/large/bulk) and what it means for pick face design
+   • Automation triggers — is this a goods-to-person candidate? AMR? sortation?
+4. What I would ask the customer before committing — 5-8 sharp questions
+5. What I am willing to commit to from this data — and what I'm not
+6. Next steps to close data gaps
 
-Be specific. Cite the actual numbers in the findings. Never invent data. If a finding is missing, say so. Be direct and useful — no hedging for its own sake, no fluff. Write the way a senior analyst would talk to a VP, not the way a report is written.`;
+Be SPECIFIC with numbers. Cite the actual Pareto %, ABC mix, peak-to-avg, cube class distribution, vendor concentration, DOH bins. Never invent data. If a number isn't in the pack, say so. Write like you're talking to a VP in a deal review, not writing a formal report. Direct. No hedging. No fluff. This is the commentary that either wins the deal or keeps GXO from taking a bad one.`;
 
   async function generate(report){
     const summary = {
@@ -2323,8 +2635,37 @@ Be specific. Cite the actual numbers in the findings. Never invent data. If a fi
       })),
       crossFile: report.cross.map(c=>({severity:c.sev, title:c.title, detail:c.detail}))
     };
-    const user = 'Here is the profiling engine output as JSON. Write your commentary.\n\n```json\n'+JSON.stringify(summary,null,2)+'\n```';
-    return call({system:SYSTEM, user, max_tokens:2500});
+    // Pull computed metrics from Viz so Claude cites real numbers
+    let metricsPack = null;
+    try {
+      if(typeof Viz!=='undefined' && window.state && state.files){
+        const m = Viz.computeMetrics(state.files);
+        metricsPack = {
+          skuCount: m.skuCount,
+          orders: m.orders, lines: m.lines, units: m.units,
+          linesPerOrder: m.lpo, unitsPerLine: m.upl,
+          paretoTop20PctOfUnits: m.paretoTop20,
+          peakDay: m.peakDay, avgDay: m.avgDay, peakToAvgDay: m.peakToAvg,
+          peakWeek: m.peakWeek, avgWeek: m.avgWeek,
+          abc: m.abc,
+          pickUomMix: m.pickUom,
+          dohBins: m.dohBins,
+          zeroLocRatePct: m.zeroLocRate,
+          cubeOnHandFt3: m.cubeOH,
+          cubeJoinRatePct: m.cubeJoinRate,
+          cubeClassHist: m.cubeClassHist,
+          channelMix: m.channelMix,
+          carrierMix: m.carrierMix,
+          vendorTop10: m.vendorTop,
+          vendorTop3Pct: m.vendorTop3Pct,
+          vendorCount: m.vendorCount,
+          newSkuTrend: m.newSku && m.newSku.slice(-6),
+          designFirstPass: m.design
+        };
+      }
+    } catch(e){ /* tolerate */ }
+    const user = 'Profiling engine findings AND computed metrics pack are below. Write your senior-designer commentary using the 6-section structure. Cite real numbers from the metrics pack.\n\n## Findings\n```json\n'+JSON.stringify(summary,null,2)+'\n```\n\n## Metrics Pack\n```json\n'+JSON.stringify(metricsPack,null,2)+'\n```';
+    return call({system:SYSTEM, user, max_tokens:4000});
   }
 
   async function test(){
