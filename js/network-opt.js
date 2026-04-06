@@ -459,7 +459,7 @@ function netoptGenerateDemoDemand() {
   var demandPoints = [];
   selected.forEach(function(z, i) {
     var pct = z.score / totalScore;
-    var volume = Math.round(totalVolume * pct / 1000); // Convert to K units
+    var volume = Math.round(totalVolume * pct); // raw units
     if (volume < 1) volume = 1;
     demandPoints.push({
       id: 'dem-' + Date.now() + '-' + i,
@@ -496,35 +496,35 @@ function netoptGenerateDemoDemand() {
 
 // Pre-defined facility candidates (10 major US warehouse cities)
 var NETOPT_FACILITY_CANDIDATES = [
-  {name: 'Atlanta', city: 'Atlanta, GA', capacity: 800, fixedCost: 3.2, varCost: 0.25},
-  {name: 'Chicago', city: 'Chicago, IL', capacity: 750, fixedCost: 3.0, varCost: 0.24},
-  {name: 'Dallas', city: 'Dallas, TX', capacity: 650, fixedCost: 2.8, varCost: 0.23},
-  {name: 'Los Angeles', city: 'Los Angeles, CA', capacity: 700, fixedCost: 3.1, varCost: 0.26},
-  {name: 'Memphis', city: 'Memphis, TN', capacity: 600, fixedCost: 2.5, varCost: 0.22},
-  {name: 'Columbus', city: 'Columbus, OH', capacity: 550, fixedCost: 2.4, varCost: 0.21},
-  {name: 'Indianapolis', city: 'Indianapolis, IN', capacity: 550, fixedCost: 2.3, varCost: 0.20},
-  {name: 'Allentown', city: 'Allentown, PA', capacity: 600, fixedCost: 2.7, varCost: 0.25},
-  {name: 'Savannah', city: 'Savannah, GA', capacity: 500, fixedCost: 2.2, varCost: 0.21},
-  {name: 'Reno', city: 'Reno, NV', capacity: 400, fixedCost: 1.8, varCost: 0.24}
+  {name: 'Atlanta', city: 'Atlanta, GA', capacity: 800000, fixedCost: 3.2, varCost: 0.25},
+  {name: 'Chicago', city: 'Chicago, IL', capacity: 750000, fixedCost: 3.0, varCost: 0.24},
+  {name: 'Dallas', city: 'Dallas, TX', capacity: 650000, fixedCost: 2.8, varCost: 0.23},
+  {name: 'Los Angeles', city: 'Los Angeles, CA', capacity: 700000, fixedCost: 3.1, varCost: 0.26},
+  {name: 'Memphis', city: 'Memphis, TN', capacity: 600000, fixedCost: 2.5, varCost: 0.22},
+  {name: 'Columbus', city: 'Columbus, OH', capacity: 550000, fixedCost: 2.4, varCost: 0.21},
+  {name: 'Indianapolis', city: 'Indianapolis, IN', capacity: 550000, fixedCost: 2.3, varCost: 0.20},
+  {name: 'Allentown', city: 'Allentown, PA', capacity: 600000, fixedCost: 2.7, varCost: 0.25},
+  {name: 'Savannah', city: 'Savannah, GA', capacity: 500000, fixedCost: 2.2, varCost: 0.21},
+  {name: 'Reno', city: 'Reno, NV', capacity: 400000, fixedCost: 1.8, varCost: 0.24}
 ];
 
 // Pre-defined major demand points (15 cities)
 var NETOPT_DEMAND_POINTS = [
-  {city: 'New York, NY', volume: 320},
-  {city: 'Los Angeles, CA', volume: 280},
-  {city: 'Chicago, IL', volume: 210},
-  {city: 'Houston, TX', volume: 180},
-  {city: 'Phoenix, AZ', volume: 150},
-  {city: 'Philadelphia, PA', volume: 140},
-  {city: 'San Antonio, TX', volume: 130},
-  {city: 'San Diego, CA', volume: 120},
-  {city: 'Dallas, TX', volume: 150},
-  {city: 'San Jose, CA', volume: 110},
-  {city: 'Austin, TX', volume: 95},
-  {city: 'Jacksonville, FL', volume: 100},
-  {city: 'Fort Worth, TX', volume: 90},
-  {city: 'Columbus, OH', volume: 85},
-  {city: 'Charlotte, NC', volume: 95}
+  {city: 'New York, NY', volume: 320000},
+  {city: 'Los Angeles, CA', volume: 280000},
+  {city: 'Chicago, IL', volume: 210000},
+  {city: 'Houston, TX', volume: 180000},
+  {city: 'Phoenix, AZ', volume: 150000},
+  {city: 'Philadelphia, PA', volume: 140000},
+  {city: 'San Antonio, TX', volume: 130000},
+  {city: 'San Diego, CA', volume: 120000},
+  {city: 'Dallas, TX', volume: 150000},
+  {city: 'San Jose, CA', volume: 110000},
+  {city: 'Austin, TX', volume: 95000},
+  {city: 'Jacksonville, FL', volume: 100000},
+  {city: 'Fort Worth, TX', volume: 90000},
+  {city: 'Columbus, OH', volume: 85000},
+  {city: 'Charlotte, NC', volume: 95000}
 ];
 
 // Initialize Network Optimization tool
@@ -636,7 +636,7 @@ function netoptRenderFacilitiesTable() {
     row.innerHTML = `
       <td style="padding:12px 16px;"><input type="text" value="${esc(f.name)}" class="wsc-input" style="width:100%;font-size:12px;" onchange="netoptState.facilities.find(function(x){return x.id==='${fid}'}).name=this.value;"></td>
       <td style="padding:12px 16px;"><input type="text" value="${esc(f.city)}" class="wsc-input" style="width:100%;font-size:12px;" onchange="netoptState.facilities.find(function(x){return x.id==='${fid}'}).city=this.value;netoptGeocodeFacility('${fid}');"></td>
-      <td style="padding:12px 16px;text-align:right;"><input type="number" value="${f.capacity}" min="100" step="50" class="wsc-input" style="width:100%;text-align:right;font-size:12px;" onchange="netoptState.facilities.find(function(x){return x.id==='${fid}'}).capacity=parseFloat(this.value);netoptUpdateKPI();"></td>
+      <td style="padding:12px 16px;text-align:right;"><input type="number" value="${f.capacity}" min="1000" step="10000" class="wsc-input" style="width:100%;text-align:right;font-size:12px;" onchange="netoptState.facilities.find(function(x){return x.id==='${fid}'}).capacity=parseFloat(this.value);netoptUpdateKPI();"></td>
       <td style="padding:12px 16px;text-align:right;"><input type="number" value="${f.fixedCost}" min="0" step="0.1" class="wsc-input" style="width:100%;text-align:right;font-size:12px;" onchange="netoptState.facilities.find(function(x){return x.id==='${fid}'}).fixedCost=parseFloat(this.value);netoptUpdateKPI();"></td>
       <td style="padding:12px 16px;text-align:right;"><input type="number" value="${f.varCost}" min="0" step="0.01" class="wsc-input" style="width:100%;text-align:right;font-size:12px;" onchange="netoptState.facilities.find(function(x){return x.id==='${fid}'}).varCost=parseFloat(this.value);netoptUpdateKPI();"></td>
       <td style="padding:12px 16px;text-align:center;">
@@ -662,7 +662,7 @@ function netoptRenderDemandsTable() {
     row.innerHTML = `
       <td style="padding:12px 16px;"><input type="text" value="${esc(d.city)}" class="wsc-input" style="width:100%;font-size:12px;" onchange="netoptState.demands.find(function(x){return x.id==='${did}'}).city=this.value;netoptGeocideDemand('${did}');"></td>
       <td style="padding:12px 16px;"><input type="text" value="${esc(d.state)}" class="wsc-input" style="width:100%;font-size:12px;" onchange="netoptState.demands.find(function(x){return x.id==='${did}'}).state=this.value;"></td>
-      <td style="padding:12px 16px;text-align:right;"><input type="number" value="${d.volume}" min="1" step="10" class="wsc-input" style="width:100%;text-align:right;font-size:12px;" onchange="netoptState.demands.find(function(x){return x.id==='${did}'}).volume=parseFloat(this.value);netoptUpdateKPI();"></td>
+      <td style="padding:12px 16px;text-align:right;"><input type="number" value="${d.volume}" min="1" step="1000" class="wsc-input" style="width:100%;text-align:right;font-size:12px;" onchange="netoptState.demands.find(function(x){return x.id==='${did}'}).volume=parseFloat(this.value);netoptUpdateKPI();"></td>
       <td style="padding:12px 16px;text-align:right;"><input type="number" value="${d.maxMiles}" min="50" step="50" class="wsc-input" style="width:100%;text-align:right;font-size:12px;" onchange="netoptState.demands.find(function(x){return x.id==='${did}'}).maxMiles=parseFloat(this.value);"></td>
       <td style="padding:12px 16px;text-align:right;"><input type="number" value="${d.maxDays || 3}" min="1" max="7" step="1" class="wsc-input" style="width:100%;text-align:right;font-size:12px;" onchange="netoptState.demands.find(function(x){return x.id==='${did}'}).maxDays=parseInt(this.value, 10);"></td>
       <td style="padding:12px 16px;text-align:center;"><button onclick="netoptRemoveDemand('${did}')" style="padding:4px 8px;background:#fff;border:1px solid var(--ies-red);color:var(--ies-red);border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;">Remove</button></td>
@@ -684,7 +684,7 @@ function netoptAddFacility() {
     id: id,
     name: 'New Facility',
     city: 'Atlanta, GA',
-    capacity: 500,
+    capacity: 500000,
     fixedCost: 2.5,
     varCost: 0.23,
     status: 'Candidate',
@@ -708,7 +708,7 @@ function netoptAddDemandPoint() {
     id: id,
     city: 'New York, NY',
     state: 'NY',
-    volume: 100,
+    volume: 100000,
     maxMiles: 500,
     maxDays: 3,
     lat: null,
@@ -743,7 +743,7 @@ function netoptAddSupplier() {
   netoptState.suppliers.push({
     id: id,
     city: 'Los Angeles, CA',
-    volume: 200,
+    volume: 200000,
     mode: 'TL',
     lat: null,
     lng: null
@@ -1024,7 +1024,7 @@ function netoptUpdateKPI() {
   constraints.inventoryCarryPct = parseFloat(document.getElementById('netopt-inventory-carry').value) || 15;
 
   // Calculate summary KPIs
-  var totalDemand = netoptState.demands.reduce((s, d) => s + (d.volume || 0), 0) * 1000; // Convert K to units
+  var totalDemand = netoptState.demands.reduce((s, d) => s + (d.volume || 0), 0);
   var openCount = netoptState.results ? (netoptState.results.openFacilities || []).length : 0;
   var totalCost = netoptState.results ? netoptState.results.totalCost : 0;
   var avgDist = netoptState.results ? netoptState.results.avgDistance : 0;
@@ -1223,7 +1223,7 @@ function netoptCalculateTotalCost(config, demands, transport, constraints) {
           closest = config[i];
         }
       }
-      var vol = (d.volume || 0) * 1000; // K to units
+      var vol = (d.volume || 0);
       // Multi-mode cost: TL and LTL are distance-based, parcel is zone-based
       var tlCost = vol * mix.tl * minDist * (transport.tlUnitMile || transport.outboundPerUnitMile || 0.0025);
       var ltlCost = vol * mix.ltl * minDist * (transport.ltlUnitMile || transport.outboundPerUnitMile || 0.0040);
@@ -1310,7 +1310,7 @@ function netoptEvaluateConfig(config, demands, transport, constraints) {
       remaining -= allocated;
 
       // Transport cost for this allocation
-      var volUnits = allocated * 1000;
+      var volUnits = allocated;
       var mix = transport.modeMix || { tl: 1, ltl: 0, parcel: 0 };
       var tlCost = volUnits * mix.tl * dist * (transport.tlUnitMile || transport.outboundPerUnitMile || 0.0025);
       var ltlCost = volUnits * mix.ltl * dist * (transport.ltlUnitMile || transport.outboundPerUnitMile || 0.0040);
@@ -1347,7 +1347,7 @@ function netoptEvaluateConfig(config, demands, transport, constraints) {
     if (remaining > 0 && pa.sortedFacs.length > 0) {
       var nearest = pa.sortedFacs[0];
       assignedVolume[nearest.facility.id] = (assignedVolume[nearest.facility.id] || 0) + remaining;
-      var volUnits = remaining * 1000;
+      var volUnits = remaining;
       var mix = transport.modeMix || { tl: 1, ltl: 0, parcel: 0 };
       transportCost += volUnits * mix.tl * nearest.dist * (transport.tlUnitMile || transport.outboundPerUnitMile || 0.0025);
       transportCost += volUnits * mix.ltl * nearest.dist * (transport.ltlUnitMile || transport.outboundPerUnitMile || 0.0040);
@@ -1375,7 +1375,7 @@ function netoptEvaluateConfig(config, demands, transport, constraints) {
 
   var varCost = config.reduce((s, f) => {
     var vol = assignedVolume[f.id] || 0;
-    return s + (vol * 1000 * (f.varCost || 0) / 1000000);
+    return s + (vol * (f.varCost || 0) / 1000000);
   }, 0);
 
   // B5: Inbound transport cost from suppliers to facilities
@@ -1385,7 +1385,7 @@ function netoptEvaluateConfig(config, demands, transport, constraints) {
     var inboundRate = transport.inboundPerUnitMile || 0.00178;
     suppliers.forEach(function(sup) {
       if (!sup.lat || !sup.lng) return;
-      var supVol = (sup.volume || 0) * 1000; // K to units
+      var supVol = (sup.volume || 0);
       // Distribute supplier volume proportionally across facilities by their assigned demand
       var totalAssigned = config.reduce(function(s, f) { return s + (assignedVolume[f.id] || 0); }, 0) || 1;
       config.forEach(function(f) {
@@ -1708,7 +1708,7 @@ function netoptRenderUtilization(r) {
     if (!u) return;
     var pct = Math.min(u.pct, 120); // cap bar display at 120%
     var barColor = u.pct <= 80 ? '#10b981' : u.pct <= 100 ? '#f59e0b' : '#ef4444';
-    var capLabel = u.capacity !== Infinity ? u.capacity.toLocaleString() + 'K' : 'No limit';
+    var capLabel = u.capacity !== Infinity ? u.capacity.toLocaleString() : 'No limit';
 
     html += '<div style="margin-bottom:8px;">';
     html += '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px;">';
@@ -2373,7 +2373,7 @@ function netoptExportResults() {
 
   // Section 3: Facility Detail with utilization
   csv += '\n--- FACILITY DETAIL ---\n';
-  csv += 'Name,City,Status,Capacity (K),Fixed Cost ($M),Var Cost ($/unit),Assigned Volume (K),Utilization %\n';
+  csv += 'Name,City,Status,Capacity,Fixed Cost ($M),Var Cost ($/unit),Assigned Volume,Utilization %\n';
   r.openFacilities.forEach(function(f) {
     var vol = r.assignedVolume && r.assignedVolume[f.id] ? r.assignedVolume[f.id] : 0;
     var util = r.utilization && r.utilization[f.id] ? r.utilization[f.id].pct : 0;
@@ -2383,7 +2383,7 @@ function netoptExportResults() {
 
   // Section 4: Demand Allocation (from demandAssignments)
   csv += '\n--- DEMAND ALLOCATION ---\n';
-  csv += 'Demand City,Volume (K),Assigned Facility,Distance (mi),Transport Cost ($),Delivery Days\n';
+  csv += 'Demand City,Volume,Assigned Facility,Distance (mi),Transport Cost ($),Delivery Days\n';
   var assignments = r.demandAssignments || [];
   if (assignments.length > 0) {
     assignments.forEach(function(a) {
@@ -2607,7 +2607,7 @@ function netoptRenderAllocationTable() {
       }
     }
 
-    var vol = (d.volume || 0) * 1000;
+    var vol = (d.volume || 0);
     var mix = netoptState.transport.modeMix || { tl: 1, ltl: 0, parcel: 0 };
     var tlCost = vol * mix.tl * minDist * (netoptState.transport.tlUnitMile || netoptState.transport.outboundPerUnitMile || 0.0025);
     var ltlCost = vol * mix.ltl * minDist * (netoptState.transport.ltlUnitMile || netoptState.transport.outboundPerUnitMile || 0.0040);
