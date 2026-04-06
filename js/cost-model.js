@@ -5163,7 +5163,7 @@ const cmApp = {
                 cost_model_equipment: ['project_id','name','category','quantity','lease_monthly','maintenance_annual','acquisition_cost','lease_rate','maintenance_cost','amortization_years','notes','pricing_bucket'],
                 cost_model_overhead: ['project_id','category','description','monthly_cost','cost_type','scaling_factor','total_annual_cost','notes','annual_cost','scaling_driver','rate','quantity','source','pricing_bucket'],
                 cost_model_vas: ['project_id','service_name','volume','rate','uom','annual_cost','notes','pricing_bucket'],
-                cost_model_volumes: ['project_id','volume_name','name','annual_volume','daily_volume','uom','source','notes','process_area']
+                cost_model_volumes: ['project_id','volume_name','name','annual_volume','daily_volume','uom','source','notes','process_area','is_outbound']
             };
 
             // Helper: delete-then-insert pattern for child tables
