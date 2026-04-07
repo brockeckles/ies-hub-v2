@@ -6776,8 +6776,8 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
           <div id="wsc-layout-dims" style="font-size:12px;font-weight:600;color:rgba(255,255,255,.5);"></div>
           <div class="hub-btn-group" style="display:inline-flex;border-radius:6px;overflow:hidden;border:1px solid rgba(255,255,255,.15);">
             <button id="wsc-view-2d" onclick="wscSetView('2d')" style="font-size:11px;padding:4px 12px;background:rgba(59,130,246,.3);color:#93c5fd;border:none;cursor:pointer;transition:.2s;font-weight:600;">2D Layout</button>
-            <button id="wsc-view-3d" onclick="wscSetView('3d')" style="font-size:11px;padding:4px 12px;background:rgba(255,255,255,.06);color:rgba(255,255,255,.5);border:none;border-left:1px solid rgba(255,255,255,.1);cursor:pointer;transition:.2s;">3D View</button>
-            <button id="wsc-view-elev" onclick="wscSetView('elevation')" style="font-size:11px;padding:4px 12px;background:rgba(255,255,255,.06);color:rgba(255,255,255,.5);border:none;border-left:1px solid rgba(255,255,255,.1);cursor:pointer;transition:.2s;">Elevation</button>
+            <button id="wsc-view-3d" onclick="wscSetView('3d')" style="display:none;font-size:11px;padding:4px 12px;background:rgba(255,255,255,.06);color:rgba(255,255,255,.5);border:none;border-left:1px solid rgba(255,255,255,.1);cursor:pointer;transition:.2s;">3D View</button>
+            <button id="wsc-view-elev" onclick="wscSetView('elevation')" style="display:none;font-size:11px;padding:4px 12px;background:rgba(255,255,255,.06);color:rgba(255,255,255,.5);border:none;border-left:1px solid rgba(255,255,255,.1);cursor:pointer;transition:.2s;">Elevation</button>
           </div>
           <button id="wsc-3d-walls-btn" onclick="wsc3dToggleWalls()" style="display:none;font-size:11px;padding:4px 12px;border-radius:6px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.7);border:1px solid rgba(255,255,255,.15);cursor:pointer;transition:.2s;margin-left:8px;">Hide Walls</button>
         </div>
@@ -10887,7 +10887,7 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
 <!-- Center of Gravity: city database, clustering, Leaflet map -->
 <script src="js/center-of-gravity.js?v=20260405-s20"></script>
 <!-- Warehouse Sizing Calculator: layout, 3D, elevation, scenarios -->
-<script src="js/warehouse-sizing.js?v=20260407-s1"></script>
+<script src="js/warehouse-sizing.js?v=20260407-s2"></script>
 <!-- Enterprise Network Optimization: GLPK solver, heatmap, service zones -->
 <script src="js/network-opt.js?v=20260406-s7"></script>
 <!-- Change Management: ADKAR initiatives, activities, flowcharts -->

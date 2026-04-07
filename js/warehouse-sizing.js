@@ -2261,6 +2261,16 @@ function wsc3dToggleWalls() {
 
 // ── 3-way view switcher ──
 function wscSetView(mode) {
+  // TEMP DISABLED 2026-04-07: 3D viewer freezing whole hub. Force 2D only.
+  mode = '2d';
+  var _btn3d = document.getElementById('wsc-view-3d');
+  var _btnElev = document.getElementById('wsc-view-elev');
+  var _wallBtn = document.getElementById('wsc-3d-walls-btn');
+  if (_btn3d) _btn3d.style.display = 'none';
+  if (_btnElev) _btnElev.style.display = 'none';
+  if (_wallBtn) _wallBtn.style.display = 'none';
+  // Free any existing 3D resources
+  try { if (typeof dispose3DView === 'function') dispose3DView(); } catch(e){}
   wscViewMode = mode;
   var svgEl = document.getElementById('wsc-layout-svg');
   var container3d = document.getElementById('wsc-3d-container');
