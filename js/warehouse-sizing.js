@@ -509,6 +509,8 @@ function renderLayout(p) {
 
   // Save params for manual mode re-renders
   wscLastLayoutParams = p;
+  // PERF: invalidate cached 3D scene since params changed
+  window.wsc3dBuiltForParams = null;
 
   // Enable drag handlers if in manual mode
   if (wscManualMode) {
@@ -2268,11 +2270,16 @@ function wscSetView(mode) {
   var btnElev = document.getElementById('wsc-view-elev');
   if (!svgEl || !container3d) return;
 
-  // Hide all
+  // Hide all (do NOT dispose 3D — pause it instead, see below)
   svgEl.style.display = 'none';
   container3d.style.display = 'none';
   if (containerElev) containerElev.style.display = 'none';
-  dispose3DView();
+
+  // PERF: pause 3D animation loop when leaving 3D, but keep scene cached in memory
+  if (mode !== '3d' && wsc3dAnimationId) {
+    cancelAnimationFrame(wsc3dAnimationId);
+    wsc3dAnimationId = null;
+  }
 
   // Reset button styles (base style + inactive, overwrite to avoid accumulation)
   var baseStyle = 'font-size:11px;padding:4px 12px;border:none;cursor:pointer;transition:.2s;';
@@ -2288,7 +2295,27 @@ function wscSetView(mode) {
     container3d.style.display = 'block';
     if (btn3d) btn3d.style.cssText = activeStyle;
     var p = wscLastLayoutParams;
-    if (p) render3DLayout(p);
+    if (p) {
+      // PERF: reuse cached scene if params haven't changed (avoid 1377-mesh rebuild)
+      if (window.wsc3dBuiltForParams === p && wsc3dRenderer && wsc3dScene && wsc3dCamera) {
+        window.wsc3dDirty = true;
+        if (!wsc3dAnimationId) {
+          (function _resumeAnim() {
+            wsc3dAnimationId = requestAnimationFrame(_resumeAnim);
+            if (!wsc3dRenderer) return;
+            if (window.wsc3dDirty) {
+              window.wsc3dDirty = false;
+              wsc3dRenderer.render(wsc3dScene, wsc3dCamera);
+            }
+          })();
+        }
+      } else {
+        // Params changed (or first build) — full rebuild
+        dispose3DView();
+        render3DLayout(p);
+        window.wsc3dBuiltForParams = p;
+      }
+    }
   } else if (mode === 'elevation') {
     if (containerElev) containerElev.style.display = 'block';
     if (btnElev) btnElev.style.cssText = activeStyle;
