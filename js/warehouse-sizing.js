@@ -82,12 +82,15 @@ function renderLayout(p) {
   var recvStH = Math.max(14, Math.min(Math.ceil(p.recvStagingSF / bW), bD * 0.10));
   var shipStH = Math.max(14, Math.min(Math.ceil(p.shipStagingSF / bW), bD * 0.10));
 
-  // Tighten building depth to match actual zone requirements
+  // FIX 2026-04-07: Removed depth-tightening logic — it broke bW × bD = totalSF.
+  // Initial calc already targets industry-standard ~2.2:1 aspect ratio.
+  // Just enforce a minimum depth so dock + staging zones fit.
   var requiredDepth = (twoDock ? dockH + recvStH : 0) + dockH + Math.max(recvStH, shipStH) + mg * 6 + 40;
-  if (bD > requiredDepth + 20) {
-    bD = requiredDepth + 10;
-    if (dimEl) dimEl.textContent = bW.toLocaleString()+' ft × '+bD.toLocaleString()+' ft';
+  if (bD < requiredDepth) {
+    bD = requiredDepth;
+    bW = Math.max(dockFaceW, Math.ceil(p.totalSF / bD));
   }
+  if (dimEl) dimEl.textContent = bW.toLocaleString()+' ft × '+bD.toLocaleString()+' ft';
 
   // Store tightened dimensions for 3D view to reuse
   wscTightenedBW = bW;
