@@ -223,8 +223,9 @@ function renderLayout(p) {
         mW = fixedPitch;
         nm = Math.max(1, Math.floor(w / mW));
       } else {
-        nm = Math.max(2, Math.min(18, Math.floor(w / totFt)));
-        mW = w / nm;
+        // FIX 2026-04-07: +aisleFt so last rack sits flush to edge (no trailing aisle waste)
+        nm = Math.max(2, Math.min(18, Math.floor((w + aisleFt) / totFt)));
+        mW = (w + aisleFt) / nm;
       }
       var rkW = mW * rackRatio;
       for (var i = 0; i < nm; i++) {
@@ -263,8 +264,9 @@ function renderLayout(p) {
         mH = fixedPitch;
         nm = Math.max(1, Math.floor(h / mH));
       } else {
-        nm = Math.max(2, Math.min(18, Math.floor(h / totFt)));
-        mH = h / nm;
+        // FIX 2026-04-07: +aisleFt so last rack sits flush to edge
+        nm = Math.max(2, Math.min(18, Math.floor((h + aisleFt) / totFt)));
+        mH = (h + aisleFt) / nm;
       }
       var rkH = mH * rackRatio;
       for (var i = 0; i < nm; i++) {
@@ -366,13 +368,12 @@ function renderLayout(p) {
     }
 
     if (p.storeType === 'single') {
-      var sp = sharedPitch(8.5, p.aisleW);
-      drawRacks(raX, raY, rNarrowW, uH, 8.5, p.aisleW, sp);
-      drawRacks(raX, lY, rFullW, lH, 8.5, p.aisleW, sp);
+      // FIX 2026-04-07: don't share pitch — lower region packs more efficiently on its own
+      drawRacks(raX, raY, rNarrowW, uH, 8.5, p.aisleW);
+      drawRacks(raX, lY, rFullW, lH, 8.5, p.aisleW);
     } else if (p.storeType === 'double') {
-      var sp = sharedPitch(16.5, p.aisleW);
-      drawRacks(raX, raY, rNarrowW, uH, 16.5, p.aisleW, sp);
-      drawRacks(raX, lY, rFullW, lH, 16.5, p.aisleW, sp);
+      drawRacks(raX, raY, rNarrowW, uH, 16.5, p.aisleW);
+      drawRacks(raX, lY, rFullW, lH, 16.5, p.aisleW);
     } else if (p.storeType === 'bulk') {
       drawBulk(raX, raY, rNarrowW, uH);
       drawBulk(raX, lY, rFullW, lH);
