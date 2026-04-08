@@ -305,7 +305,7 @@ async function loadAllData() {
     loadVerticalMeta(),
     loadDieselChart(),
     loadLaborChart(),
-    loadFreightChart(),
+    loadSteelChart(),
     loadKPIStrip(),
     loadAlerts(),
     loadSignalFeed(),
@@ -384,38 +384,46 @@ async function loadPipelineChart() {
   });
 }
 
-// ── Freight Rate Chart (live from freight_rates) ──
-async function loadFreightChart() {
-  const { data: spotData } = await sb.from('freight_rates')
-    .select('report_date, rate')
-    .eq('index_name', 'DAT Spot Van')
+// ── Steel Price Chart (live from steel_prices) ──
+var steelChartInstance;
+async function loadSteelChart() {
+  const { data } = await sb.from('steel_prices')
+    .select('report_date, price, wow_change')
+    .eq('index_name', 'CRU HRC')
     .order('report_date', { ascending: true });
 
-  const { data: contractData } = await sb.from('freight_rates')
-    .select('report_date, rate')
-    .eq('index_name', 'DAT Contract Van')
-    .order('report_date', { ascending: true });
+  if (!data?.length) return;
 
-  if (!spotData?.length) return;
-
-  const labels = spotData.map(r => {
+  const labels = data.map(r => {
     const d = new Date(r.report_date + 'T00:00:00');
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   });
 
-  const ctx = document.getElementById('freightChart');
-  if (freightChartInstance) freightChartInstance.destroy();
-  freightChartInstance = new Chart(ctx, {
+  const ctx = document.getElementById('steelChart');
+  if (steelChartInstance) steelChartInstance.destroy();
+  steelChartInstance = new Chart(ctx, {
     type: 'line',
     data: {
       labels,
       datasets: [
-        { label: 'DAT Spot Van', data: spotData.map(r => parseFloat(r.rate)), borderColor: '#00b4d8', tension: 0.3, pointRadius: 3, borderWidth: 2 },
-        { label: 'Contract Van', data: (contractData || []).map(r => parseFloat(r.rate)), borderColor: '#6b7a90', tension: 0.3, pointRadius: 3, borderWidth: 2, borderDash: [5,5] }
+        { label: 'CRU HRC ($/ton)', data: data.map(r => parseFloat(r.price)), borderColor: '#ef6c00', backgroundColor: 'rgba(239,108,0,0.08)', tension: 0.3, pointRadius: 3, borderWidth: 2, fill: true }
       ]
     },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } }, scales: { y: { beginAtZero: false, ticks: { callback: v => '$' + v.toFixed(2) } } } }
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } }, scales: { y: { beginAtZero: false, ticks: { callback: v => '$' + v } } } }
   });
+
+  // Update KPI tile with latest
+  const latest = data[data.length - 1];
+  const tile = document.getElementById('ccKpiSteel');
+  if (tile && latest) {
+    tile.textContent = '$' + Math.round(parseFloat(latest.price));
+    const sub = tile.parentElement.querySelector('.kpi-sub');
+    if (sub) {
+      const wow = parseFloat(latest.wow_change || 0);
+      sub.textContent = (wow >= 0 ? '\u25B2 +' : '\u25BC ') + Math.abs(wow).toFixed(1) + '% WoW';
+      sub.className = 'kpi-sub ' + (wow >= 0 ? 'change-up' : 'change-down');
+    }
+  }
 }
 
 // ── KPI Strip (live from multiple tables) ──
