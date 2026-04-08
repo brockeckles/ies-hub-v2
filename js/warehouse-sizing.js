@@ -367,13 +367,22 @@ function renderLayout(p) {
       }
     }
 
+    // FIX 2026-04-08: share pitch derived from the LARGER (lower) region so aisles visually align
+    // across upper and lower rack sections. Lower region dominates, upper matches its cadence.
+    function pitchFrom(regionSize, modFt, aisleFt) {
+      var totFt = modFt + aisleFt;
+      var nm = Math.max(2, Math.min(18, Math.floor((regionSize + aisleFt) / totFt)));
+      return (regionSize + aisleFt) / nm;
+    }
+    var lowerSize = isVert ? rFullW : lH;
     if (p.storeType === 'single') {
-      // FIX 2026-04-07: don't share pitch — lower region packs more efficiently on its own
-      drawRacks(raX, raY, rNarrowW, uH, 8.5, p.aisleW);
-      drawRacks(raX, lY, rFullW, lH, 8.5, p.aisleW);
+      var sp1 = pitchFrom(lowerSize, 8.5, p.aisleW);
+      drawRacks(raX, raY, rNarrowW, uH, 8.5, p.aisleW, sp1);
+      drawRacks(raX, lY, rFullW, lH, 8.5, p.aisleW, sp1);
     } else if (p.storeType === 'double') {
-      drawRacks(raX, raY, rNarrowW, uH, 16.5, p.aisleW);
-      drawRacks(raX, lY, rFullW, lH, 16.5, p.aisleW);
+      var sp2 = pitchFrom(lowerSize, 16.5, p.aisleW);
+      drawRacks(raX, raY, rNarrowW, uH, 16.5, p.aisleW, sp2);
+      drawRacks(raX, lY, rFullW, lH, 16.5, p.aisleW, sp2);
     } else if (p.storeType === 'bulk') {
       drawBulk(raX, raY, rNarrowW, uH);
       drawBulk(raX, lY, rFullW, lH);
