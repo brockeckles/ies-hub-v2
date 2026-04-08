@@ -367,23 +367,81 @@ function renderLayout(p) {
       }
     }
 
-    // FIX 2026-04-08: share pitch derived from the LARGER (lower) region so aisles visually align
-    // across upper and lower rack sections. Lower region dominates, upper matches its cadence.
-    function pitchFrom(regionSize, modFt, aisleFt) {
+    // FIX 2026-04-08: draw racks as a SINGLE continuous grid across the full storage height.
+    // Rows that pass through the upper zone (beside office/VAS) are truncated to the narrow width;
+    // rows in the lower zone span the full width. Guarantees one global pitch = perfect alignment.
+    function drawRacksUnified(modFt, aisleFt) {
       var totFt = modFt + aisleFt;
-      var nm = Math.max(2, Math.min(18, Math.floor((regionSize + aisleFt) / totFt)));
-      return (regionSize + aisleFt) / nm;
+      var isDouble = modFt > 10;
+      var ddFront = 'rgba(245,158,11,0.55)';
+      var ddBack  = 'rgba(217,119,6,0.5)';
+      var ddFlue  = 'rgba(255,60,60,0.6)';
+      if (isVert) {
+        // Vertical (narrow/tall building): columns of racks repeat left-to-right.
+        // Upper rows (y < raY+uH) must stay inside rNarrowW; lower rows use rFullW.
+        // For vert orientation the upper/lower split is by X not Y — fall back to simple full-width in vert case.
+        var nm = Math.max(2, Math.min(18, Math.floor((rFullW + aisleFt) / totFt)));
+        var mW = (rFullW + aisleFt) / nm;
+        var rackRatio = modFt / totFt;
+        var rkW = mW * rackRatio;
+        for (var i = 0; i < nm; i++) {
+          var mx = raX + i * mW;
+          if (mx + rkW > raX + rFullW + 1) break;
+          var colY = raY, colH = raH;
+          // If this column falls within the narrow upper zone (i.e. extends past rNarrowW), clip to upper region only
+          if (mx + rkW > raX + rNarrowW + 1) { colY = raY + uH + 4; colH = raH - uH - 4; }
+          if (isDouble) {
+            var gap = 1.5, halfRk = (rkW - gap)/2, frontW = halfRk*0.5, backW = halfRk*0.5;
+            s += '<rect x="'+mx+'" y="'+colY+'" width="'+frontW+'" height="'+colH+'" fill="'+ddFront+'" rx="0.3" data-rack="1"/>';
+            s += '<rect x="'+(mx+frontW)+'" y="'+colY+'" width="'+backW+'" height="'+colH+'" fill="'+ddBack+'" rx="0.3" data-rack="1"/>';
+            var flueX = mx + halfRk;
+            s += '<rect x="'+flueX+'" y="'+colY+'" width="'+gap+'" height="'+colH+'" fill="'+ddFlue+'" data-rack="1"/>';
+            s += '<rect x="'+(flueX+gap)+'" y="'+colY+'" width="'+backW+'" height="'+colH+'" fill="'+ddBack+'" rx="0.3" data-rack="1"/>';
+            s += '<rect x="'+(flueX+gap+backW)+'" y="'+colY+'" width="'+frontW+'" height="'+colH+'" fill="'+ddFront+'" rx="0.3" data-rack="1"/>';
+          } else {
+            var hr = (rkW - 1)/2;
+            s += '<rect x="'+mx+'" y="'+colY+'" width="'+hr+'" height="'+colH+'" fill="'+C.storage.rack+'" rx="0.5" data-rack="1"/>';
+            s += '<rect x="'+(mx+hr+1)+'" y="'+colY+'" width="'+hr+'" height="'+colH+'" fill="'+C.storage.rack+'" rx="0.5" data-rack="1"/>';
+          }
+        }
+      } else {
+        // Horizontal (wide building): rack rows stack top-to-bottom across raH.
+        // ONE global pitch derived from total raH — then each row's width depends on y-position.
+        var nm = Math.max(2, Math.min(22, Math.floor((raH + aisleFt) / totFt)));
+        var mH = (raH + aisleFt) / nm;
+        var rackRatio = modFt / totFt;
+        var rkH = mH * rackRatio;
+        var upperBottomY = raY + uH;
+        for (var i = 0; i < nm; i++) {
+          var my = raY + i * mH;
+          if (my + rkH > raY + raH + 1) break;
+          // Row width: if the entire row (rack bar) fits within upper zone height, use narrow; else full
+          var rowX = raX;
+          var rowW = (my + rkH <= upperBottomY) ? rNarrowW : rFullW;
+          if (isDouble) {
+            var gap = 1.5, halfRk = (rkH - gap)/2, frontH = halfRk*0.5, backH = halfRk*0.5;
+            s += '<rect x="'+rowX+'" y="'+my+'" width="'+rowW+'" height="'+frontH+'" fill="'+ddFront+'" rx="0.3" data-rack="1"/>';
+            s += '<rect x="'+rowX+'" y="'+(my+frontH)+'" width="'+rowW+'" height="'+backH+'" fill="'+ddBack+'" rx="0.3" data-rack="1"/>';
+            var flueY = my + halfRk;
+            s += '<rect x="'+rowX+'" y="'+flueY+'" width="'+rowW+'" height="'+gap+'" fill="'+ddFlue+'" data-rack="1"/>';
+            s += '<rect x="'+rowX+'" y="'+(flueY+gap)+'" width="'+rowW+'" height="'+backH+'" fill="'+ddBack+'" rx="0.3" data-rack="1"/>';
+            s += '<rect x="'+rowX+'" y="'+(flueY+gap+backH)+'" width="'+rowW+'" height="'+frontH+'" fill="'+ddFront+'" rx="0.3" data-rack="1"/>';
+          } else {
+            var hr = (rkH - 1)/2;
+            s += '<rect x="'+rowX+'" y="'+my+'" width="'+rowW+'" height="'+hr+'" fill="'+C.storage.rack+'" rx="0.5" data-rack="1"/>';
+            s += '<rect x="'+rowX+'" y="'+(my+hr+1)+'" width="'+rowW+'" height="'+hr+'" fill="'+C.storage.rack+'" rx="0.5" data-rack="1"/>';
+          }
+          if (mH - rkH > 4 && i < nm-1) {
+            s += '<text x="'+(rowX+rowW/2)+'" y="'+(my+rkH+(mH-rkH)/2+2)+'" text-anchor="middle" fill="'+C.aisle+'" font-size="'+F.aisle+'" font-family="Montserrat,sans-serif" data-rack="1">'+aisleFt+'\' aisle</text>';
+          }
+        }
+      }
     }
-    // Derive pitch from the SMALLER (upper) region so it fits cleanly; lower inherits same pitch.
-    var upperSize = isVert ? rNarrowW : uH;
+
     if (p.storeType === 'single') {
-      var sp1 = pitchFrom(upperSize, 8.5, p.aisleW);
-      drawRacks(raX, raY, rNarrowW, uH, 8.5, p.aisleW, sp1);
-      drawRacks(raX, lY, rFullW, lH, 8.5, p.aisleW, sp1);
+      drawRacksUnified(8.5, p.aisleW);
     } else if (p.storeType === 'double') {
-      var sp2 = pitchFrom(upperSize, 16.5, p.aisleW);
-      drawRacks(raX, raY, rNarrowW, uH, 16.5, p.aisleW, sp2);
-      drawRacks(raX, lY, rFullW, lH, 16.5, p.aisleW, sp2);
+      drawRacksUnified(16.5, p.aisleW);
     } else if (p.storeType === 'bulk') {
       drawBulk(raX, raY, rNarrowW, uH);
       drawBulk(raX, lY, rFullW, lH);
