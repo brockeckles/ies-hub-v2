@@ -5637,7 +5637,8 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
           <div class="sector-pulse-card-title">Labor Watch</div>
           <span class="sector-pulse-card-tag" style="background:rgba(255,193,7,.12);color:#b58a00;">LIVE</span>
         </div>
-        <div style="max-height:340px;overflow-y:auto;">
+        <input type="search" id="spLaborSearch" placeholder="Search by company, event, or location…" style="width:100%;box-sizing:border-box;padding:6px 10px;margin:4px 0 8px;border:1px solid var(--ies-gray-200,#e1e5ec);border-radius:6px;font-size:12px;font-family:inherit;background:var(--ies-white,#fff);color:var(--ies-gray-700,#2d3748);">
+        <div style="max-height:320px;overflow-y:auto;">
         <table class="sp-mini-table" id="spLabor">
           <thead style="position:sticky;top:0;background:var(--ies-white,#fff);z-index:1;"><tr><th>Event</th><th>Company</th><th>Location</th><th>Impact</th><th>Status</th></tr></thead>
           <tbody><tr><td colspan="5" style="color:var(--ies-gray-400);">Loading…</td></tr></tbody>
@@ -10879,7 +10880,7 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
 <!-- Wiki & security page content -->
 <script src="js/wiki-content.js?v=20260406-s9"></script>
 <!-- Command Center: charts, signal feed, sector pulse -->
-<script src="js/command-center.js?v=20260408-s2"></script>
+<script src="js/command-center.js?v=20260408-s3"></script>
 <!-- Market Explorer: Leaflet map, market detail panels -->
 <script src="js/market-explorer.js"></script>
 <!-- Deal Management: pipeline, opportunities, hours, tasks, artifacts -->
