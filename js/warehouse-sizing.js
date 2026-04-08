@@ -374,13 +374,14 @@ function renderLayout(p) {
       var nm = Math.max(2, Math.min(18, Math.floor((regionSize + aisleFt) / totFt)));
       return (regionSize + aisleFt) / nm;
     }
-    var lowerSize = isVert ? rFullW : lH;
+    // Derive pitch from the SMALLER (upper) region so it fits cleanly; lower inherits same pitch.
+    var upperSize = isVert ? rNarrowW : uH;
     if (p.storeType === 'single') {
-      var sp1 = pitchFrom(lowerSize, 8.5, p.aisleW);
+      var sp1 = pitchFrom(upperSize, 8.5, p.aisleW);
       drawRacks(raX, raY, rNarrowW, uH, 8.5, p.aisleW, sp1);
       drawRacks(raX, lY, rFullW, lH, 8.5, p.aisleW, sp1);
     } else if (p.storeType === 'double') {
-      var sp2 = pitchFrom(lowerSize, 16.5, p.aisleW);
+      var sp2 = pitchFrom(upperSize, 16.5, p.aisleW);
       drawRacks(raX, raY, rNarrowW, uH, 16.5, p.aisleW, sp2);
       drawRacks(raX, lY, rFullW, lH, 16.5, p.aisleW, sp2);
     } else if (p.storeType === 'bulk') {
