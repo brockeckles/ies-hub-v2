@@ -161,35 +161,14 @@ async function loadSPLabor() {
     var { data } = await sb.from('union_activity').select('*').gte('event_date', cutoffStr).order('event_date', { ascending: false }).limit(500);
     var tb = document.querySelector('#spLabor tbody');
     if (!tb || !data || !data.length) return;
-    window.__laborWatchRows = data; // cache for search
-    function renderLaborRows(rows) {
-      if (!rows.length) { tb.innerHTML = '<tr><td colspan="5" style="color:var(--ies-gray-400);padding:14px;text-align:center;">No matches</td></tr>'; return; }
-      tb.innerHTML = rows.map(function(u) {
-        var impactClass = 'sp-status-' + (u.impact || 'low').toLowerCase();
-        var statusMap = { 'Strike vote': 'sp-status-elevated', 'Negotiating': 'sp-status-moderate', 'Filed': 'sp-status-moderate', 'Organizing': 'sp-status-moderate', 'Ratified': 'sp-status-normal' };
-        var statusClass = statusMap[u.status] || 'sp-status-normal';
-        var evtText = esc(u.event_description);
-        var evtHtml = u.source_url ? '<a href="' + esc(u.source_url) + '" target="_blank" rel="noopener" style="color:inherit;text-decoration:none;">' + evtText + ' ' + LINK_SVG + '</a>' : evtText;
-        return '<tr><td style="font-weight:600;max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="' + esc(u.event_description) + '">' + evtHtml + '</td><td>' + esc(u.company || '') + '</td><td>' + esc(u.location || '') + '</td><td><span class="sp-status ' + impactClass + '">' + esc(u.impact) + '</span></td><td><span class="sp-status ' + statusClass + '">' + esc(u.status) + '</span></td></tr>';
-      }).join('');
-    }
-    window.__renderLaborRows = renderLaborRows;
-    renderLaborRows(data);
-    // Wire up search input (filters by company, event, or location)
-    var searchEl = document.getElementById('spLaborSearch');
-    if (searchEl && !searchEl.__wired) {
-      searchEl.__wired = true;
-      searchEl.addEventListener('input', function() {
-        var q = (this.value || '').toLowerCase().trim();
-        if (!q) { renderLaborRows(window.__laborWatchRows); return; }
-        var filtered = window.__laborWatchRows.filter(function(r) {
-          return (r.company||'').toLowerCase().indexOf(q) !== -1
-              || (r.event_description||'').toLowerCase().indexOf(q) !== -1
-              || (r.location||'').toLowerCase().indexOf(q) !== -1;
-        });
-        renderLaborRows(filtered);
-      });
-    }
+    tb.innerHTML = data.map(function(u) {
+      var impactClass = 'sp-status-' + (u.impact || 'low').toLowerCase();
+      var statusMap = { 'Strike vote': 'sp-status-elevated', 'Negotiating': 'sp-status-moderate', 'Filed': 'sp-status-moderate', 'Organizing': 'sp-status-moderate', 'Ratified': 'sp-status-normal' };
+      var statusClass = statusMap[u.status] || 'sp-status-normal';
+      var evtText = esc(u.event_description);
+      var evtHtml = u.source_url ? '<a href="' + esc(u.source_url) + '" target="_blank" rel="noopener" style="color:inherit;text-decoration:none;">' + evtText + ' ' + LINK_SVG + '</a>' : evtText;
+      return '<tr><td style="font-weight:600;max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="' + esc(u.event_description) + '">' + evtHtml + '</td><td>' + esc(u.company || '') + '</td><td>' + esc(u.location || '') + '</td><td><span class="sp-status ' + impactClass + '">' + esc(u.impact) + '</span></td><td><span class="sp-status ' + statusClass + '">' + esc(u.status) + '</span></td></tr>';
+    }).join('');
   } catch(e) { console.warn('loadSPLabor error:', e); }
 }
 
