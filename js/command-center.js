@@ -156,14 +156,16 @@ async function loadSPSupplyChain() {
 
 async function loadSPLabor() {
   try {
-    var { data } = await sb.from('union_activity').select('*').order('event_date', { ascending: false }).limit(6);
+    var { data } = await sb.from('union_activity').select('*').order('event_date', { ascending: false }).limit(40);
     var tb = document.querySelector('#spLabor tbody');
     if (!tb || !data || !data.length) return;
     tb.innerHTML = data.map(function(u) {
       var impactClass = 'sp-status-' + (u.impact || 'low').toLowerCase();
       var statusMap = { 'Strike vote': 'sp-status-elevated', 'Negotiating': 'sp-status-moderate', 'Filed': 'sp-status-moderate', 'Organizing': 'sp-status-moderate', 'Ratified': 'sp-status-normal' };
       var statusClass = statusMap[u.status] || 'sp-status-normal';
-      return '<tr><td style="font-weight:600;max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="' + esc(u.event_description) + '">' + esc(u.event_description) + '</td><td>' + esc(u.company || '') + '</td><td>' + esc(u.location || '') + '</td><td><span class="sp-status ' + impactClass + '">' + esc(u.impact) + '</span></td><td><span class="sp-status ' + statusClass + '">' + esc(u.status) + '</span></td></tr>';
+      var evtText = esc(u.event_description);
+      var evtHtml = u.source_url ? '<a href="' + esc(u.source_url) + '" target="_blank" rel="noopener" style="color:inherit;text-decoration:none;">' + evtText + ' ' + LINK_SVG + '</a>' : evtText;
+      return '<tr><td style="font-weight:600;max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="' + esc(u.event_description) + '">' + evtHtml + '</td><td>' + esc(u.company || '') + '</td><td>' + esc(u.location || '') + '</td><td><span class="sp-status ' + impactClass + '">' + esc(u.impact) + '</span></td><td><span class="sp-status ' + statusClass + '">' + esc(u.status) + '</span></td></tr>';
     }).join('');
   } catch(e) { console.warn('loadSPLabor error:', e); }
 }
