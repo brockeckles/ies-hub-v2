@@ -1084,6 +1084,15 @@ const cmApp = {
 
             this.projectData.laborLines = directLabor;
             this.projectData.indirectLaborLines = indirectLabor;
+            // Map DB column names → UI field names for equipment
+            equipment.forEach(function(line) {
+                if (line.name && !line.equipment_name) line.equipment_name = line.name;
+                // Ensure unit_cost is populated (migrate legacy data)
+                if (!line.unit_cost && line.acquisition_cost) {
+                    var q = line.quantity || 1;
+                    line.unit_cost = q > 1 ? line.acquisition_cost / q : line.acquisition_cost;
+                }
+            });
             this.projectData.equipmentLines = equipment;
             this.projectData.overheadLines = overhead;
             this.projectData.vasLines = vas;
@@ -1524,6 +1533,7 @@ const cmApp = {
 
         const addEquip = (name, category, qty, catalogItem, drivenBy) => {
             if (qty <= 0) return;
+            const unitCost = catalogItem ? parseFloat(catalogItem.purchase_cost || 0) : 0;
             newLines.push({
                 equipment_name: catalogItem ? catalogItem.name : name,
                 category: catalogItem ? catalogItem.category : category,
@@ -1531,7 +1541,8 @@ const cmApp = {
                 acquisition_type: 'lease',
                 monthly_cost: catalogItem ? parseFloat(catalogItem.monthly_lease_cost || 0) : 0,
                 monthly_maintenance: catalogItem ? parseFloat(catalogItem.monthly_maintenance || 0) : 0,
-                acquisition_cost: catalogItem ? parseFloat(catalogItem.purchase_cost || 0) * qty : 0,
+                unit_cost: unitCost,
+                acquisition_cost: unitCost * qty,
                 amort_years: 5,
                 driven_by: drivenBy,
                 source: 'auto',
@@ -2359,7 +2370,7 @@ const cmApp = {
     _calcFields: {
         laborLines: ['volume','base_uph','hourly_rate','burden_pct','mhe_equipment_id','it_equipment_id','most_template_id'],
         indirectLaborLines: ['headcount','hourly_rate','burden_pct'],
-        equipmentLines: ['quantity','monthly_cost','monthly_maintenance','acquisition_cost','amort_years','maintenance_pct','ownership_type'],
+        equipmentLines: ['quantity','monthly_cost','monthly_maintenance','unit_cost','amort_years','maintenance_pct','ownership_type'],
         overheadLines: ['monthly_cost','annual_cost'],
         vasLines: ['volume','rate','monthly_cost'],
         startupLines: ['one_time_cost'],
@@ -2421,23 +2432,8 @@ const cmApp = {
                 this.updateLaborTotals();
             }
             else if (arr === 'equipmentLines') {
-                // Inline update: recompute with lease/buy logic
-                var ownType = line.ownership_type || line.acquisition_type || 'lease';
-                var eqAnnualCost;
-                if (ownType === 'purchase') {
-                    var amYrs = line.amort_years || 5;
-                    var acq = line.acquisition_cost || 0;
-                    var mPct = line.maintenance_pct || 0.10;
-                    eqAnnualCost = ((acq / amYrs) + (acq * mPct)) * (line.quantity || 1);
-                } else {
-                    eqAnnualCost = ((line.monthly_cost || 0) + (line.monthly_maintenance || 0)) * (line.quantity || 1) * 12;
-                }
-                const costCell = document.getElementById('equip-cost-' + idx);
-                if (costCell) costCell.textContent = '$' + eqAnnualCost.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-                const eqTotal = this.calculateEquipmentCost();
-                const eqEl = document.getElementById('totalEquipmentCost');
-                if (eqEl) eqEl.textContent = '$' + eqTotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-                this.renderEquipmentSummaryCard();
+                // Full re-render needed: unit_cost/qty changes affect the computed Acq Cost cell
+                this.renderEquipmentTable();
             }
             else if (arr === 'overheadLines') {
                 // Inline update computed cell instead of full re-render
@@ -2881,16 +2877,26 @@ const cmApp = {
 
         this.projectData.equipmentLines.forEach((line, idx) => {
             var ownType = line.ownership_type || line.acquisition_type || 'lease';
+            // Migrate legacy: if acquisition_cost exists but no unit_cost, derive unit_cost
+            if (line.acquisition_cost && !line.unit_cost) {
+                var qty = line.quantity || 1;
+                line.unit_cost = qty > 1 ? line.acquisition_cost / qty : line.acquisition_cost;
+            }
+            var unitCost = line.unit_cost || 0;
+            var qty = line.quantity || 1;
+            var totalAcqCost = unitCost * qty;
             var annualCost;
             if (ownType === 'purchase') {
                 var amortYrs = line.amort_years || 5;
-                var acqCost = line.acquisition_cost || 0;
                 var maintPct = line.maintenance_pct || 0.10;
-                annualCost = ((acqCost / amortYrs) + (acqCost * maintPct)) * (line.quantity || 1);
+                annualCost = (totalAcqCost / amortYrs) + (totalAcqCost * maintPct);
             } else {
-                var monthlyTotal = ((line.monthly_cost || 0) + (line.monthly_maintenance || 0)) * (line.quantity || 1);
+                var monthlyTotal = ((line.monthly_cost || 0) + (line.monthly_maintenance || 0)) * qty;
                 annualCost = monthlyTotal * 12;
             }
+            // Keep acquisition_cost in sync for persistence
+            line.acquisition_cost = totalAcqCost;
+            const fmtAcq = '$' + totalAcqCost.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0});
             const row = document.createElement('tr');
             row.innerHTML =
                 '<td style="min-width:160px;">' + this._cmInp('text', line.equipment_name, idx, 'equipmentLines', 'equipment_name', {w:150, ph:'Equipment'}) + '</td>' +
@@ -2902,7 +2908,8 @@ const cmApp = {
                 '</select></td>' +
                 '<td>' + this._cmInp('number', line.monthly_cost, idx, 'equipmentLines', 'monthly_cost', {w:80, ph:'$/mo'}) + '</td>' +
                 '<td>' + this._cmInp('number', line.monthly_maintenance, idx, 'equipmentLines', 'monthly_maintenance', {w:80, ph:'Maint/mo'}) + '</td>' +
-                '<td>' + this._cmInp('number', line.acquisition_cost, idx, 'equipmentLines', 'acquisition_cost', {w:85, ph:'$0'}) + '</td>' +
+                '<td>' + this._cmInp('number', line.unit_cost, idx, 'equipmentLines', 'unit_cost', {w:80, ph:'Unit $'}) + '</td>' +
+                '<td class="cm-table-number" style="font-size:13px;color:var(--ies-navy);font-weight:600;white-space:nowrap;">' + fmtAcq + '</td>' +
                 '<td>' + this._cmInp('number', line.amort_years, idx, 'equipmentLines', 'amort_years', {w:50, step:'1', ph:'5'}) + '</td>' +
                 '<td class="cm-table-number" id="equip-cost-' + idx + '" style="font-weight:600;">$' + annualCost.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</td>' +
                 '<td>' + this._cmInp('text', line.driven_by, idx, 'equipmentLines', 'driven_by', {w:100, ph:'Driver'}) + '</td>' +
@@ -2930,12 +2937,12 @@ const cmApp = {
             var ownType = line.ownership_type || line.acquisition_type || 'lease';
             var qty = line.quantity || 1;
             if (ownType === 'purchase') {
-                var acq = (line.acquisition_cost || 0) * qty;
+                var totalAcq = (line.unit_cost || 0) * qty;
                 var amYrs = line.amort_years || 5;
                 var mPct = line.maintenance_pct || 0.10;
-                totalCapital += acq;
-                totalAmort += acq / amYrs;
-                totalMaint += acq * mPct;
+                totalCapital += totalAcq;
+                totalAmort += totalAcq / amYrs;
+                totalMaint += totalAcq * mPct;
             } else {
                 totalLease += (line.monthly_cost || 0) * qty;
                 totalMaint += (line.monthly_maintenance || 0) * qty * 12;
@@ -3124,8 +3131,8 @@ const cmApp = {
         // 1. Racking capital — from equipment lines with purchase_cost > 0
         this.projectData.equipmentLines.forEach(line => {
             if (line.category === 'Racking' || line.category === 'Conveyor') {
-                const unitCost = line.acquisition_cost ? line.acquisition_cost / Math.max(1, line.quantity) : 0;
-                const totalCost = unitCost > 0 ? line.acquisition_cost :
+                const unitCost = line.unit_cost || 0;
+                const totalCost = unitCost > 0 ? unitCost * (line.quantity || 1) :
                     (line.category === 'Racking' ? line.quantity * 85 : line.quantity * 200); // default per-unit install cost
                 if (totalCost > 0) {
                     lines.push({
@@ -4224,7 +4231,17 @@ const cmApp = {
 
         // Equipment
         this.projectData.equipmentLines.forEach(l => {
-            const annual = ((l.monthly_cost || 0) + (l.monthly_maintenance || 0)) * 12 + (l.acquisition_cost || 0);
+            var ownType = l.ownership_type || l.acquisition_type || 'lease';
+            var qty = l.quantity || 1;
+            var annual;
+            if (ownType === 'purchase') {
+                var totalAcq = (l.unit_cost || 0) * qty;
+                var amYrs = l.amort_years || 5;
+                var mPct = l.maintenance_pct || 0.10;
+                annual = (totalAcq / amYrs) + (totalAcq * mPct);
+            } else {
+                annual = ((l.monthly_cost || 0) + (l.monthly_maintenance || 0)) * qty * 12;
+            }
             addCost(l.pricing_bucket, annual);
         });
 
@@ -4500,42 +4517,44 @@ const cmApp = {
         let cost = 0;
         this.projectData.equipmentLines.forEach(line => {
             var ownType = line.ownership_type || line.acquisition_type || 'lease';
+            var qty = line.quantity || 1;
             if (ownType === 'purchase') {
                 var amortYrs = line.amort_years || 5;
-                var acqCost = line.acquisition_cost || 0;
+                var unitCost = line.unit_cost || 0;
+                var totalAcq = unitCost * qty;
                 var maintPct = line.maintenance_pct || 0.10;
-                cost += ((acqCost / amortYrs) + (acqCost * maintPct)) * (line.quantity || 1);
+                cost += (totalAcq / amortYrs) + (totalAcq * maintPct);
             } else {
-                var monthly = ((line.monthly_cost || 0) + (line.monthly_maintenance || 0)) * (line.quantity || 1);
+                var monthly = ((line.monthly_cost || 0) + (line.monthly_maintenance || 0)) * qty;
                 cost += monthly * 12;
             }
         });
         return cost;
     },
 
-    // Capital investment from PURCHASE equipment (acquisition cost × quantity)
+    // Capital investment from PURCHASE equipment (unit_cost × quantity)
     calculateEquipmentCapitalInvestment() {
         let capital = 0;
         this.projectData.equipmentLines.forEach(line => {
             var ownType = line.ownership_type || line.acquisition_type || 'lease';
             if (ownType === 'purchase') {
                 var qty = line.quantity || 1;
-                capital += (line.acquisition_cost || 0) * qty;
+                capital += (line.unit_cost || 0) * qty;
             }
         });
         return capital;
     },
 
-    // Annual amortization of PURCHASE equipment (acq / amort_years × quantity)
+    // Annual amortization of PURCHASE equipment (unit_cost × qty / amort_years)
     calculateEquipmentAnnualAmortization() {
         let amortization = 0;
         this.projectData.equipmentLines.forEach(line => {
             var ownType = line.ownership_type || line.acquisition_type || 'lease';
             if (ownType === 'purchase') {
                 var qty = line.quantity || 1;
-                var acqCost = (line.acquisition_cost || 0) * qty;
+                var totalAcq = (line.unit_cost || 0) * qty;
                 var years = Math.max(1, line.amort_years || 5);
-                amortization += acqCost / years;
+                amortization += totalAcq / years;
             }
         });
         return amortization;
@@ -4791,8 +4810,12 @@ const cmApp = {
             );
             if (!match) return;
             const ownType = line.ownership_type || line.acquisition_type || 'lease';
+            if (match.purchase_cost) {
+                line.unit_cost = parseFloat(match.purchase_cost);
+                line.acquisition_cost = line.unit_cost * (line.quantity || 1);
+            }
             if (ownType === 'purchase') {
-                if (match.purchase_cost) { line.acquisition_cost = parseFloat(match.purchase_cost); updated++; }
+                if (match.purchase_cost) updated++;
             } else {
                 if (match.monthly_lease_cost) line.monthly_cost = parseFloat(match.monthly_lease_cost);
                 updated++;
@@ -4882,6 +4905,7 @@ const cmApp = {
             equipment_name: '',
             category: '',
             quantity: 1,
+            unit_cost: 0,
             acquisition_cost: 0,
             monthly_cost: 0,
             monthly_maintenance: 0,
@@ -5385,7 +5409,7 @@ const cmApp = {
             // Known DB columns per child table (prevents PostgREST unknown-column rejection)
             var dbColumns = {
                 cost_model_labor: ['project_id','role_name','activity_name','role_category','headcount','hourly_rate','burden_pct','benefits_per_hour','annual_hours','total_annual_cost','source','most_template_id','most_template_name','annual_volume','calculated_uph','notes','uom','complexity_tier','mhe_equipment_id','it_equipment_id','pricing_bucket','volume_line_id','adjusted_uph','base_uph','volume','shift_num'],
-                cost_model_equipment: ['project_id','name','category','quantity','lease_monthly','maintenance_annual','acquisition_cost','lease_rate','maintenance_cost','amortization_years','notes','pricing_bucket'],
+                cost_model_equipment: ['project_id','name','category','quantity','monthly_cost','monthly_maintenance','acquisition_cost','unit_cost','ownership_type','maintenance_pct','acquisition_type','pricing_bucket','notes'],
                 cost_model_overhead: ['project_id','category','description','monthly_cost','cost_type','scaling_factor','total_annual_cost','notes','annual_cost','scaling_driver','rate','quantity','source','pricing_bucket'],
                 cost_model_vas: ['project_id','service_name','volume','rate','uom','annual_cost','notes','pricing_bucket'],
                 cost_model_volumes: ['project_id','volume_name','name','annual_volume','daily_volume','uom','source','notes','process_area','is_outbound']
@@ -5417,6 +5441,10 @@ const cmApp = {
                             if (src.activity_name) clean.role_name = src.activity_name;
                             if (src.volume != null) clean.annual_volume = src.volume;
                             if (src.base_uph != null) clean.calculated_uph = src.base_uph;
+                        }
+                        // Map CM UI field names → DB column names for equipment
+                        if (tableName === 'cost_model_equipment') {
+                            if (src.equipment_name) clean.name = src.equipment_name;
                         }
                         // Coerce empty-string ID fields to null (PostgREST integer cast hardening)
                         Object.keys(clean).forEach(function(k) {
