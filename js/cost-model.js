@@ -2332,7 +2332,7 @@ const cmApp = {
     _calcFields: {
         laborLines: ['volume','base_uph','hourly_rate','burden_pct','mhe_equipment_id','it_equipment_id','most_template_id'],
         indirectLaborLines: ['headcount','hourly_rate','burden_pct'],
-        equipmentLines: ['quantity','monthly_cost','monthly_maintenance','amort_years'],
+        equipmentLines: ['quantity','monthly_cost','monthly_maintenance','acquisition_cost','amort_years','maintenance_pct','ownership_type'],
         overheadLines: ['monthly_cost','annual_cost'],
         vasLines: ['volume','rate','monthly_cost'],
         startupLines: ['one_time_cost'],
@@ -2869,7 +2869,7 @@ const cmApp = {
                 '<td style="min-width:160px;">' + this._cmInp('text', line.equipment_name, idx, 'equipmentLines', 'equipment_name', {w:150, ph:'Equipment'}) + '</td>' +
                 '<td style="min-width:120px;">' + this._cmInp('text', line.category, idx, 'equipmentLines', 'category', {w:110, ph:'Category'}) + '</td>' +
                 '<td>' + this._cmInp('number', line.quantity, idx, 'equipmentLines', 'quantity', {w:50, step:'1', ph:'Qty'}) + '</td>' +
-                '<td><select class="cm-input" style="width:90px;font-size:13px;padding:5px 4px;" onchange="cmApp._updateField(\'equipmentLines\',' + idx + ',\'ownership_type\',this.value);cmApp.renderEquipmentTable();">' +
+                '<td><select class="cm-input" style="width:90px;font-size:13px;padding:5px 4px;" onchange="cmApp._updateLine(\'equipmentLines\',' + idx + ',\'ownership_type\',this.value,\'text\');cmApp.renderEquipmentTable();">' +
                     '<option value="lease"' + (ownType === 'lease' ? ' selected' : '') + '>Lease</option>' +
                     '<option value="purchase"' + (ownType === 'purchase' ? ' selected' : '') + '>Purchase</option>' +
                 '</select></td>' +
@@ -3016,7 +3016,7 @@ const cmApp = {
                     card.innerHTML +=
                         '<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--ies-gray-100);display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;font-size:12px;">' +
                             '<div class="cm-field-group"><label class="cm-field-label">Service Name</label>' + self._cmInp('text', line.service_name, idx, 'vasLines', 'service_name', {w:'100%', ph:'Service Name'}) + '</div>' +
-                            '<div class="cm-field-group"><label class="cm-field-label">Service Type</label><select class="cm-input" style="width:100%;font-size:12px;" onchange="cmApp._updateField(\'vasLines\',' + idx + ',\'service_type\',this.value)">' +
+                            '<div class="cm-field-group"><label class="cm-field-label">Service Type</label><select class="cm-input" style="width:100%;font-size:12px;" onchange="cmApp._updateLine(\'vasLines\',' + idx + ',\'service_type\',this.value,\'text\')">' +
                                 '<option value="custom"' + (line.service_type === 'custom' ? ' selected' : '') + '>Custom</option>' +
                                 '<option value="copacking"' + (line.service_type === 'copacking' ? ' selected' : '') + '>Co-packing / Kitting</option>' +
                                 '<option value="labeling"' + (line.service_type === 'labeling' ? ' selected' : '') + '>Labeling / Ticketing</option>' +
