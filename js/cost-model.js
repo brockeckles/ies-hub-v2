@@ -3369,6 +3369,13 @@ const cmApp = {
         const vasCost = this.calculateVasCost();
         const startupAmort = this.calculateStartupAmortization();
 
+        // Capital visibility (does not affect totalCost — purchase amortization stays in equipmentCost)
+        const equipmentCapital = this.calculateEquipmentCapitalInvestment();
+        const equipmentAmort = this.calculateEquipmentAnnualAmortization();
+        const startupCapital = this.projectData.startupLines.reduce((s, l) => s + (l.one_time_cost || 0), 0);
+        const totalCapitalAll = equipmentCapital + startupCapital;
+        const totalCapitalAmortAll = equipmentAmort + startupAmort;
+
         const totalCost = laborCost + facilityCost + equipmentCost + overheadCost + vasCost + startupAmort;
         const margin = parseFloat(document.getElementById('targetMargin').value) || 0;
         const totalRevenue = totalCost * (1 + margin / 100);
@@ -3377,6 +3384,16 @@ const cmApp = {
         document.getElementById('summaryTotalCost').textContent = '$' + totalCost.toLocaleString('en-US', {maximumFractionDigits: 0});
         document.getElementById('summaryTotalRevenue').textContent = '$' + totalRevenue.toLocaleString('en-US', {maximumFractionDigits: 0});
         document.getElementById('summaryTotalFtes').textContent = fmtNum(this.getTotalFtes(), 0);
+
+        // Capital metric tiles (present-if-mounted)
+        var elCapPurch = document.getElementById('summaryCapitalPurchases');
+        if (elCapPurch) elCapPurch.textContent = '$' + equipmentCapital.toLocaleString('en-US', {maximumFractionDigits: 0});
+        var elEqAmort = document.getElementById('summaryEquipmentAmortization');
+        if (elEqAmort) elEqAmort.textContent = '$' + equipmentAmort.toLocaleString('en-US', {maximumFractionDigits: 0});
+        var elTotCap = document.getElementById('summaryTotalCapital');
+        if (elTotCap) elTotCap.textContent = '$' + totalCapitalAll.toLocaleString('en-US', {maximumFractionDigits: 0});
+        var elTotAmort = document.getElementById('summaryTotalAmortization');
+        if (elTotAmort) elTotAmort.textContent = '$' + totalCapitalAmortAll.toLocaleString('en-US', {maximumFractionDigits: 0});
 
         const ordersPerYear = parseFloat(document.getElementById('ordersPacked').value) || 1;
         const outboundInfo = this.getOutboundUom();
@@ -4463,6 +4480,34 @@ const cmApp = {
             }
         });
         return cost;
+    },
+
+    // Capital investment from PURCHASE equipment (acquisition cost × quantity)
+    calculateEquipmentCapitalInvestment() {
+        let capital = 0;
+        this.projectData.equipmentLines.forEach(line => {
+            var ownType = line.ownership_type || line.acquisition_type || 'lease';
+            if (ownType === 'purchase') {
+                var qty = line.quantity || 1;
+                capital += (line.acquisition_cost || 0) * qty;
+            }
+        });
+        return capital;
+    },
+
+    // Annual amortization of PURCHASE equipment (acq / amort_years × quantity)
+    calculateEquipmentAnnualAmortization() {
+        let amortization = 0;
+        this.projectData.equipmentLines.forEach(line => {
+            var ownType = line.ownership_type || line.acquisition_type || 'lease';
+            if (ownType === 'purchase') {
+                var qty = line.quantity || 1;
+                var acqCost = (line.acquisition_cost || 0) * qty;
+                var years = Math.max(1, line.amort_years || 5);
+                amortization += acqCost / years;
+            }
+        });
+        return amortization;
     },
 
     calculateOverheadCost() {
