@@ -8682,8 +8682,9 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
                     </tbody>
                 </table>
                 </div>
-                <div class="cm-mt-16">
+                <div class="cm-mt-16" style="display:flex;gap:8px;align-items:center;">
                     <button class="cm-btn cm-btn-secondary" onclick="cmApp.addLaborRow()">+ Add Labor Row</button>
+                    <button class="cm-btn" style="padding:6px 14px;font-size:12px;background:var(--ies-gray-50);border:1px solid var(--ies-gray-200);color:var(--ies-gray-600);cursor:pointer;border-radius:6px;" onclick="cmApp.refreshLaborFromCatalog()" title="Update all labor lines to latest market rates">↻ Refresh from Catalog</button>
                 </div>
             </div>
 
@@ -8767,8 +8768,9 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
                     </tbody>
                 </table>
                 </div>
-                <div class="cm-mt-16">
+                <div class="cm-mt-16" style="display:flex;gap:8px;align-items:center;">
                     <button class="cm-btn cm-btn-secondary" onclick="cmApp.showEquipmentCatalog()">+ Add Equipment</button>
+                    <button class="cm-btn" style="padding:6px 14px;font-size:12px;background:var(--ies-gray-50);border:1px solid var(--ies-gray-200);color:var(--ies-gray-600);cursor:pointer;border-radius:6px;" onclick="cmApp.refreshEquipmentFromCatalog()" title="Update all equipment lines to latest catalog pricing">↻ Refresh from Catalog</button>
                 </div>
             </div>
 
@@ -10918,7 +10920,7 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
 <!-- Feedback: idea submission, voting -->
 <script src="js/feedback.js"></script>
 <!-- Cost Model Builder: cmApp, dealApp, financial modeling -->
-<script src="js/cost-model.js?v=20260416-s2"></script>
+<script src="js/cost-model.js?v=20260416-s3"></script>
 <!-- Cost Model Interaction Tests (gated behind __CM_TEST_MODE__) -->
 <script src="js/cost-model-tests.js?v=20260405-s31"></script>
 <!-- Fleet Modeler: fmApp, lane optimization -->
@@ -10928,7 +10930,7 @@ window.addEventListener('load', function(){ if(sessionStorage.getItem('ies-auth'
 <!-- Deck Generator: PptxGenJS presentation automation -->
 <script src="js/deck-generator.js"></script>
 <!-- Admin Panel: reference data CRUD -->
-<script src="js/admin-panel.js?v=20260405-s2"></script>
+<script src="js/admin-panel.js?v=20260416-s3"></script>
 <!-- Tour Engine: guided tour system + tour definitions for all sections -->
 <script src="js/tour-engine.js?v=20260405-s16"></script>
 

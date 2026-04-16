@@ -473,7 +473,8 @@ const cmApp = {
                 this.loadRefData('ref_facility_rates', 'facilityRates'),
                 this.loadRefData('ref_utility_rates', 'utilityRates'),
                 this.loadRefData('ref_equipment', 'equipmentCatalog'),
-                this.loadRefData('ref_overhead_rates', 'overheadRates')
+                this.loadRefData('ref_overhead_rates', 'overheadRates'),
+                this.loadRefData('pricing_assumptions', 'pricingAssumptions')
             ]);
 
             // Seed default reference data if tables are empty
@@ -2209,6 +2210,32 @@ const cmApp = {
         return (parseFloat(document.getElementById('laborEscalation').value) || 3) / 100;
     },
 
+    // ── Escalation Engine (pricing_assumptions) ──
+    // Returns decimal escalation rate for a given scope/metric/year.
+    // Lookup order: category-specific → global → fallback to flat input.
+    _getEscalationRate(scope, scopeKey, metric, yearNum) {
+        const pa = (this.refData || {}).pricingAssumptions || [];
+        // Try category-level first, then global
+        const row = pa.find(r => r.scope === scope && r.scope_key === scopeKey && r.metric === metric)
+                 || pa.find(r => r.scope === 'global' && r.metric === metric);
+        if (!row) return null; // caller falls back to flat input
+        const yr = Math.min(Math.max(yearNum, 1), 5);
+        const val = parseFloat(row['year_' + yr + '_pct']);
+        return isNaN(val) ? null : val / 100;
+    },
+
+    // Compound multiplier for a cost line over N years using per-year rates.
+    // If pricing_assumptions not available, returns null (caller uses flat).
+    _getEscalationMultiplier(scope, scopeKey, metric, yearNum) {
+        let mult = 1.0;
+        for (let y = 2; y <= yearNum; y++) {
+            const rate = this._getEscalationRate(scope, scopeKey, metric, y - 1);
+            if (rate === null) return null;
+            mult *= (1 + rate);
+        }
+        return mult;
+    },
+
     // Seasonality helpers
     getSeasonalityProfile() {
         var inputs = document.querySelectorAll('.cm-seasonality');
@@ -3691,17 +3718,21 @@ const cmApp = {
         }
 
         const projections = [];
+        const hasPa = ((this.refData || {}).pricingAssumptions || []).length > 0;
         for (let yr = 1; yr <= years; yr++) {
             const volMult = Math.pow(1 + volGrowth, yr - 1);
-            const laborMult = Math.pow(1 + laborEsc, yr - 1);
-            const costMult = Math.pow(1 + costEsc, yr - 1);
+            // Per-category escalation from pricing_assumptions (falls back to flat inputs)
+            const laborMult  = (hasPa ? this._getEscalationMultiplier('labor_category', 'hourly', 'wage', yr) : null) || Math.pow(1 + laborEsc, yr - 1);
+            const equipMult  = (hasPa ? this._getEscalationMultiplier('equipment_category', 'MHE', 'capex', yr) : null) || Math.pow(1 + costEsc, yr - 1);
+            const facilMult  = (hasPa ? this._getEscalationMultiplier('equipment_category', 'Facility', 'capex', yr) : null) || Math.pow(1 + costEsc, yr - 1);
+            const overMult   = Math.pow(1 + costEsc, yr - 1); // overhead stays flat-rate
 
             // Year 1 labor is higher due to learning curve (lower productivity = more hours)
             const learningMult = yr === 1 ? (1 / yr1LearningFactor) : 1.0;
             const labor = baseLaborCost * laborMult * volMult * learningMult;
-            const facility = baseFacilityCost * costMult;
-            const equipment = baseEquipmentCost * costMult;
-            const overhead = baseOverheadCost * costMult * Math.pow(1 + volGrowth * 0.3, yr - 1);
+            const facility = baseFacilityCost * facilMult;
+            const equipment = baseEquipmentCost * equipMult;
+            const overhead = baseOverheadCost * overMult * Math.pow(1 + volGrowth * 0.3, yr - 1);
             const vas = baseVasCost * volMult;
             const startup = startupAmort;
             const totalCost = labor + facility + equipment + overhead + vas + startup;
@@ -4742,6 +4773,94 @@ const cmApp = {
         this.projectData.equipmentLines.splice(idx, 1);
         this.renderEquipmentTable();
         this.markChanged();
+    },
+
+    // ── Refresh from Catalog ──
+    refreshEquipmentFromCatalog() {
+        const catalog = (this.refData || {}).equipmentCatalog || [];
+        if (!catalog.length) { alert('Equipment catalog not loaded.'); return; }
+        let updated = 0;
+        this.projectData.equipmentLines.forEach(line => {
+            // Match by name (case-insensitive substring)
+            const match = catalog.find(c =>
+                c.name && line.equipment_name &&
+                c.name.toLowerCase() === line.equipment_name.toLowerCase()
+            ) || catalog.find(c =>
+                c.name && line.equipment_name &&
+                c.name.toLowerCase().includes(line.equipment_name.toLowerCase())
+            );
+            if (!match) return;
+            const ownType = line.ownership_type || line.acquisition_type || 'lease';
+            if (ownType === 'purchase') {
+                if (match.purchase_cost) { line.acquisition_cost = parseFloat(match.purchase_cost); updated++; }
+            } else {
+                if (match.monthly_lease_cost) line.monthly_cost = parseFloat(match.monthly_lease_cost);
+                updated++;
+            }
+            if (match.monthly_maintenance) line.monthly_maintenance = parseFloat(match.monthly_maintenance);
+            if (match.useful_life_years) line.amort_years = match.useful_life_years;
+        });
+        this.renderEquipmentTable();
+        this.markChanged();
+        alert('Updated ' + updated + ' of ' + this.projectData.equipmentLines.length + ' equipment lines from catalog (Apr-26 pricing).');
+    },
+
+    refreshLaborFromCatalog() {
+        const rates = (this.refData || {}).laborRates || [];
+        if (!rates.length) { alert('Labor rates catalog not loaded.'); return; }
+        // Get current model's market_id
+        const marketId = document.getElementById('market') ? document.getElementById('market').value : null;
+        const marketRates = marketId ? rates.filter(r => r.market_id === marketId) : rates;
+        if (!marketRates.length) { alert('No labor rates found for selected market.'); return; }
+        let updated = 0;
+        this.projectData.laborLines.forEach(line => {
+            // Try exact role_name match first, then fuzzy via activity keywords
+            let match = marketRates.find(r => r.role_name && line.activity_name &&
+                r.role_name.toLowerCase() === line.activity_name.toLowerCase());
+            if (!match) {
+                // Map MOST activity names to ref categories
+                const name = (line.activity_name || '').toLowerCase();
+                let roleKey = null;
+                if (name.includes('fork') || name.includes('putaway') || name.includes('replen') || name.includes('pallet pick') || name.includes('load trailer')) roleKey = 'forklift operator';
+                else if (name.includes('pick') || name.includes('pack') || name.includes('warehouse') || name.includes('vas') || name.includes('returns') || name.includes('case check')) roleKey = 'warehouse associate';
+                else if (name.includes('ship') || name.includes('receiving') || name.includes('manifest') || name.includes('stage')) roleKey = 'shipping/receiving clerk';
+                else if (name.includes('inventory') || name.includes('cycle count') || name.includes('audit')) roleKey = 'inventory control';
+                else if (name.includes('lead') || name.includes('trainer')) roleKey = 'lead / trainer';
+                else if (name.includes('maintenance') || name.includes('maint')) roleKey = 'maintenance tech';
+                else if (name.includes('supervisor') || name.includes('super')) roleKey = 'supervisor';
+                else if (name.includes('ops manager') || name.includes('operations manager')) roleKey = 'operations manager';
+                else if (name.includes('customer service') || name.includes('csr')) roleKey = 'customer service rep';
+                else if (name.includes('account manager')) roleKey = 'account manager';
+                if (roleKey) match = marketRates.find(r => r.role_name && r.role_name.toLowerCase() === roleKey);
+            }
+            if (!match) return;
+            line.hourly_rate = parseFloat(match.hourly_rate);
+            if (match.burden_pct) line.burden_pct = parseFloat(match.burden_pct);
+            if (match.benefits_per_hour) line.benefits_per_hour = parseFloat(match.benefits_per_hour);
+            updated++;
+        });
+        // Also refresh indirect labor
+        (this.projectData.indirectLaborLines || []).forEach(line => {
+            let match = marketRates.find(r => r.role_name && line.role_name &&
+                r.role_name.toLowerCase() === line.role_name.toLowerCase());
+            if (!match) {
+                const name = (line.role_name || '').toLowerCase();
+                let roleKey = null;
+                if (name.includes('supervisor')) roleKey = 'supervisor';
+                else if (name.includes('ops manager') || name.includes('operations')) roleKey = 'operations manager';
+                else if (name.includes('account manager')) roleKey = 'account manager';
+                else if (name.includes('lead')) roleKey = 'lead / trainer';
+                if (roleKey) match = marketRates.find(r => r.role_name && r.role_name.toLowerCase() === roleKey);
+            }
+            if (!match) return;
+            line.hourly_rate = parseFloat(match.hourly_rate);
+            if (match.burden_pct) line.burden_pct = parseFloat(match.burden_pct);
+            updated++;
+        });
+        this.renderLaborTable();
+        this.renderIndirectLaborTable();
+        this.markChanged();
+        alert('Updated ' + updated + ' labor lines from catalog (Apr-26 market rates).');
     },
 
     deleteOverheadLine(idx) {
@@ -5877,15 +5996,18 @@ const dealApp = {
         // Determine max contract years across all sites
         var maxYears = Math.max.apply(null, sites.map(function(s){ return s.contractYears; }).concat([3]));
         var laborEsc = cmApp.getLaborEscalationPct(); // Read from input instead of hardcoded
+        var hasPa = ((cmApp.refData || {}).pricingAssumptions || []).length > 0;
 
         // Build multi-year projections for the deal
         var projections = [];
         for (var yr = 1; yr <= maxYears; yr++) {
             var p = { year: yr, totalCost: 0, revenue: 0, grossProfit: 0, ebitda: 0, ebit: 0, taxes: 0, netIncome: 0, startup: 0, orders: 0 };
+            // Use per-year escalation from pricing_assumptions when available
+            var dealCostMult = (hasPa ? cmApp._getEscalationMultiplier('labor_category', 'hourly', 'wage', yr) : null) || Math.pow(1 + laborEsc, yr - 1);
             sites.forEach(function(s) {
                 if (yr > s.contractYears) return; // site's contract ended
                 var volMult = Math.pow(1 + (s.volumeGrowth / 100), yr - 1);
-                var costMult = Math.pow(1 + laborEsc, yr - 1);
+                var costMult = dealCostMult;
                 var siteCost = s.cost * costMult * (yr === 1 ? 1 : (1 + (s.volumeGrowth / 100 * 0.3)));
                 var siteStartup = yr === 1 ? (s.startup / s.contractYears) : (s.startup / s.contractYears);
                 var siteMargin = s.margin / 100;

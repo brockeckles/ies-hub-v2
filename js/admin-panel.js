@@ -10,7 +10,7 @@ async function loadAdminPanel() {
 
   if (!tabsContainer || !tableContainer) return;
 
-  var tables = ['accounts', 'competitors', 'markets', 'verticals'];
+  var tables = ['accounts', 'competitors', 'markets', 'verticals', 'escalation'];
   var tabsHtml = '<div class="admin-table-header"><input type="text" class="admin-search" placeholder="Search..." oninput="filterAdminTable(this.value)"/><button class="hub-btn" style="padding:var(--sp-10) var(--sp-16);font-size:13px;" onclick="showAdminFormModal(curAdminTable, null)">+ Add ' + tables[0] + '</button></div><div class="admin-tabs">';
 
   tables.forEach(function(table) {
@@ -30,12 +30,21 @@ async function switchAdminTab(table) {
 
   window.curAdminTable = table;
   var addBtn = document.querySelector('.admin-search').parentElement.querySelector('.hub-btn');
-  addBtn.textContent = '+ Add ' + table.slice(0, -1);
+  if (table === 'escalation') {
+    addBtn.textContent = '+ Add Assumption';
+    addBtn.onclick = function() { showEscalationForm(null); };
+  } else {
+    addBtn.textContent = '+ Add ' + table.slice(0, -1);
+    addBtn.onclick = function() { showAdminFormModal(curAdminTable, null); };
+  }
 
   await loadAdminTable(table);
 }
 
 async function loadAdminTable(table) {
+  // Escalation tab queries pricing_assumptions, not master_*
+  if (table === 'escalation') { return loadEscalationTable(); }
+
   var res;
   try {
     res = await sb.from('master_' + table).select('*').order('id', { ascending: true });
@@ -587,5 +596,97 @@ function filterAdminTable(query) {
     var text = row.textContent.toLowerCase();
     row.style.display = text.includes(query.toLowerCase()) ? '' : 'none';
   });
+}
+
+// ── Escalation / Pricing Assumptions CRUD ──
+async function loadEscalationTable() {
+  var res;
+  try {
+    res = await sb.from('pricing_assumptions').select('*').order('scope', { ascending: true });
+  } catch(e) {
+    showSectionError('sec-admin', 'Failed to load escalation data.');
+    return;
+  }
+  if (res.error) {
+    showSectionError('sec-admin', 'Failed to load escalation: ' + res.error.message);
+    return;
+  }
+  clearSectionError('sec-admin');
+
+  var rows = res.data || [];
+  var html = '<table class="admin-data-table"><tbody>';
+  html += '<tr><th>Scope</th><th>Key</th><th>Metric</th><th>Y1 %</th><th>Y2 %</th><th>Y3 %</th><th>Y4 %</th><th>Y5 %</th><th>Notes</th><th>Actions</th></tr>';
+  rows.forEach(function(row) {
+    html += '<tr class="data-row">' +
+      '<td><span class="admin-badge">' + esc(row.scope) + '</span></td>' +
+      '<td>' + esc(row.scope_key || 'ALL') + '</td>' +
+      '<td><strong>' + esc(row.metric) + '</strong></td>' +
+      '<td style="text-align:right;">' + (row.year_1_pct != null ? row.year_1_pct : '—') + '</td>' +
+      '<td style="text-align:right;">' + (row.year_2_pct != null ? row.year_2_pct : '—') + '</td>' +
+      '<td style="text-align:right;">' + (row.year_3_pct != null ? row.year_3_pct : '—') + '</td>' +
+      '<td style="text-align:right;">' + (row.year_4_pct != null ? row.year_4_pct : '—') + '</td>' +
+      '<td style="text-align:right;">' + (row.year_5_pct != null ? row.year_5_pct : '—') + '</td>' +
+      '<td style="font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + esc(row.notes || '') + '">' + esc(row.notes || '—') + '</td>' +
+      '<td><button class="admin-btn-sm" onclick="showEscalationForm(\'' + row.id + '\')">Edit</button> <button class="admin-btn-sm admin-btn-danger" onclick="deleteEscalationRow(\'' + row.id + '\')">Delete</button></td></tr>';
+  });
+  html += '</tbody></table>';
+  document.getElementById('admin-table-container').innerHTML = html;
+}
+
+async function deleteEscalationRow(id) {
+  if (!confirm('Delete this escalation assumption?')) return;
+  await sb.from('pricing_assumptions').delete().eq('id', id);
+  await loadEscalationTable();
+}
+
+async function showEscalationForm(id) {
+  var row = null;
+  if (id && id !== 'null') {
+    var res = await sb.from('pricing_assumptions').select('*').eq('id', id).single();
+    if (res.data) row = res.data;
+  }
+  var scopes = ['global','equipment_category','labor_category','metric'];
+  var metrics = ['capex','maintenance','wage','benefits','other'];
+  var html = '<div style="padding:24px;max-width:480px;margin:0 auto;">' +
+    '<h3 style="margin-bottom:16px;">' + (row ? 'Edit' : 'New') + ' Escalation Assumption</h3>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">' +
+    '<label>Scope<br><select id="esc-scope" class="cm-input" style="width:100%;padding:8px;">' + scopes.map(s => '<option value="' + s + '"' + (row && row.scope === s ? ' selected' : '') + '>' + s + '</option>').join('') + '</select></label>' +
+    '<label>Scope Key<br><input id="esc-scope-key" class="cm-input" style="width:100%;padding:8px;" placeholder="e.g., MHE, hourly" value="' + esc((row && row.scope_key) || '') + '"/></label>' +
+    '<label>Metric<br><select id="esc-metric" class="cm-input" style="width:100%;padding:8px;">' + metrics.map(m => '<option value="' + m + '"' + (row && row.metric === m ? ' selected' : '') + '>' + m + '</option>').join('') + '</select></label>' +
+    '<label>Effective Date<br><input id="esc-date" type="date" class="cm-input" style="width:100%;padding:8px;" value="' + ((row && row.effective_date) || new Date().toISOString().split('T')[0]) + '"/></label>' +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:16px;">' +
+    ['1','2','3','4','5'].map(y => '<label style="text-align:center;">Y' + y + ' %<br><input id="esc-y' + y + '" type="number" step="0.1" class="cm-input" style="width:100%;padding:8px;text-align:center;" value="' + ((row && row['year_' + y + '_pct']) || '3') + '"/></label>').join('') +
+    '</div>' +
+    '<label>Notes<br><input id="esc-notes" class="cm-input" style="width:100%;padding:8px;" value="' + esc((row && row.notes) || '') + '"/></label>' +
+    '<div style="margin-top:16px;display:flex;gap:8px;">' +
+    '<button class="hub-btn" onclick="saveEscalationRow(' + (row ? "'" + row.id + "'" : 'null') + ')" style="padding:8px 20px;">Save</button>' +
+    '<button class="hub-btn" onclick="loadEscalationTable()" style="padding:8px 20px;background:var(--ies-gray-200);color:var(--ies-gray-700);">Cancel</button>' +
+    '</div></div>';
+  document.getElementById('admin-table-container').innerHTML = html;
+}
+
+async function saveEscalationRow(id) {
+  var obj = {
+    scope: document.getElementById('esc-scope').value,
+    scope_key: document.getElementById('esc-scope-key').value || null,
+    metric: document.getElementById('esc-metric').value,
+    year_1_pct: parseFloat(document.getElementById('esc-y1').value) || 0,
+    year_2_pct: parseFloat(document.getElementById('esc-y2').value) || 0,
+    year_3_pct: parseFloat(document.getElementById('esc-y3').value) || 0,
+    year_4_pct: parseFloat(document.getElementById('esc-y4').value) || 0,
+    year_5_pct: parseFloat(document.getElementById('esc-y5').value) || 0,
+    effective_date: document.getElementById('esc-date').value,
+    notes: document.getElementById('esc-notes').value || null,
+    updated_at: new Date().toISOString()
+  };
+  if (id) {
+    await sb.from('pricing_assumptions').update(obj).eq('id', id);
+  } else {
+    await sb.from('pricing_assumptions').insert(obj);
+  }
+  await loadEscalationTable();
+  // Also refresh cmApp's cached data
+  if (window.cmApp && cmApp.loadRefData) cmApp.loadRefData('pricing_assumptions', 'pricingAssumptions');
 }
 
