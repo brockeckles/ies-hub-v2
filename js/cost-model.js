@@ -417,6 +417,191 @@ async function cmApiDelete(table, id) {
 // Global variable to track active cost model project for scenario linking
 var activeCostModelProjectId = null;
 
+// ═══════════════════════════════════════════════════════════════════
+// cmCalc — Single source of truth for all Cost Model calculations.
+// Every rendering function, total, P&L projection, and pricing bucket
+// calls these instead of inlining the formula. Change it once here,
+// it's correct everywhere.
+// ═══════════════════════════════════════════════════════════════════
+const cmCalc = {
+
+    // ── Equipment ──────────────────────────────────────────────────
+    /** Total acquisition cost for an equipment line (unit_cost × qty) */
+    equipTotalAcq(line) {
+        return (line.unit_cost || 0) * (line.quantity || 1);
+    },
+
+    /** Annual cost for a single equipment line (lease OR purchase path) */
+    equipLineAnnual(line) {
+        var ownType = line.ownership_type || line.acquisition_type || 'lease';
+        var qty = line.quantity || 1;
+        if (ownType === 'purchase') {
+            var totalAcq = (line.unit_cost || 0) * qty;
+            var amortYrs = line.amort_years || 5;
+            var maintPct = line.maintenance_pct || 0.10;
+            return (totalAcq / amortYrs) + (totalAcq * maintPct);
+        }
+        return ((line.monthly_cost || 0) + (line.monthly_maintenance || 0)) * qty * 12;
+    },
+
+    /** Annual amortization only (purchase equipment) */
+    equipLineAmort(line) {
+        var ownType = line.ownership_type || line.acquisition_type || 'lease';
+        if (ownType !== 'purchase') return 0;
+        var totalAcq = (line.unit_cost || 0) * (line.quantity || 1);
+        return totalAcq / Math.max(1, line.amort_years || 5);
+    },
+
+    /** Equipment summary breakdown: { capital, amort, leaseMo, maintAnnual } */
+    equipLineSummary(line) {
+        var ownType = line.ownership_type || line.acquisition_type || 'lease';
+        var qty = line.quantity || 1;
+        if (ownType === 'purchase') {
+            var totalAcq = (line.unit_cost || 0) * qty;
+            var amYrs = line.amort_years || 5;
+            var mPct = line.maintenance_pct || 0.10;
+            return { capital: totalAcq, amort: totalAcq / amYrs, leaseMo: 0, maintAnnual: totalAcq * mPct };
+        }
+        return {
+            capital: 0, amort: 0,
+            leaseMo: (line.monthly_cost || 0) * qty,
+            maintAnnual: (line.monthly_maintenance || 0) * qty * 12
+        };
+    },
+
+    // ── Labor ──────────────────────────────────────────────────────
+    /**
+     * Fully loaded hourly rate: rate × (1 + burden%) + benefits.
+     * This is the "sticker price" before shift/OT/bonus adjustments.
+     */
+    fullyLoadedRate(line) {
+        var rate = line.hourly_rate || 0;
+        var burden = (line.burden_pct != null && line.burden_pct !== '') ? line.burden_pct / 100 : 0;
+        return rate * (1 + burden) + (line.benefits_per_hour || 0);
+    },
+
+    /**
+     * Direct labor line annual cost.
+     * opts: { shiftPrem, otPct, benefitLoadFallback }
+     *   shiftPrem — shift differential for this line (0 for 1st shift)
+     *   otPct     — overtime percentage (fraction, e.g. 0.05)
+     *   benefitLoadFallback — fallback burden if line.burden_pct is null
+     */
+    directLineAnnual(line, opts) {
+        opts = opts || {};
+        var hours = line.annual_hours || 0;
+        var rate = line.hourly_rate || 0;
+        var burden = (line.burden_pct != null && line.burden_pct !== '')
+            ? line.burden_pct / 100
+            : (opts.benefitLoadFallback || 0);
+        var shiftPrem = opts.shiftPrem || 0;
+        var otPct = opts.otPct || 0;
+        return hours * rate * (1 + shiftPrem) * (1 + burden) * (1 + otPct * 0.5);
+    },
+
+    /**
+     * Indirect labor line annual cost.
+     * opts: { operatingHours, bonusPct, benefitLoadFallback }
+     */
+    indirectLineAnnual(line, opts) {
+        opts = opts || {};
+        var opHours = opts.operatingHours || 0;
+        var rate = line.hourly_rate || 0;
+        var burden = (line.burden_pct != null && line.burden_pct !== '')
+            ? line.burden_pct / 100
+            : (opts.benefitLoadFallback || 0);
+        var bonusMult = 1 + (opts.bonusPct || 0);
+        return (line.headcount || 0) * opHours * rate * (1 + burden) * bonusMult;
+    },
+
+    /** Simple annual cost for inline display (no shift/OT/bonus — for real-time cell updates) */
+    directLineAnnualSimple(line) {
+        return (line.annual_hours || 0) * (line.hourly_rate || 0) * (1 + (line.burden_pct || 0) / 100);
+    },
+    indirectLineAnnualSimple(line, operatingHours) {
+        var hrs = (line.headcount || 0) * operatingHours;
+        line.annual_hours = hrs;
+        return hrs * (line.hourly_rate || 0) * (1 + (line.burden_pct || 0) / 100);
+    },
+
+    // ── FTE ────────────────────────────────────────────────────────
+    fte(line, operatingHours) {
+        return operatingHours > 0 ? (line.annual_hours || 0) / operatingHours : 0;
+    },
+
+    // ── Overhead ──────────────────────────────────────────────────
+    overheadLineAnnual(line) {
+        if (line.cost_type === 'monthly') return (line.monthly_cost || 0) * 12;
+        return line.annual_cost || ((line.monthly_cost || 0) * 12);
+    },
+
+    // ── VAS ───────────────────────────────────────────────────────
+    vasLineAnnual(line) {
+        return line.total_cost || ((line.rate || 0) * (line.volume || 0));
+    },
+
+    // ── Validation ────────────────────────────────────────────────
+    /**
+     * Runs sanity checks on a full projectData object.
+     * Returns array of { level: 'warn'|'error', area, message }
+     */
+    validateModel(pd, opts) {
+        opts = opts || {};
+        var issues = [];
+        var warn = function(area, msg) { issues.push({ level: 'warn', area: area, message: msg }); };
+        var err  = function(area, msg) { issues.push({ level: 'error', area: area, message: msg }); };
+
+        // Labor checks
+        (pd.laborLines || []).forEach(function(l, i) {
+            if (!l.hourly_rate || l.hourly_rate <= 0) warn('labor', 'Direct line ' + (i+1) + ' (' + (l.activity_name || 'unnamed') + ') has no hourly rate');
+            if (l.hourly_rate > 100) warn('labor', 'Direct line ' + (i+1) + ' rate $' + l.hourly_rate + '/hr seems high — verify');
+            if (l.burden_pct == null) warn('labor', 'Direct line ' + (i+1) + ' (' + (l.activity_name || 'unnamed') + ') has no burden %');
+            if ((l.annual_hours || 0) <= 0 && (l.volume || 0) > 0) warn('labor', 'Direct line ' + (i+1) + ' has volume but zero hours — check UPH');
+        });
+        (pd.indirectLaborLines || []).forEach(function(l, i) {
+            if (!l.hourly_rate || l.hourly_rate <= 0) warn('labor', 'Indirect line ' + (i+1) + ' (' + (l.role_name || 'unnamed') + ') has no hourly rate');
+            if (l.hourly_rate > 150) warn('labor', 'Indirect line ' + (i+1) + ' rate $' + l.hourly_rate + '/hr seems very high');
+            if (l.burden_pct == null) warn('labor', 'Indirect line ' + (i+1) + ' (' + (l.role_name || 'unnamed') + ') has no burden %');
+            if ((l.headcount || 0) <= 0) warn('labor', 'Indirect line ' + (i+1) + ' (' + (l.role_name || 'unnamed') + ') has zero headcount');
+        });
+
+        // Equipment checks
+        (pd.equipmentLines || []).forEach(function(l, i) {
+            var ownType = l.ownership_type || l.acquisition_type || 'lease';
+            if (ownType === 'purchase' && (!l.unit_cost || l.unit_cost <= 0)) warn('equipment', 'Line ' + (i+1) + ' (' + (l.equipment_name || 'unnamed') + ') is purchase with no unit cost');
+            if (ownType === 'lease' && (!l.monthly_cost || l.monthly_cost <= 0)) warn('equipment', 'Line ' + (i+1) + ' (' + (l.equipment_name || 'unnamed') + ') is lease with $0/mo');
+            var annual = cmCalc.equipLineAnnual(l);
+            if (annual > 500000) warn('equipment', 'Line ' + (i+1) + ' (' + (l.equipment_name || 'unnamed') + ') annual cost $' + Math.round(annual).toLocaleString() + ' — verify');
+            if ((l.quantity || 1) > 200) warn('equipment', 'Line ' + (i+1) + ' qty=' + l.quantity + ' seems unusually high');
+        });
+
+        // Overhead checks
+        (pd.overheadLines || []).forEach(function(l, i) {
+            var annual = cmCalc.overheadLineAnnual(l);
+            if (annual <= 0) warn('overhead', 'Line ' + (i+1) + ' (' + (l.category || 'unnamed') + ') has $0 annual cost');
+        });
+
+        // Cross-check totals
+        var totalLabor = 0;
+        (pd.laborLines || []).forEach(function(l) { totalLabor += cmCalc.directLineAnnualSimple(l); });
+        (pd.indirectLaborLines || []).forEach(function(l) {
+            var opHrs = opts.operatingHours || 2080;
+            totalLabor += cmCalc.indirectLineAnnualSimple(l, opHrs);
+        });
+        var totalEquip = 0;
+        (pd.equipmentLines || []).forEach(function(l) { totalEquip += cmCalc.equipLineAnnual(l); });
+        var totalOverhead = 0;
+        (pd.overheadLines || []).forEach(function(l) { totalOverhead += cmCalc.overheadLineAnnual(l); });
+
+        var grandTotal = totalLabor + totalEquip + totalOverhead;
+        if (grandTotal <= 0 && (pd.laborLines || []).length > 0) err('totals', 'Grand total is $0 despite having labor lines — something is broken');
+        if (totalLabor > 0 && totalEquip === 0 && (pd.equipmentLines || []).length > 0) warn('totals', 'Equipment cost is $0 despite having equipment lines — check unit costs');
+        if (totalEquip > totalLabor * 3 && totalLabor > 0) warn('totals', 'Equipment ($' + Math.round(totalEquip).toLocaleString() + ') is >3× labor ($' + Math.round(totalLabor).toLocaleString() + ') — unusual for 3PL');
+
+        return issues;
+    }
+};
+
 // Main application
 const cmApp = {
     currentProject: null,
@@ -2075,8 +2260,8 @@ const cmApp = {
             const hourlyRate = parseFloat(laborRate.hourly_rate) || 18;
             const burdenPct = parseFloat(laborRate.burden_pct) || 30;
             const benefitsPerHour = parseFloat(laborRate.benefits_per_hour) || 3;
-            const fullyLoadedRate = hourlyRate * (1 + burdenPct / 100) + benefitsPerHour;
-            const annualCost = annualHours * fullyLoadedRate;
+            const fullyLoadedRateVal = cmCalc.fullyLoadedRate({ hourly_rate: hourlyRate, burden_pct: burdenPct, benefits_per_hour: benefitsPerHour });
+            const annualCost = annualHours * fullyLoadedRateVal;
 
             newLaborLines.push({
                 activity_name: template.activity_name,
@@ -2296,24 +2481,20 @@ const cmApp = {
     updateLaborTotals() {
         const otPct = this.getOvertimePct();
         const benefitLoad = this.getBenefitLoadPct();
+        const opHours = this.getOperatingHours();
+        const bonusPct = this.getBonusPct();
+        const shift2Prem = (parseFloat(document.getElementById('shift2Premium').value) || 0) / 100;
+        const shift3Prem = (parseFloat(document.getElementById('shift3Premium').value) || 0) / 100;
         let directTotal = 0;
         let indirectTotal = 0;
 
         this.projectData.laborLines.forEach(line => {
-            const hours = line.annual_hours || 0;
-            const rate = line.hourly_rate || 0;
-            const burden = line.burden_pct != null ? (line.burden_pct / 100) : benefitLoad;
-            // OT premium: otPct of hours paid at 1.5x, rest at 1.0x
-            const effectiveRate = rate * (1 + burden) * (1 + otPct * 0.5);
-            directTotal += hours * effectiveRate;
+            var shiftPrem = line.shift_num === 3 ? shift3Prem : (line.shift_num === 2 ? shift2Prem : 0);
+            directTotal += cmCalc.directLineAnnual(line, { shiftPrem: shiftPrem, otPct: otPct, benefitLoadFallback: benefitLoad });
         });
 
         this.projectData.indirectLaborLines.forEach(line => {
-            const hours = this.getOperatingHours();
-            const rate = line.hourly_rate || 0;
-            const burden = line.burden_pct != null ? (line.burden_pct / 100) : benefitLoad;
-            const bonusMult = 1 + this.getBonusPct();
-            indirectTotal += (line.headcount || 0) * hours * rate * (1 + burden) * bonusMult;
+            indirectTotal += cmCalc.indirectLineAnnual(line, { operatingHours: opHours, bonusPct: bonusPct, benefitLoadFallback: benefitLoad });
         });
 
         const totalLaborCost = directTotal + indirectTotal;
@@ -2408,8 +2589,8 @@ const cmApp = {
             if (arr === 'laborLines') {
                 // Inline update computed cells instead of full re-render (prevents focus loss)
                 const operatingHours = this.getOperatingHours();
-                const fte = operatingHours > 0 ? (line.annual_hours || 0) / operatingHours : 0;
-                const annualCost = (line.annual_hours || 0) * (line.hourly_rate || 0) * (1 + (line.burden_pct || 0) / 100);
+                const fte = cmCalc.fte(line, operatingHours);
+                const annualCost = cmCalc.directLineAnnualSimple(line);
                 const volCell = document.getElementById('labor-vol-' + idx);
                 const auphCell = document.getElementById('labor-auph-' + idx);
                 const hrsCell = document.getElementById('labor-hrs-' + idx);
@@ -2424,9 +2605,7 @@ const cmApp = {
             }
             else if (arr === 'indirectLaborLines') {
                 // Inline update computed cell instead of full re-render
-                const hrs = (line.headcount || 0) * this.getOperatingHours();
-                line.annual_hours = hrs;
-                const annualCost = hrs * (line.hourly_rate || 0) * (1 + (line.burden_pct || 0) / 100);
+                const annualCost = cmCalc.indirectLineAnnualSimple(line, this.getOperatingHours());
                 const costCell = document.getElementById('indirect-cost-' + idx);
                 if (costCell) costCell.textContent = '$' + annualCost.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0});
                 this.updateLaborTotals();
@@ -2437,7 +2616,7 @@ const cmApp = {
             }
             else if (arr === 'overheadLines') {
                 // Inline update computed cell instead of full re-render
-                const annualCost = line.annual_cost || ((line.monthly_cost || 0) * 12);
+                const annualCost = cmCalc.overheadLineAnnual(line);
                 const costCell = document.getElementById('overhead-cost-' + idx);
                 if (costCell) costCell.textContent = '$' + annualCost.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
                 const totalAnnual = this.calculateOverheadCost();
@@ -2801,9 +2980,8 @@ const cmApp = {
             line.shift_num = shiftNum;
 
             var diffPct = shiftNum === 3 ? shift3Prem : (shiftNum === 2 ? shift2Prem : 0);
-            var adjRate = (line.hourly_rate || 0) * (1 + diffPct);
-            var annualCost = (line.annual_hours || 0) * adjRate * (1 + (line.burden_pct || 0) / 100);
-            const fte = operatingHours > 0 ? (line.annual_hours || 0) / operatingHours : 0;
+            var annualCost = cmCalc.directLineAnnual(line, { shiftPrem: diffPct });
+            const fte = cmCalc.fte(line, operatingHours);
             const uomLabel = line.uom ? '<span style="font-size:11px;color:var(--ies-gray-400);">/' + line.uom + '</span>' : '';
 
             // Volume source: auto-populate from named volume line if selected
@@ -2856,9 +3034,7 @@ const cmApp = {
         tbody.innerHTML = '';
 
         this.projectData.indirectLaborLines.forEach((line, idx) => {
-            const hrs = (line.headcount || 0) * this.getOperatingHours();
-            line.annual_hours = hrs;
-            const annualCost = hrs * (line.hourly_rate || 0) * (1 + (line.burden_pct || 0) / 100);
+            const annualCost = cmCalc.indirectLineAnnualSimple(line, this.getOperatingHours());
             const row = document.createElement('tr');
             row.innerHTML =
                 '<td>' + this._cmInp('text', line.role_name, idx, 'indirectLaborLines', 'role_name', {w:160, ph:'Role'}) + '</td>' +
@@ -2882,18 +3058,8 @@ const cmApp = {
                 var qty = line.quantity || 1;
                 line.unit_cost = qty > 1 ? line.acquisition_cost / qty : line.acquisition_cost;
             }
-            var unitCost = line.unit_cost || 0;
-            var qty = line.quantity || 1;
-            var totalAcqCost = unitCost * qty;
-            var annualCost;
-            if (ownType === 'purchase') {
-                var amortYrs = line.amort_years || 5;
-                var maintPct = line.maintenance_pct || 0.10;
-                annualCost = (totalAcqCost / amortYrs) + (totalAcqCost * maintPct);
-            } else {
-                var monthlyTotal = ((line.monthly_cost || 0) + (line.monthly_maintenance || 0)) * qty;
-                annualCost = monthlyTotal * 12;
-            }
+            var totalAcqCost = cmCalc.equipTotalAcq(line);
+            var annualCost = cmCalc.equipLineAnnual(line);
             // Keep acquisition_cost in sync for persistence
             line.acquisition_cost = totalAcqCost;
             const fmtAcq = '$' + totalAcqCost.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0});
@@ -2934,19 +3100,11 @@ const cmApp = {
         }
         var totalLease = 0, totalMaint = 0, totalCapital = 0, totalAmort = 0;
         lines.forEach(function(line) {
-            var ownType = line.ownership_type || line.acquisition_type || 'lease';
-            var qty = line.quantity || 1;
-            if (ownType === 'purchase') {
-                var totalAcq = (line.unit_cost || 0) * qty;
-                var amYrs = line.amort_years || 5;
-                var mPct = line.maintenance_pct || 0.10;
-                totalCapital += totalAcq;
-                totalAmort += totalAcq / amYrs;
-                totalMaint += totalAcq * mPct;
-            } else {
-                totalLease += (line.monthly_cost || 0) * qty;
-                totalMaint += (line.monthly_maintenance || 0) * qty * 12;
-            }
+            var s = cmCalc.equipLineSummary(line);
+            totalCapital += s.capital;
+            totalAmort += s.amort;
+            totalLease += s.leaseMo;
+            totalMaint += s.maintAnnual;
         });
         var fmt = function(v) { return '$' + v.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0}); };
         card.innerHTML =
@@ -2976,7 +3134,7 @@ const cmApp = {
         tbody.innerHTML = '';
 
         this.projectData.overheadLines.forEach((line, idx) => {
-            const annualCost = line.annual_cost || ((line.monthly_cost || 0) * 12);
+            const annualCost = cmCalc.overheadLineAnnual(line);
             const row = document.createElement('tr');
             row.innerHTML =
                 '<td>' + this._cmInp('text', line.category, idx, 'overheadLines', 'category', {w:110, ph:'Category'}) + '</td>' +
@@ -3504,6 +3662,10 @@ const cmApp = {
         if (vpEl) vpEl.textContent = fmtNum(varPerOrder, 2, '$');
         if (fpEl) fpEl.textContent = totalCost > 0 ? fmtNum(fixedAnnual / totalCost * 100, 0) + '%' : '0%';
         if (vPctEl) vPctEl.textContent = totalCost > 0 ? fmtNum(variableAnnual / totalCost * 100, 0) + '%' : '0%';
+
+        // Run model validation and display warnings
+        var validationIssues = cmCalc.validateModel(this.projectData, { operatingHours: this.getOperatingHours() });
+        this._renderValidationWarnings(validationIssues);
 
         // Generate decision support heuristics
         this.generateHeuristics({
@@ -4218,42 +4380,28 @@ const cmApp = {
 
         // Direct labor
         this.projectData.laborLines.forEach(l => {
-            const fullyLoaded = (l.hourly_rate || 0) * (1 + (l.burden_pct || 0) / 100) + (l.benefits_per_hour || 0);
-            addCost(l.pricing_bucket, (l.annual_hours || 0) * fullyLoaded);
+            addCost(l.pricing_bucket, (l.annual_hours || 0) * cmCalc.fullyLoadedRate(l));
         });
 
         // Indirect labor
         const opHours = this.getOperatingHours();
         this.projectData.indirectLaborLines.forEach(l => {
-            const fullyLoaded = (l.hourly_rate || 0) * (1 + (l.burden_pct || 0) / 100) + (l.benefits_per_hour || 0);
-            addCost(l.pricing_bucket, (l.headcount || 0) * opHours * fullyLoaded);
+            addCost(l.pricing_bucket, (l.headcount || 0) * opHours * cmCalc.fullyLoadedRate(l));
         });
 
         // Equipment
         this.projectData.equipmentLines.forEach(l => {
-            var ownType = l.ownership_type || l.acquisition_type || 'lease';
-            var qty = l.quantity || 1;
-            var annual;
-            if (ownType === 'purchase') {
-                var totalAcq = (l.unit_cost || 0) * qty;
-                var amYrs = l.amort_years || 5;
-                var mPct = l.maintenance_pct || 0.10;
-                annual = (totalAcq / amYrs) + (totalAcq * mPct);
-            } else {
-                annual = ((l.monthly_cost || 0) + (l.monthly_maintenance || 0)) * qty * 12;
-            }
-            addCost(l.pricing_bucket, annual);
+            addCost(l.pricing_bucket, cmCalc.equipLineAnnual(l));
         });
 
         // Overhead
         this.projectData.overheadLines.forEach(l => {
-            const annual = l.cost_type === 'monthly' ? (l.monthly_cost || 0) * 12 : (l.annual_cost || 0);
-            addCost(l.pricing_bucket, annual);
+            addCost(l.pricing_bucket, cmCalc.overheadLineAnnual(l));
         });
 
         // VAS
         this.projectData.vasLines.forEach(l => {
-            addCost(l.pricing_bucket, (l.rate || 0) * (l.volume || 0));
+            addCost(l.pricing_bucket, cmCalc.vasLineAnnual(l));
         });
 
         // Startup amortization
@@ -4345,6 +4493,29 @@ const cmApp = {
         } else {
             el.innerHTML = items.map(i => '<div style="padding:2px 0;">\u26a0\ufe0f ' + i + '</div>').join('');
         }
+    },
+
+    _renderValidationWarnings(issues) {
+        var el = document.getElementById('cmValidationWarnings');
+        if (!el) {
+            // Create warning container below summary if it doesn't exist
+            var summaryCard = document.getElementById('costSummarySection') || document.getElementById('summaryCard');
+            if (!summaryCard) return;
+            el = document.createElement('div');
+            el.id = 'cmValidationWarnings';
+            el.style.cssText = 'margin:8px 0;';
+            summaryCard.parentNode.insertBefore(el, summaryCard.nextSibling);
+        }
+        if (!issues || issues.length === 0) { el.innerHTML = ''; return; }
+        var html = '<div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:12px 16px;font-size:13px;">' +
+            '<div style="font-weight:700;color:#92400e;margin-bottom:6px;">Model Warnings (' + issues.length + ')</div>';
+        issues.forEach(function(iss) {
+            var icon = iss.level === 'error' ? '\u274c' : '\u26a0\ufe0f';
+            var color = iss.level === 'error' ? '#dc2626' : '#92400e';
+            html += '<div style="padding:2px 0;color:' + color + ';">' + icon + ' <b>' + iss.area + ':</b> ' + iss.message + '</div>';
+        });
+        html += '</div>';
+        el.innerHTML = html;
     },
 
     generateHeuristics(m) {
@@ -4460,23 +4631,16 @@ const cmApp = {
         const otPct = this.getOvertimePct();
         const benefitLoad = this.getBenefitLoadPct();
         const bonusPct = this.getBonusPct();
+        const opHours = this.getOperatingHours();
         var shift2Prem = (parseFloat(document.getElementById('shift2Premium').value) || 0) / 100;
         var shift3Prem = (parseFloat(document.getElementById('shift3Premium').value) || 0) / 100;
         let cost = 0;
         this.projectData.laborLines.forEach(line => {
-            const hours = line.annual_hours || 0;
-            const rate = line.hourly_rate || 0;
-            const burden = line.burden_pct != null ? (line.burden_pct / 100) : benefitLoad;
             var shiftPrem = line.shift_num === 3 ? shift3Prem : (line.shift_num === 2 ? shift2Prem : 0);
-            const effectiveRate = rate * (1 + shiftPrem) * (1 + burden) * (1 + otPct * 0.5);
-            cost += hours * effectiveRate;
+            cost += cmCalc.directLineAnnual(line, { shiftPrem: shiftPrem, otPct: otPct, benefitLoadFallback: benefitLoad });
         });
         this.projectData.indirectLaborLines.forEach(line => {
-            const hours = this.getOperatingHours();
-            const rate = line.hourly_rate || 0;
-            const burden = line.burden_pct != null ? (line.burden_pct / 100) : benefitLoad;
-            const bonusMult = 1 + bonusPct;
-            cost += (line.headcount || 0) * hours * rate * (1 + burden) * bonusMult;
+            cost += cmCalc.indirectLineAnnual(line, { operatingHours: opHours, bonusPct: bonusPct, benefitLoadFallback: benefitLoad });
         });
         return cost;
     },
@@ -4515,81 +4679,39 @@ const cmApp = {
 
     calculateEquipmentCost() {
         let cost = 0;
-        this.projectData.equipmentLines.forEach(line => {
-            var ownType = line.ownership_type || line.acquisition_type || 'lease';
-            var qty = line.quantity || 1;
-            if (ownType === 'purchase') {
-                var amortYrs = line.amort_years || 5;
-                var unitCost = line.unit_cost || 0;
-                var totalAcq = unitCost * qty;
-                var maintPct = line.maintenance_pct || 0.10;
-                cost += (totalAcq / amortYrs) + (totalAcq * maintPct);
-            } else {
-                var monthly = ((line.monthly_cost || 0) + (line.monthly_maintenance || 0)) * qty;
-                cost += monthly * 12;
-            }
-        });
+        this.projectData.equipmentLines.forEach(line => { cost += cmCalc.equipLineAnnual(line); });
         return cost;
     },
 
-    // Capital investment from PURCHASE equipment (unit_cost × quantity)
     calculateEquipmentCapitalInvestment() {
         let capital = 0;
-        this.projectData.equipmentLines.forEach(line => {
-            var ownType = line.ownership_type || line.acquisition_type || 'lease';
-            if (ownType === 'purchase') {
-                var qty = line.quantity || 1;
-                capital += (line.unit_cost || 0) * qty;
-            }
-        });
+        this.projectData.equipmentLines.forEach(line => { capital += cmCalc.equipTotalAcq(line); });
         return capital;
     },
 
-    // Annual amortization of PURCHASE equipment (unit_cost × qty / amort_years)
     calculateEquipmentAnnualAmortization() {
         let amortization = 0;
-        this.projectData.equipmentLines.forEach(line => {
-            var ownType = line.ownership_type || line.acquisition_type || 'lease';
-            if (ownType === 'purchase') {
-                var qty = line.quantity || 1;
-                var totalAcq = (line.unit_cost || 0) * qty;
-                var years = Math.max(1, line.amort_years || 5);
-                amortization += totalAcq / years;
-            }
-        });
+        this.projectData.equipmentLines.forEach(line => { amortization += cmCalc.equipLineAmort(line); });
         return amortization;
     },
 
     calculateOverheadCost() {
         let cost = 0;
-        this.projectData.overheadLines.forEach(line => {
-            if (line.cost_type === 'monthly') {
-                cost += (line.monthly_cost || 0) * 12;
-            } else {
-                cost += line.annual_cost || 0;
-            }
-        });
+        this.projectData.overheadLines.forEach(line => { cost += cmCalc.overheadLineAnnual(line); });
         return cost;
     },
 
     calculateVasCost() {
         let cost = 0;
-        this.projectData.vasLines.forEach(line => {
-            // Use computed total_cost if available (from renderVasTable breakdown), else fallback
-            cost += line.total_cost || ((line.rate || 0) * (line.volume || 0));
-        });
+        this.projectData.vasLines.forEach(line => { cost += cmCalc.vasLineAnnual(line); });
         return cost;
     },
 
     getTotalFtes() {
         let ftes = 0;
         const hours = this.getOperatingHours();
-        this.projectData.laborLines.forEach(line => {
-            if (hours > 0) ftes += (line.annual_hours || 0) / hours;
-        });
-        this.projectData.indirectLaborLines.forEach(line => {
-            ftes += line.headcount || 0;
-        });
+        this.projectData.laborLines.forEach(line => { ftes += cmCalc.fte(line, hours); });
+        this.projectData.indirectLaborLines.forEach(line => { ftes += line.headcount || 0; });
         return ftes;
     },
 
